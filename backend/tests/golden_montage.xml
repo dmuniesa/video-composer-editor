@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE xmeml>
+<xmeml version="5">
+  <sequence id="sequence-1">
+    <name>trip montage</name>
+    <duration>500</duration>
+    <rate>
+      <timebase>25</timebase>
+      <ntsc>FALSE</ntsc>
+    </rate>
+    <media>
+      <video>
+        <format>
+          <samplecharacteristics>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <width>1920</width>
+            <height>1080</height>
+            <anamorphic>FALSE</anamorphic>
+            <pixelaspectratio>square</pixelaspectratio>
+          </samplecharacteristics>
+        </format>
+        <track>
+          <clipitem id="clipitem-1">
+            <name>beach.mp4</name>
+            <enabled>TRUE</enabled>
+            <duration>300</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>100</end>
+            <in>50</in>
+            <out>150</out>
+            <file id="file-1">
+              <name>beach.mp4</name>
+              <pathurl>file://localhost/media/trip/beach.mp4</pathurl>
+              <rate>
+                <timebase>25</timebase>
+                <ntsc>FALSE</ntsc>
+              </rate>
+              <duration>300</duration>
+              <media>
+                <video>
+                  <samplecharacteristics>
+                    <width>1920</width>
+                    <height>1080</height>
+                  </samplecharacteristics>
+                </video>
+                <audio/>
+              </media>
+            </file>
+          </clipitem>
+          <clipitem id="clipitem-2">
+            <name>dinner with ñ.mov</name>
+            <enabled>TRUE</enabled>
+            <duration>900</duration>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>TRUE</ntsc>
+            </rate>
+            <start>100</start>
+            <end>238</end>
+            <in>300</in>
+            <out>438</out>
+            <file id="file-2">
+              <name>dinner with ñ.mov</name>
+              <pathurl>file://localhost/media/trip/dinner%20with%20%C3%B1.mov</pathurl>
+              <rate>
+                <timebase>30</timebase>
+                <ntsc>TRUE</ntsc>
+              </rate>
+              <duration>900</duration>
+              <media>
+                <video>
+                  <samplecharacteristics>
+                    <width>3840</width>
+                    <height>2160</height>
+                  </samplecharacteristics>
+                </video>
+                <audio/>
+              </media>
+            </file>
+          </clipitem>
+        </track>
+        <track>
+          <clipitem id="clipitem-3">
+            <name>beach.mp4</name>
+            <enabled>TRUE</enabled>
+            <duration>300</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>200</start>
+            <end>275</end>
+            <in>0</in>
+            <out>75</out>
+            <file id="file-1"/>
+          </clipitem>
+        </track>
+      </video>
+      <audio>
+        <track>
+          <clipitem id="audioclip-1">
+            <name>song.mp3</name>
+            <enabled>TRUE</enabled>
+            <duration>500</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>500</end>
+            <in>0</in>
+            <out>500</out>
+            <file id="file-song">
+              <name>song.mp3</name>
+              <pathurl>file://localhost/media/trip/song.mp3</pathurl>
+              <rate>
+                <timebase>25</timebase>
+                <ntsc>FALSE</ntsc>
+              </rate>
+              <duration>500</duration>
+              <media>
+                <audio>
+                  <samplecharacteristics>
+                    <samplerate>48000</samplerate>
+                    <depth>16</depth>
+                  </samplecharacteristics>
+                  <channelcount>2</channelcount>
+                </audio>
+              </media>
+            </file>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+            </sourcetrack>
+          </clipitem>
+        </track>
+        <track>
+          <clipitem id="audioclip-2">
+            <name>song.mp3</name>
+            <enabled>TRUE</enabled>
+            <duration>500</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>500</end>
+            <in>0</in>
+            <out>500</out>
+            <file id="file-song"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>2</trackindex>
+            </sourcetrack>
+          </clipitem>
+        </track>
+      </audio>
+    </media>
+  </sequence>
+</xmeml>

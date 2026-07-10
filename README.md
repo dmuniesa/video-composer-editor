@@ -1,0 +1,98 @@
+# 🎬 Video Montage Composer
+
+Turn a folder of vacation videos + a song into an **Adobe Premiere Pro** project.
+
+A locally-run web app that:
+
+1. **Scans** a folder of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
+2. **Analyzes every clip with Gemini** through Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`): description, 1–10 score, and hashtags.
+3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
+4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …).
+5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
+6. **Exports FCP7 XML (`xmeml` v5)** that Premiere Pro imports directly as a sequence linked to your original files, ready for final editing and color grading.
+
+## Requirements
+
+- Python 3.10+, Node 20+, **ffmpeg/ffprobe** on PATH
+- [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`) — optional but recommended.
+  Install it and run `agy` once to sign in with your Google account.
+  Without it, everything still works except AI descriptions/scores/hashtags and AI section labels.
+
+## Setup
+
+```bash
+# backend
+cd backend
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+
+# frontend
+cd ../frontend
+npm install && npm run build
+```
+
+## Run
+
+```bash
+cd backend
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8765
+```
+
+Open <http://127.0.0.1:8765> — the built frontend is served by the backend.
+
+For frontend development, run `npm run dev` in `frontend/` (Vite on :5173 proxies to :8765).
+
+If the `agy` binary lives somewhere unusual or its flags change, override the
+command template: `AGY_CMD="/path/to/agy --headless -p" uvicorn ...`
+
+## Workflow
+
+| Page | What you do |
+|---|---|
+| **Setup** | Browse to your video folder → the app scans it and queues frame extraction + AI analysis. Pick the song here too. |
+| **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. |
+| **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. |
+| **Montage** | Drag clips (or their ranges) from the bin onto the tracks. Drag to move, edge-drag to trim, snapping to beats/sections (**S** toggles). **Space** previews audio + a jump-cut video preview. **Del** removes the selected clip. |
+| **Export** | "Export to Premiere" downloads `montage.xml`. In Premiere: **File → Import**, and the sequence appears with your clips and the song, linked to the original files. Relink if your media moved. |
+
+All derived media and the project database live in `<your video folder>/.montage-cache/` — delete that folder to reset a project.
+
+## Let Claude build the montage (MCP)
+
+The app ships an MCP server that exposes the project to Claude:
+
+```bash
+claude mcp add montage -- /abs/path/backend/.venv/bin/python /abs/path/backend/mcp_server.py --project /path/to/video/folder
+```
+
+Tools: `get_project_summary`, `list_videos`, `get_music_sections`, `get_beats`,
+`get_timeline`, `place_clip`, `move_clip`, `remove_clip`, `clear_track`.
+Track numbers are 0-based indexes; rejected videos are never listed.
+
+Then ask Claude, for example:
+
+> Build a montage: put my 4–5 star clips on the choruses and high-energy
+> sections, calmer clips on the verses, prefer each video's hand-picked
+> ranges, cut on the beat, and don't repeat a clip.
+
+Keep the web app open: clips placed by Claude appear on the timeline live (purple).
+
+## Tests
+
+```bash
+cd backend && .venv/bin/python -m pytest tests/
+```
+
+The suite generates fixture media with ffmpeg and fakes the Antigravity CLI
+(`tests/fake_agy.sh`), so it runs without a Google account. Includes a
+golden-file test for the Premiere XML.
+
+## Notes & limitations
+
+- Antigravity CLI does not officially support audio input, so music analysis is
+  local (librosa) and Gemini only labels the sections from the extracted data.
+- The timeline preview is best-effort (jump cuts, not frame-accurate rendering) —
+  the real render happens in Premiere.
+- HEVC/10-bit clips get a 720p H.264 proxy for browser playback; the exported
+  XML always references the **original** files.
+
+See [docs/PLAN.md](docs/PLAN.md) for the full design document.
