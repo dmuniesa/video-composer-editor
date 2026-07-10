@@ -11,24 +11,98 @@ A locally-run web app that:
 5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
 6. **Exports FCP7 XML (`xmeml` v5)** that Premiere Pro imports directly as a sequence linked to your original files, ready for final editing and color grading.
 
-## Requirements
+## Preparing the environment
 
-- Python 3.10+, Node 20+, **ffmpeg/ffprobe** on PATH
-- [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`) — optional but recommended.
-  Install it and run `agy` once to sign in with your Google account.
-  Without it, everything still works except AI descriptions/scores/hashtags and AI section labels.
+Everything runs on **your own machine** (the app needs direct access to your video
+files, ffmpeg and the `agy` CLI). You need:
 
-## Setup
+| Tool | Version | Used for |
+|---|---|---|
+| Python | 3.10+ | backend, librosa music analysis, MCP server |
+| Node.js | 20+ | building the React frontend |
+| ffmpeg + ffprobe | any recent | frames, thumbnails, proxies, metadata |
+| Antigravity CLI (`agy`) | latest | Gemini analysis (optional but recommended) |
+| Claude Code / Claude Desktop | latest | only if you want AI auto-placement via MCP (optional) |
+
+### 1. Base tools
+
+**macOS** (with [Homebrew](https://brew.sh)):
 
 ```bash
-# backend
-cd backend
-python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-
-# frontend
-cd ../frontend
-npm install && npm run build
+brew install python@3.12 node ffmpeg git
 ```
+
+**Windows** (PowerShell, with winget):
+
+```powershell
+winget install Python.Python.3.12 OpenJS.NodeJS.LTS Gyan.FFmpeg Git.Git
+```
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip nodejs npm ffmpeg git
+```
+
+Verify: `python3 --version`, `node --version`, `ffmpeg -version` all work in a new terminal.
+
+### 2. Antigravity CLI (Gemini)
+
+Optional: without it everything works except AI descriptions/scores/hashtags and
+AI section labels. Official installers (see [antigravity.google/docs/cli-install](https://antigravity.google/docs/cli-install)):
+
+```bash
+# macOS / Linux
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://antigravity.google/cli/install.ps1 | iex
+```
+
+Then, in a **new terminal**:
+
+```bash
+agy          # first run opens the browser to sign in with your Google account
+```
+
+Sign in once; after that the app can call `agy` headlessly on its own. Check it
+works with a quick `agy --headless -p "say hi"`.
+
+Notes:
+
+- `agy` must be reachable from the shell that launches the backend. If it lives
+  somewhere unusual or its flags change, override the command template:
+  `AGY_CMD="/path/to/agy --headless -p"`.
+- The AI analysis sends a few JPEG frames per video to Google. Skip installing
+  `agy` if you don't want that.
+
+### 3. This app
+
+```bash
+git clone https://github.com/dmuniesa/video-composer-editor.git
+cd video-composer-editor
+
+# backend (Python virtualenv)
+cd backend
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"     # Windows: .venv\Scripts\pip install -e ".[dev]"
+
+# frontend (build once, served by the backend)
+cd ../frontend
+npm install
+npm run build
+```
+
+The first `pip install` takes a few minutes (librosa pulls in numba/llvmlite).
+
+### 4. (Optional) Claude for auto-placement
+
+Install [Claude Code](https://claude.com/claude-code) (`npm install -g @anthropic-ai/claude-code`)
+or Claude Desktop, then register the MCP server as described in
+[Let Claude build the montage](#let-claude-build-the-montage-mcp) below.
 
 ## Run
 
