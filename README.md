@@ -98,6 +98,25 @@ npm run build
 
 The first `pip install` takes a few minutes (librosa pulls in numba/llvmlite).
 
+### Alternative: conda
+
+If you use [conda/miniconda](https://docs.conda.io), one environment covers
+step 1 (Python, Node **and** ffmpeg come from conda-forge) and the backend
+install — you only need conda + git preinstalled:
+
+```bash
+git clone https://github.com/dmuniesa/video-composer-editor.git
+cd video-composer-editor
+conda env create -f environment.yml
+conda activate video-montage
+
+cd frontend && npm install && npm run build && cd ..
+```
+
+With the environment active, run the server with plain `uvicorn` (no `.venv/bin/`
+prefix), and register the MCP server with `python backend/mcp_server.py ...`.
+The Antigravity CLI (step 2) is installed the same way in both setups.
+
 ### 4. (Optional) Claude for auto-placement
 
 Install [Claude Code](https://claude.com/claude-code) (`npm install -g @anthropic-ai/claude-code`)

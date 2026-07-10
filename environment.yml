@@ -1,0 +1,14 @@
+# Conda environment with everything the app needs: Python, Node.js, ffmpeg
+# and the backend package (librosa, FastAPI, MCP...).
+#   conda env create -f environment.yml
+#   conda activate video-montage
+name: video-montage
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - nodejs>=20
+  - ffmpeg
+  - pip
+  - pip:
+      - -e ./backend[dev]
