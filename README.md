@@ -139,6 +139,8 @@ command template: `AGY_CMD="/path/to/agy --headless -p" uvicorn ...`
 
 ## Workflow
 
+📖 **Full user manual with screenshots: [docs/MANUAL.md](docs/MANUAL.md)**
+
 | Page | What you do |
 |---|---|
 | **Setup** | Browse to your video folder → the app scans it and queues frame extraction + AI analysis. Pick the song here too. |
