@@ -53,10 +53,12 @@ Without one, everything works except AI descriptions/scores/hashtags and AI
 section labels. Two options, selectable on the in-app **Settings** page:
 
 **Option A — OpenAI-compatible endpoint (e.g. z.ai GLM).** Nothing to install:
-open **Settings** in the app and fill in the base URL, a vision-capable model
-and your API key. For z.ai GLM: base URL `https://api.z.ai/api/paas/v4`, model
-`glm-4.6v-flash`, API key from your z.ai account. Local endpoints (Ollama,
-LM Studio) work too. Use **Save & test AI** to validate.
+open **Settings** in the app and fill in the base URL, an image-capable model
+and your API key. For z.ai GLM: API plan → base URL `https://api.z.ai/api/paas/v4`
+(model `glm-4.6v-flash`); **Coding Plan** → base URL
+`https://api.z.ai/api/coding/paas/v4` (model `glm-4.7` / `glm-4.6v`, images
+supported). Local endpoints (Ollama, LM Studio) work too. Use **Save & test AI**
+to validate.
 
 **Option B — Antigravity CLI (Gemini).** Official installers (see
 [antigravity.google/docs/cli-install](https://antigravity.google/docs/cli-install)):

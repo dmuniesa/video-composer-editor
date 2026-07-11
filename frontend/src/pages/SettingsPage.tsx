@@ -102,7 +102,7 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <input
             value={a.openai_base_url}
             onChange={(e) => setAI({ openai_base_url: e.target.value })}
-            placeholder="https://api.z.ai/api/paas/v4"
+            placeholder="https://api.z.ai/api/coding/paas/v4"
           />
 
           <label>API key</label>
@@ -135,11 +135,14 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <span className="hint">{testResult}</span>
         </div>
         <p className="hint" style={{ marginTop: 10 }}>
-          For <b>z.ai GLM</b>: base URL <code>https://api.z.ai/api/paas/v4</code>, a vision model
-          such as <code>glm-4.6v-flash</code>, and your API key from z.ai. Any endpoint speaking
-          the OpenAI <code>/chat/completions</code> protocol with image input works (OpenAI,
-          OpenRouter, Ollama, LM Studio…). Frames are sent to that provider — use a local endpoint
-          if you prefer to keep them on your machine.
+          For <b>z.ai GLM</b>, the base URL depends on your plan: API plan →{' '}
+          <code>https://api.z.ai/api/paas/v4</code> (e.g. model <code>glm-4.6v-flash</code>);{' '}
+          <b>Coding Plan</b> → <code>https://api.z.ai/api/coding/paas/v4</code> (e.g. model{' '}
+          <code>glm-4.7</code> or <code>glm-4.6v</code> — these accept images too). A Coding Plan
+          key only works on the coding endpoint. Any endpoint speaking the OpenAI{' '}
+          <code>/chat/completions</code> protocol with image input works (OpenAI, OpenRouter,
+          Ollama, LM Studio…). Frames are sent to that provider — use a local endpoint if you
+          prefer to keep them on your machine.
         </p>
       </div>
 

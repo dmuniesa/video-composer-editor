@@ -205,11 +205,16 @@ Choose who analyzes your video frames and labels the song sections:
 - **Antigravity CLI (Gemini)** — the `agy` command; the command template is
   editable in case the CLI lives elsewhere or its flags change.
 - **OpenAI-compatible endpoint** — any service speaking the OpenAI
-  `/chat/completions` protocol with image input. For **z.ai GLM**: base URL
-  `https://api.z.ai/api/paas/v4`, a vision-capable model such as
-  `glm-4.6v-flash`, and your z.ai API key. Also works with OpenAI, OpenRouter,
-  or a fully local Ollama / LM Studio (leave the API key empty if the endpoint
-  doesn't need one).
+  `/chat/completions` protocol with image input. For **z.ai GLM** the base URL
+  depends on your plan:
+  - **API plan**: `https://api.z.ai/api/paas/v4` with a vision model such as
+    `glm-4.6v-flash`;
+  - **Coding Plan**: `https://api.z.ai/api/coding/paas/v4` with e.g. `glm-4.7`
+    or `glm-4.6v` (the coding models accept images too). Note a Coding Plan
+    key is only valid on the coding endpoint, not the general one.
+
+  Also works with OpenAI, OpenRouter, or a fully local Ollama / LM Studio
+  (leave the API key empty if the endpoint doesn't need one).
 - **Disabled** — no AI; rating and manual tagging still work.
 
 **Save & test AI** sends a tiny prompt through the selected provider and shows
