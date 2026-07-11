@@ -8,6 +8,7 @@ import ReviewPage from './pages/ReviewPage'
 import MusicPage from './pages/MusicPage'
 import MontagePage from './pages/MontagePage'
 import SettingsPage from './pages/SettingsPage'
+import LogsPage from './pages/LogsPage'
 
 function ProjectShell() {
   const { pid = '' } = useParams()
@@ -43,6 +44,7 @@ function ProjectShell() {
         <NavLink to={`/p/${pid}/review`}>Review</NavLink>
         <NavLink to={`/p/${pid}/music`}>Music</NavLink>
         <NavLink to={`/p/${pid}/montage`}>Montage</NavLink>
+        <NavLink to={`/p/${pid}/logs`}>Logs</NavLink>
         <NavLink to={`/p/${pid}/settings`}>Settings</NavLink>
         <span className="spacer" />
         <span className="hint">{project?.name ?? ''}</span>
@@ -53,6 +55,7 @@ function ProjectShell() {
           <Route path="review" element={<ReviewPage pid={pid} />} />
           <Route path="music" element={<MusicPage pid={pid} />} />
           <Route path="montage" element={<MontagePage pid={pid} />} />
+          <Route path="logs" element={<LogsPage pid={pid} />} />
           <Route path="settings" element={<SettingsPage pid={pid} />} />
           <Route path="*" element={<Navigate to="setup" replace />} />
         </Routes>

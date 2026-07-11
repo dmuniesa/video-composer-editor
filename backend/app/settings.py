@@ -46,7 +46,7 @@ class AISettings(BaseModel):
     """
 
     provider: str = Field("auto", pattern="^(auto|agy|openai|off)$")
-    agy_cmd: str = "agy --headless -p"
+    agy_cmd: str = "agy -p"
     openai_base_url: str = ""  # e.g. https://api.z.ai/api/paas/v4
     openai_api_key: str = ""
     openai_model: str = ""  # e.g. glm-4.6v-flash
@@ -56,6 +56,9 @@ class AISettings(BaseModel):
 class Settings(BaseModel):
     frames: FrameSettings = Field(default_factory=FrameSettings)
     ai: AISettings = Field(default_factory=AISettings)
+    # Verbose backend logging: captures full AI prompts and raw model responses
+    # in the Logs tab. Env var MONTAGE_LOG_LEVEL, when set, overrides this.
+    debug_logging: bool = False
 
 
 _lock = threading.Lock()

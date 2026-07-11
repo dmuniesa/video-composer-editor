@@ -7,11 +7,14 @@ and normalization of the results."""
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 
 from .. import settings
 from . import gemini, openai_client
+
+log = logging.getLogger(__name__)
 
 
 class AIError(RuntimeError):
@@ -131,14 +134,21 @@ def analyze_video_frames(frame_paths: list[Path], workdir: Path) -> dict:
     Retries once on unparseable output."""
     active = provider()
     if active == "agy":
-        refs = " ".join(f"@{p.relative_to(workdir)}" for p in frame_paths)
+        # Absolute paths are required: agy ignores the process cwd and runs in
+        # a global shared scratch dir (~/.gemini/antigravity-cli/scratch), so
+        # relative @frame_00.jpg refs resolve to whatever stale frames a
+        # previous analysis left there, mixing descriptions between videos.
+        refs = " ".join(f"@{p.resolve()}" for p in frame_paths)
         intro = f"These images are frames sampled evenly from ONE video clip, in order: {refs}"
     else:
         intro = "The attached images are frames sampled evenly from ONE video clip, in order."
     prompt = VIDEO_PROMPT.format(frames_intro=intro)
 
+    log.info(
+        "analyze video: provider=%s, %d frame(s) in %s", active, len(frame_paths), workdir
+    )
     last_error: Exception | None = None
-    for _ in range(2):
+    for attempt in range(1, 3):
         raw = _ask(prompt, frame_paths, workdir)
         try:
             data = json.loads(_extract_json(raw))
@@ -155,6 +165,12 @@ def analyze_video_frames(frame_paths: list[Path], workdir: Path) -> dict:
             }
         except (ValueError, TypeError, AIError) as exc:
             last_error = exc
+            log.warning(
+                "attempt %d/2: could not parse AI response (%s)\n--- raw ---\n%s",
+                attempt,
+                exc,
+                raw.strip()[:1000],
+            )
     raise AIError(f"could not parse AI response: {last_error}")
 
 

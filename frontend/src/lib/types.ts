@@ -28,6 +28,7 @@ export interface AppSettings {
     openai_model: string
     timeout_s: number
   }
+  debug_logging: boolean
   ai_status?: { available: boolean; provider: string | null }
 }
 
@@ -114,4 +115,12 @@ export interface FsListing {
   dirs: string[]
   videos: string[]
   audios: string[]
+}
+
+export interface LogRecord {
+  seq: number
+  time: number
+  level: string
+  logger: string
+  message: string
 }

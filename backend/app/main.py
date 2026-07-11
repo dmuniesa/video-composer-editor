@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,6 +12,28 @@ from fastapi.staticfiles import StaticFiles
 
 from .api import export, media, music, projects, settings_api, timeline, videos
 from .events import broadcaster
+from .logbuffer import BufferHandler, apply_level
+
+
+def _configure_logging() -> None:
+    """Route the app's own logs to the console and the in-app Logs tab.
+
+    Level comes from Settings (the "Verbose logging" toggle) or the
+    MONTAGE_LOG_LEVEL env var when set; DEBUG additionally captures the full
+    AI prompts and raw model responses (handy for debugging AI analysis)."""
+    logger = logging.getLogger("app")
+    if not any(isinstance(h, BufferHandler) for h in logger.handlers):
+        console = logging.StreamHandler()
+        console.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S")
+        )
+        logger.addHandler(console)
+        logger.addHandler(BufferHandler())  # feeds /api/logs + the Logs tab
+    logger.propagate = False  # don't double-log through the root logger
+    apply_level()
+
+
+_configure_logging()
 
 app = FastAPI(title="Video Montage Composer")
 

@@ -39,6 +39,24 @@ class Broadcaster:
             except asyncio.QueueFull:
                 pass
 
+    def publish_all(self, event: str, data: dict[str, Any] | None = None) -> None:
+        """Thread-safe fan-out to every subscriber, regardless of project.
+
+        Used for global events (e.g. log lines) that aren't tied to one
+        project's state."""
+        payload = {"event": event, "data": data or {}}
+        if self._loop is None:
+            return
+        self._loop.call_soon_threadsafe(self._publish_all_now, payload)
+
+    def _publish_all_now(self, payload: dict) -> None:
+        for subscribers in list(self._subscribers.values()):
+            for q in list(subscribers):
+                try:
+                    q.put_nowait(payload)
+                except asyncio.QueueFull:
+                    pass
+
 
 broadcaster = Broadcaster()
 

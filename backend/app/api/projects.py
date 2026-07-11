@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 
 from .. import db as dbm
+from .. import logbuffer
 from ..events import broadcaster, sse_format
 from ..models import Project, Song, Video
 from ..services import ai, jobs, pipeline
@@ -152,6 +153,19 @@ def project_set_song(pid: str, body: SongRequest) -> dict:
 def project_jobs(pid: str, active: bool = False) -> list[dict]:
     resolve_project(pid)
     return jobs.list_jobs(pid, active_only=active)
+
+
+@router.get("/logs")
+def logs_list() -> dict:
+    """Recent backend log records (AI calls, prompts, errors). Global, not
+    per-project. New records also stream live over the SSE 'log' event."""
+    return {"records": logbuffer.records()}
+
+
+@router.post("/logs/clear")
+def logs_clear() -> dict:
+    logbuffer.clear()
+    return {"ok": True}
 
 
 class NotifyRequest(BaseModel):

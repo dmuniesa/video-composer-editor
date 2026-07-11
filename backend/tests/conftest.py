@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -27,9 +27,13 @@ def _isolated_registry(tmp_path, monkeypatch):
 
 @pytest.fixture
 def fake_agy(monkeypatch):
-    script = TESTS_DIR / "fake_agy.sh"
-    os.chmod(script, 0o755)
-    monkeypatch.setenv("AGY_CMD", f"bash {script} --headless -p")
+    script = TESTS_DIR / "fake_agy.py"
+    # Python instead of bash so the fake runs on Windows too, and forward
+    # slashes because agy_command() parses AGY_CMD with shlex.split (POSIX
+    # mode), which eats backslashes.
+    monkeypatch.setenv(
+        "AGY_CMD", f"{Path(sys.executable).as_posix()} {script.as_posix()} -p"
+    )
     yield script
 
 

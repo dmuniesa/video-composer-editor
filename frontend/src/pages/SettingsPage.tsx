@@ -62,6 +62,26 @@ export default function SettingsPage({ pid }: { pid?: string }) {
     }
   }
 
+  const clearAnalysis = async () => {
+    if (!pid) return
+    if (
+      !window.confirm(
+        'Delete the AI description, score and hashtags from EVERY video in this project?\n\nThis cannot be undone — the data is wiped and the clips go back to "extracted" (re-run analysis from the Library when you’re ready).',
+      )
+    )
+      return
+    setBusy(true)
+    setStatus('')
+    try {
+      const r = await api.clearAnalysis(pid)
+      setStatus(`✓ Cleared AI analysis from ${r.cleared} video(s)`)
+    } catch (e) {
+      setStatus(String((e as Error).message))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const num = (v: string, fallback: number) => {
     const n = Number(v)
     return Number.isFinite(n) ? n : fallback
@@ -95,7 +115,7 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <input
             value={a.agy_cmd}
             onChange={(e) => setAI({ agy_cmd: e.target.value })}
-            placeholder="agy --headless -p"
+            placeholder="agy -p"
           />
 
           <label>OpenAI base URL</label>
@@ -144,6 +164,24 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           Ollama, LM Studio…). Frames are sent to that provider — use a local endpoint if you
           prefer to keep them on your machine.
         </p>
+        {pid && (
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: '1px solid var(--border)',
+            }}
+          >
+            <button onClick={clearAnalysis} disabled={busy}>
+              Clear AI analysis for this project
+            </button>
+            <p className="hint" style={{ marginTop: 8 }}>
+              Wipes the description, score and hashtags the AI produced for every clip — when they
+              came out wrong or mixed up. Extracted frames are kept; clips go back to "extracted" so
+              you can re-run analysis from the Library when you’re ready. Does not re-run the AI.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="panel">
@@ -190,6 +228,29 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             Re-extract frames for this project
           </button>
         )}
+      </div>
+
+      <div className="panel">
+        <h2>Logging</h2>
+        <p className="hint">
+          Controls how much the backend records in the <b>Logs</b> tab.
+        </p>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.debug_logging}
+            onChange={(e) => set({ debug_logging: e.target.checked })}
+          />
+          <span>
+            <b>Verbose (debug) logging</b>
+            <br />
+            <span className="hint">
+              Also captures the full AI prompts and raw model responses — useful to debug why a
+              clip's analysis failed. Applies as soon as you save (no restart needed). The{' '}
+              <code>MONTAGE_LOG_LEVEL</code> env var, if set, overrides this.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>

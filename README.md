@@ -79,14 +79,14 @@ Then, in a **new terminal**:
 agy          # first run opens the browser to sign in with your Google account
 ```
 
-Sign in once; after that the app can call `agy` headlessly on its own. Check it
-works with a quick `agy --headless -p "say hi"`.
+Sign in once; after that the app can call `agy` non-interactively on its own.
+Check it works with a quick `agy -p "say hi"`.
 
 Notes:
 
 - `agy` must be reachable from the shell that launches the backend. If it lives
   somewhere unusual or its flags change, override the command template:
-  `AGY_CMD="/path/to/agy --headless -p"`.
+  `AGY_CMD="/path/to/agy -p"`.
 - The AI analysis sends a few JPEG frames per video to Google. Skip installing
   `agy` if you don't want that.
 
@@ -146,7 +146,7 @@ Open <http://127.0.0.1:8765> — the built frontend is served by the backend.
 For frontend development, run `npm run dev` in `frontend/` (Vite on :5173 proxies to :8765).
 
 If the `agy` binary lives somewhere unusual or its flags change, override the
-command template: `AGY_CMD="/path/to/agy --headless -p" uvicorn ...`
+command template: `AGY_CMD="/path/to/agy -p" uvicorn ...`
 
 ## Workflow
 
@@ -189,7 +189,7 @@ cd backend && .venv/bin/python -m pytest tests/
 ```
 
 The suite generates fixture media with ffmpeg and fakes the Antigravity CLI
-(`tests/fake_agy.sh`), so it runs without a Google account. Includes a
+(`tests/fake_agy.py`), so it runs without a Google account. Includes a
 golden-file test for the Premiere XML.
 
 ## Notes & limitations

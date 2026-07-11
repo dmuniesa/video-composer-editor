@@ -141,6 +141,49 @@ def test_full_flow(client, project):
     assert root.find("sequence/media/audio/track/clipitem") is not None
 
 
+def test_clear_analysis(client, project):
+    """Settings 'Clear AI analysis' wipes description/score/hashtags from every
+    video and leaves the clips re-analyzable, without re-running the AI itself."""
+    pid, _videos_dir = project
+
+    client.post(f"/api/projects/{pid}/scan")
+    wait_until(
+        lambda: all(
+            v["status"] in ("extracted", "ready", "error")
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+    client.post(f"/api/projects/{pid}/analyze", json={})
+    wait_until(
+        lambda: all(
+            v["status"] == "ready"
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+    before = client.get(f"/api/projects/{pid}/videos").json()
+    assert len(before) == 2
+    assert all(v["description"] and v["ai_score"] is not None and v["hashtags"] for v in before)
+
+    r = client.post(f"/api/projects/{pid}/clear_analysis").json()
+    assert r["cleared"] == 2
+    assert "requeued" not in r  # clear does not re-run the AI
+
+    after = client.get(f"/api/projects/{pid}/videos").json()
+    assert all(v["description"] == "" and v["ai_score"] is None and v["hashtags"] == [] for v in after)
+    assert all(v["status"] == "extracted" for v in after)
+
+    # clips are still re-analyzable manually from the Library
+    client.post(f"/api/projects/{pid}/analyze", json={})
+    wait_until(
+        lambda: all(
+            v["status"] == "ready"
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+    redone = client.get(f"/api/projects/{pid}/videos").json()
+    assert all(v["description"] and v["ai_score"] is not None for v in redone)
+
+
 def test_fs_browser(client, tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "a.mp4").touch()

@@ -78,8 +78,8 @@ Runtime model: one FastAPI process serves the API, the media, and (in prod mode)
 - `jobs.py`: asyncio queue with bounded concurrency (ffmpeg jobs ~2, agy jobs ~2), progress reported over SSE.
 
 ### Phase 2 — Gemini analysis via Antigravity CLI
-- `gemini.py` invokes `agy` headless per video:
-  `agy --headless -p "<prompt> @frame1.jpg @frame2.jpg …"` (command template configurable via env `AGY_CMD` since flags may evolve; docs: `-p/--prompt` triggers non-interactive mode, `@file` pulls files into context, images are officially supported).
+- `gemini.py` invokes `agy` non-interactively per video:
+  `agy -p "<prompt> @frame1.jpg @frame2.jpg …"` (command template configurable via env `AGY_CMD` since flags may evolve; docs: `-p/--prompt` triggers non-interactive mode, `@file` pulls files into context, images are officially supported).
 - Prompt asks for **strict JSON**: `{"description": "...", "score": 1-10, "hashtags": ["beach","sunset","people"], "highlights": [{"frame": 2, "reason": "..."}]}`. Parse defensively (extract first JSON object from output); on failure retry once, then mark video `error` (user can re-run or edit manually).
 - Store in `video_analysis`; hashtags are also editable in the UI.
 - Graceful degradation: if `agy` is not installed/authenticated, the app still works — analysis fields stay empty and everything manual still functions. README documents `agy` install + one-time OAuth login.

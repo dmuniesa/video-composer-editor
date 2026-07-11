@@ -2,6 +2,7 @@ import type {
   AppSettings,
   FsListing,
   JobInfo,
+  LogRecord,
   ProjectInfo,
   SongInfo,
   Track,
@@ -51,6 +52,9 @@ export const api = {
   jobs: (pid: string, active = true) =>
     req<JobInfo[]>(`/api/projects/${pid}/jobs?active=${active}`),
 
+  logs: () => req<{ records: LogRecord[] }>('/api/logs'),
+  clearLogs: () => req<{ ok: boolean }>('/api/logs/clear', { method: 'POST' }),
+
   settings: () => req<AppSettings>('/api/settings'),
   saveSettings: (s: AppSettings) => {
     const { ai_status: _ignored, ...body } = s
@@ -62,6 +66,8 @@ export const api = {
     }),
   reextract: (pid: string) =>
     req<{ queued: number }>(`/api/projects/${pid}/reextract`, { method: 'POST' }),
+  clearAnalysis: (pid: string) =>
+    req<{ cleared: number }>(`/api/projects/${pid}/clear_analysis`, { method: 'POST' }),
 
   videos: (pid: string) => req<Video[]>(`/api/projects/${pid}/videos`),
   rate: (pid: string, video_ids: number[], patch: { stars?: number; rejected?: boolean }) =>
