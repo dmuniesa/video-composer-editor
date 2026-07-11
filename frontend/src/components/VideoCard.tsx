@@ -1,5 +1,6 @@
-import { media, fmtTime } from '../lib/api'
+import { fmtTime } from '../lib/api'
 import type { Video } from '../lib/types'
+import ScrubThumb from './ScrubThumb'
 import StarRating from './StarRating'
 
 interface Props {
@@ -20,12 +21,11 @@ export default function VideoCard({ pid, video, selected, onSelect, onOpen, onRa
       onClick={onSelect}
       onDoubleClick={onOpen}
     >
-      <div className="thumb">
-        <img src={media.thumb(pid, video.id)} loading="lazy" alt={video.filename} />
+      <ScrubThumb pid={pid} videoId={video.id} duration={video.duration}>
         <span className="duration">{fmtTime(video.duration)}</span>
         {video.status !== 'ready' && <span className="status-chip">{video.status}</span>}
         {video.rejected && <span className="status-chip" style={{ top: 26, color: 'var(--danger)' }}>rejected</span>}
-      </div>
+      </ScrubThumb>
       <div className="body">
         <div className="name" title={video.rel_path}>{video.filename}</div>
         <div className="desc">{video.error ? <span className="error-text">{video.error}</span> : video.description || '—'}</div>

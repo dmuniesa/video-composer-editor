@@ -79,6 +79,9 @@ star rating.
 
 ![Review page](img/review.png)
 
+- **Hover scrub** (like Premiere/Final Cut): move the mouse horizontally over
+  a thumbnail and the clip plays under your cursor — left edge is the start,
+  right edge the end, with a time readout. Works in the montage bin too.
 - **Click** a card to select it. **Ctrl/Cmd-click** adds to the selection,
   **Shift-click** selects a range.
 - Press **1–5** to rate the selection, **0** to clear the rating, **X** to

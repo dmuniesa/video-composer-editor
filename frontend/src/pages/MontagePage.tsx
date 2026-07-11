@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, media, fmtTime } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
+import ScrubThumb from '../components/ScrubThumb'
 import Waveform from '../components/Waveform'
 import { sectionColor } from './MusicPage'
 
@@ -309,7 +310,7 @@ export default function MontagePage({ pid }: { pid: string }) {
                 )
               }
             >
-              <img src={media.thumb(pid, v.id)} loading="lazy" alt="" />
+              <ScrubThumb pid={pid} videoId={v.id} duration={v.duration} />
               <div className="meta">
                 <div className="name">{v.filename}</div>
                 <div className="sub">

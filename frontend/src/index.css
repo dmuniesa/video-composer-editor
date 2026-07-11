@@ -101,6 +101,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .video-card.rejected { opacity: 0.4; }
 .video-card .thumb { position: relative; aspect-ratio: 16/9; background: #000; }
 .video-card .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* hover scrub (Premiere-style) */
+.thumb { cursor: crosshair; }
+.thumb .scrub-video {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; pointer-events: none; background: #000;
+}
+.thumb .scrub-line {
+  position: absolute; top: 0; bottom: 0; width: 1.5px;
+  background: rgba(255, 255, 255, 0.85); pointer-events: none;
+}
+.thumb .scrub-time {
+  position: absolute; left: 6px; bottom: 6px; background: rgba(0, 0, 0, 0.75);
+  padding: 1px 6px; border-radius: 4px; font-size: 11px; pointer-events: none;
+}
 .video-card .duration {
   position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,0.75);
   padding: 1px 6px; border-radius: 4px; font-size: 11px;
@@ -164,7 +179,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   display: flex; gap: 8px; background: var(--bg-elevated); border: 1px solid var(--border);
   border-radius: 8px; padding: 6px; cursor: grab; align-items: center;
 }
-.bin-item img { width: 84px; aspect-ratio: 16/9; object-fit: cover; border-radius: 4px; background: #000; }
+.bin-item .thumb {
+  position: relative; width: 84px; flex-shrink: 0; aspect-ratio: 16/9;
+  border-radius: 4px; background: #000; overflow: hidden;
+}
+.bin-item .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bin-item .thumb .scrub-time { left: 3px; bottom: 3px; font-size: 9px; padding: 0 4px; }
 .bin-item .meta { flex: 1; min-width: 0; }
 .bin-item .meta .name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bin-item .meta .sub { font-size: 11px; color: var(--text-dim); }
