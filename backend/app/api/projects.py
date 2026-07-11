@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from .. import db as dbm
 from ..events import broadcaster, sse_format
 from ..models import Project, Song, Video
-from ..services import gemini, jobs, pipeline
+from ..services import ai, jobs, pipeline
 from .deps import resolve_project
 
 router = APIRouter()
@@ -100,7 +100,8 @@ def project_get(pid: str) -> dict:
             "song_status": song.status if song else None,
             "video_count": total,
             "videos_by_status": by_status,
-            "agy_available": gemini.agy_available(),
+            "ai_available": ai.available(),
+            "ai_provider": ai.provider(),
         }
 
 
@@ -118,12 +119,8 @@ class AnalyzeRequest(BaseModel):
 @router.post("/projects/{pid}/analyze")
 def project_analyze(pid: str, body: AnalyzeRequest) -> dict:
     video_dir = resolve_project(pid)
-    if not gemini.agy_available():
-        raise HTTPException(
-            409,
-            "Antigravity CLI (agy) not found. Install it, run `agy` once to log in, "
-            "or set AGY_CMD. You can still rate and tag videos manually.",
-        )
+    if not ai.available():
+        raise HTTPException(409, ai.unavailable_reason())
     with dbm.open_session(video_dir) as db:
         if body.video_ids is not None:
             ids = body.video_ids

@@ -77,18 +77,18 @@ export default function SetupPage({ project, onChanged, standalone }: Props) {
           </button>
           <button
             className="primary"
-            disabled={!project.agy_available}
-            title={project.agy_available ? '' : 'Antigravity CLI (agy) not found on the server'}
+            disabled={!project.ai_available}
+            title={project.ai_available ? `provider: ${project.ai_provider}` : 'No AI provider configured'}
             onClick={() => api.analyze(project.id).then(onChanged).catch((e) => setError(e.message))}
           >
-            Analyze all with Gemini
+            Analyze all with AI{project.ai_provider ? ` (${project.ai_provider})` : ''}
           </button>
         </div>
-        {!project.agy_available && (
+        {!project.ai_available && (
           <p className="hint" style={{ marginTop: 10 }}>
-            ⚠️ Antigravity CLI (<code>agy</code>) was not found — AI analysis is disabled. Install it,
-            run <code>agy</code> once to sign in, then restart the server. Rating and manual tagging
-            still work.
+            ⚠️ No AI provider available — AI analysis is disabled. Install the Antigravity CLI
+            (<code>agy</code>) and sign in, or configure an OpenAI-compatible endpoint (e.g. z.ai
+            GLM) on the <b>Settings</b> page. Rating and manual tagging still work.
           </p>
         )}
       </div>

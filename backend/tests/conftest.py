@@ -11,12 +11,18 @@ TESTS_DIR = Path(__file__).resolve().parent
 
 @pytest.fixture(autouse=True)
 def _isolated_registry(tmp_path, monkeypatch):
-    """Keep the project registry out of $HOME during tests."""
+    """Keep the project registry and settings out of $HOME during tests."""
     monkeypatch.setenv("MONTAGE_REGISTRY", str(tmp_path / "registry.json"))
     import app.db as dbm
 
     monkeypatch.setattr(dbm, "REGISTRY_PATH", tmp_path / "registry.json")
+
+    monkeypatch.setenv("MONTAGE_SETTINGS", str(tmp_path / "settings.json"))
+    from app import settings
+
+    settings.reload()
     yield
+    settings.reload()
 
 
 @pytest.fixture

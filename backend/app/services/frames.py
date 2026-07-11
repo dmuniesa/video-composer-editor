@@ -1,20 +1,22 @@
 """Derived media generation with ffmpeg: analysis frames, grid thumbnail,
 filmstrip for the trim UI, and browser-playable H.264 proxies.
 
-Everything is cached under <video_dir>/.montage-cache/<cache_key>/ and
-regenerated only if missing."""
+Frame count/size and proxy quality come from the user settings. Everything is
+cached under <video_dir>/.montage-cache/<cache_key>/ and regenerated only if
+missing (the re-extract action deletes the cache first)."""
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
 
-FRAME_MIN, FRAME_MAX = 3, 10
-FILMSTRIP_TILES = 20
-FILMSTRIP_TILE_WIDTH = 160
+from .. import settings
 
 
 def frame_count_for(duration: float) -> int:
-    return max(FRAME_MIN, min(FRAME_MAX, 3 + int(duration // 5)))
+    f = settings.get().frames
+    lo, hi = min(f.min_count, f.max_count), max(f.min_count, f.max_count)
+    extra = int(duration // f.seconds_per_frame) if f.seconds_per_frame > 0 else 0
+    return max(lo, min(hi, lo + extra))
 
 
 def frame_timestamps(duration: float, count: int) -> list[float]:
@@ -36,12 +38,13 @@ def _run_ffmpeg(args: list[str], timeout: int = 300) -> None:
         raise RuntimeError(f"ffmpeg failed: {out.stderr.strip()[:400]}")
 
 
-def extract_frame(video: Path, at: float, dest: Path, width: int = 640) -> None:
+def extract_frame(video: Path, at: float, dest: Path, width: int | None = None, quality: int | None = None) -> None:
+    f = settings.get().frames
     _run_ffmpeg(
         [
             "-ss", f"{at:.3f}", "-i", str(video),
-            "-frames:v", "1", "-vf", f"scale={width}:-2",
-            "-q:v", "3", str(dest),
+            "-frames:v", "1", "-vf", f"scale={width or f.width}:-2",
+            "-q:v", str(quality or f.jpeg_quality), str(dest),
         ]
     )
 
@@ -67,19 +70,19 @@ def make_thumbnail(video: Path, duration: float, cache: Path) -> Path:
 
 
 def make_filmstrip(video: Path, duration: float, cache: Path) -> Path:
-    """One wide JPEG of FILMSTRIP_TILES tiles, used as TrimBar background."""
+    """One wide JPEG of N tiles, used as the TrimBar background."""
     cache.mkdir(parents=True, exist_ok=True)
     dest = cache / "filmstrip.jpg"
     if dest.exists():
         return dest
     if duration <= 0:
         raise RuntimeError("cannot build filmstrip for zero-duration video")
-    fps = FILMSTRIP_TILES / duration
+    tiles = settings.get().frames.filmstrip_tiles
+    fps = tiles / duration
     _run_ffmpeg(
         [
             "-i", str(video),
-            "-vf",
-            f"fps={fps:.6f},scale={FILMSTRIP_TILE_WIDTH}:-2,tile={FILMSTRIP_TILES}x1",
+            "-vf", f"fps={fps:.6f},scale=160:-2,tile={tiles}x1",
             "-frames:v", "1", "-q:v", "5", str(dest),
         ],
         timeout=600,
@@ -88,16 +91,17 @@ def make_filmstrip(video: Path, duration: float, cache: Path) -> Path:
 
 
 def make_proxy(video: Path, cache: Path) -> Path:
-    """720p H.264 + AAC proxy for browser playback of unfriendly codecs."""
+    """H.264 + AAC proxy for browser playback of unfriendly codecs."""
     cache.mkdir(parents=True, exist_ok=True)
     dest = cache / "proxy.mp4"
     if dest.exists():
         return dest
+    height = settings.get().frames.proxy_height
     tmp = cache / "proxy.tmp.mp4"
     _run_ffmpeg(
         [
             "-i", str(video),
-            "-vf", "scale=-2:720",
+            "-vf", f"scale=-2:{height}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k",
@@ -108,3 +112,14 @@ def make_proxy(video: Path, cache: Path) -> Path:
     )
     tmp.rename(dest)
     return dest
+
+
+def clear_derived_frames(cache: Path) -> None:
+    """Delete analysis frames + filmstrip + thumbnail so the next media job
+    regenerates them with the current settings (the proxy is kept)."""
+    if not cache.is_dir():
+        return
+    for p in cache.glob("frame_*.jpg"):
+        p.unlink(missing_ok=True)
+    (cache / "filmstrip.jpg").unlink(missing_ok=True)
+    (cache / "thumb.jpg").unlink(missing_ok=True)

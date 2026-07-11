@@ -12,6 +12,7 @@ better.)
 - [5. Build the montage](#5-build-the-montage)
 - [6. Let Claude place the clips for you](#6-let-claude-place-the-clips-for-you)
 - [7. Export to Premiere Pro](#7-export-to-premiere-pro)
+- [8. Settings: AI provider and frame extraction](#8-settings-ai-provider-and-frame-extraction)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Troubleshooting](#troubleshooting)
 
@@ -187,6 +188,52 @@ In Premiere Pro:
    them and use **Link Media** to point at the folder.
 
 From there, finish it: transitions, color grading, reframes, audio mix.
+
+## 8. Settings: AI provider and frame extraction
+
+The **Settings** page (in the top navigation) configures the whole app; the
+values are global and persist in `~/.video-montage-composer/settings.json`.
+
+![Settings page](img/settings.png)
+
+### AI provider
+
+Choose who analyzes your video frames and labels the song sections:
+
+- **Auto** *(default)* — uses the Antigravity CLI if installed, otherwise the
+  OpenAI-compatible endpoint if configured.
+- **Antigravity CLI (Gemini)** — the `agy` command; the command template is
+  editable in case the CLI lives elsewhere or its flags change.
+- **OpenAI-compatible endpoint** — any service speaking the OpenAI
+  `/chat/completions` protocol with image input. For **z.ai GLM**: base URL
+  `https://api.z.ai/api/paas/v4`, a vision-capable model such as
+  `glm-4.6v-flash`, and your z.ai API key. Also works with OpenAI, OpenRouter,
+  or a fully local Ollama / LM Studio (leave the API key empty if the endpoint
+  doesn't need one).
+- **Disabled** — no AI; rating and manual tagging still work.
+
+**Save & test AI** sends a tiny prompt through the selected provider and shows
+the result, so you can validate the key/URL before analyzing hundreds of clips.
+Privacy note: the extracted frames are sent to whichever provider you choose —
+use a local endpoint if you don't want them leaving your machine.
+
+### Frame extraction
+
+Controls how each video is sampled for analysis:
+
+- **Minimum / maximum frames per video** and **+1 frame every N seconds** —
+  e.g. min 3, max 10, +1 every 5 s means a 20 s clip yields 7 frames. More
+  frames give the AI a better view of long clips but cost more tokens/time.
+- **Frame width** and **JPEG quality** — resolution of the frames sent to the
+  AI.
+- **Filmstrip tiles** — how many thumbnails compose the trim-bar strip.
+- **Proxy height** — resolution of the H.264 preview proxies.
+
+Changes apply to newly scanned videos. To apply them to an existing project,
+open Settings *from inside the project* and click **Re-extract frames for this
+project** — derived frames/thumbnails/filmstrips are regenerated in the
+background (then use *Analyze all* with force if you also want fresh AI
+descriptions).
 
 ## Keyboard shortcuts
 

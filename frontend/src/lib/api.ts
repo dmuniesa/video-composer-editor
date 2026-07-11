@@ -1,4 +1,5 @@
 import type {
+  AppSettings,
   FsListing,
   JobInfo,
   ProjectInfo,
@@ -49,6 +50,18 @@ export const api = {
     }),
   jobs: (pid: string, active = true) =>
     req<JobInfo[]>(`/api/projects/${pid}/jobs?active=${active}`),
+
+  settings: () => req<AppSettings>('/api/settings'),
+  saveSettings: (s: AppSettings) => {
+    const { ai_status: _ignored, ...body } = s
+    return req<AppSettings>('/api/settings', { method: 'PUT', body: JSON.stringify(body) })
+  },
+  testAI: () =>
+    req<{ ok: boolean; provider: string | null; error?: string }>('/api/settings/test_ai', {
+      method: 'POST',
+    }),
+  reextract: (pid: string) =>
+    req<{ queued: number }>(`/api/projects/${pid}/reextract`, { method: 'POST' }),
 
   videos: (pid: string) => req<Video[]>(`/api/projects/${pid}/videos`),
   rate: (pid: string, video_ids: number[], patch: { stars?: number; rejected?: boolean }) =>

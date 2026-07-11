@@ -6,7 +6,29 @@ export interface ProjectInfo {
   song_status: string | null
   video_count: number
   videos_by_status: Record<string, number>
-  agy_available: boolean
+  ai_available: boolean
+  ai_provider: string | null
+}
+
+export interface AppSettings {
+  frames: {
+    min_count: number
+    max_count: number
+    seconds_per_frame: number
+    width: number
+    jpeg_quality: number
+    filmstrip_tiles: number
+    proxy_height: number
+  }
+  ai: {
+    provider: string
+    agy_cmd: string
+    openai_base_url: string
+    openai_api_key: string
+    openai_model: string
+    timeout_s: number
+  }
+  ai_status?: { available: boolean; provider: string | null }
 }
 
 export interface VideoRange {

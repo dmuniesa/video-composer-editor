@@ -11,7 +11,7 @@ from sqlalchemy import select
 from .. import db as dbm
 from ..events import broadcaster
 from ..models import Song, SongSection, Video, VideoAnalysis, VideoRating
-from . import audio_analysis, frames, gemini, jobs, scanner
+from . import ai, audio_analysis, frames, jobs, scanner
 
 
 def video_cache(video_dir: Path, cache_key: str) -> Path:
@@ -106,7 +106,7 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
 
 def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = False) -> bool:
     """Queue Gemini analysis for one video. Returns False when skipped."""
-    if not gemini.agy_available():
+    if not ai.available():
         return False
     if jobs.has_active(pid, "analyze", video_id):
         return False
@@ -130,7 +130,7 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
             db.commit()
             broadcaster.publish(pid, "video", {"id": video_id})
             try:
-                result = gemini.analyze_video_frames(frame_paths, workdir=cache)
+                result = ai.analyze_video_frames(frame_paths, workdir=cache)
                 analysis = video.analysis or VideoAnalysis(video_id=video_id)
                 analysis.description = result["description"]
                 analysis.ai_score = result["score"]
@@ -208,11 +208,11 @@ def queue_song_job(pid: str, video_dir: Path) -> None:
                 song.error = None
                 db.commit()
 
-                # Best-effort semantic labels from Gemini.
-                if gemini.agy_available():
-                    jobs.update(job, 0.8, "labeling sections (Gemini)")
+                # Best-effort semantic labels from the AI provider.
+                if ai.available():
+                    jobs.update(job, 0.8, "labeling sections (AI)")
                     try:
-                        labels = gemini.label_sections(
+                        labels = ai.label_sections(
                             result.duration, result.bpm, result.sections
                         )
                         # The relationship still caches the deleted sections;

@@ -5,7 +5,7 @@ Turn a folder of vacation videos + a song into an **Adobe Premiere Pro** project
 A locally-run web app that:
 
 1. **Scans** a folder of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
-2. **Analyzes every clip with Gemini** through Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`): description, 1–10 score, and hashtags.
+2. **Analyzes every clip with AI**: description, 1–10 score, and hashtags — via Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`, Gemini) or any **OpenAI-compatible endpoint** (z.ai GLM, OpenAI, OpenRouter, Ollama…), selectable on the in-app Settings page.
 3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
 4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …).
 5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
@@ -21,7 +21,7 @@ files, ffmpeg and the `agy` CLI). You need:
 | Python | 3.10+ | backend, librosa music analysis, MCP server |
 | Node.js | 20+ | building the React frontend |
 | ffmpeg + ffprobe | any recent | frames, thumbnails, proxies, metadata |
-| Antigravity CLI (`agy`) | latest | Gemini analysis (optional but recommended) |
+| AI provider | — | clip analysis (optional): Antigravity CLI (`agy`) **or** an OpenAI-compatible endpoint (z.ai GLM…) |
 | Claude Code / Claude Desktop | latest | only if you want AI auto-placement via MCP (optional) |
 
 ### 1. Base tools
@@ -47,10 +47,19 @@ sudo apt install -y python3 python3-venv python3-pip nodejs npm ffmpeg git
 
 Verify: `python3 --version`, `node --version`, `ffmpeg -version` all work in a new terminal.
 
-### 2. Antigravity CLI (Gemini)
+### 2. AI provider (optional)
 
-Optional: without it everything works except AI descriptions/scores/hashtags and
-AI section labels. Official installers (see [antigravity.google/docs/cli-install](https://antigravity.google/docs/cli-install)):
+Without one, everything works except AI descriptions/scores/hashtags and AI
+section labels. Two options, selectable on the in-app **Settings** page:
+
+**Option A — OpenAI-compatible endpoint (e.g. z.ai GLM).** Nothing to install:
+open **Settings** in the app and fill in the base URL, a vision-capable model
+and your API key. For z.ai GLM: base URL `https://api.z.ai/api/paas/v4`, model
+`glm-4.6v-flash`, API key from your z.ai account. Local endpoints (Ollama,
+LM Studio) work too. Use **Save & test AI** to validate.
+
+**Option B — Antigravity CLI (Gemini).** Official installers (see
+[antigravity.google/docs/cli-install](https://antigravity.google/docs/cli-install)):
 
 ```bash
 # macOS / Linux

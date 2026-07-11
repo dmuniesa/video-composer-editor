@@ -10,7 +10,7 @@ from sqlalchemy import select
 from .. import db as dbm
 from ..events import broadcaster
 from ..models import Song, SongSection
-from ..services import gemini, jobs, pipeline
+from ..services import ai, jobs, pipeline
 from .deps import resolve_project
 
 router = APIRouter()
@@ -70,10 +70,10 @@ def song_reanalyze(pid: str) -> dict:
 
 @router.post("/projects/{pid}/song/label")
 def song_label(pid: str) -> dict:
-    """Re-run Gemini semantic labeling on existing sections."""
+    """Re-run AI semantic labeling on existing sections."""
     video_dir = resolve_project(pid)
-    if not gemini.agy_available():
-        raise HTTPException(409, "Antigravity CLI (agy) not available")
+    if not ai.available():
+        raise HTTPException(409, ai.unavailable_reason())
     with dbm.open_session(video_dir) as db:
         song = db.scalar(select(Song))
         if song is None or song.status != "ready":
@@ -86,7 +86,7 @@ def song_label(pid: str) -> dict:
                 {"start": s.start, "end": s.end, "energy": s.energy, "cluster": 0}
                 for s in song.sections
             ]
-            labels = gemini.label_sections(song.duration, song.bpm or 0.0, sections)
+            labels = ai.label_sections(song.duration, song.bpm or 0.0, sections)
             for section, label in zip(song.sections, labels):
                 if label:
                     section.label = label
