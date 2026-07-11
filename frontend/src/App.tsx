@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
+import { Link, NavLink, Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { api } from './lib/api'
 import { useProjectEvents } from './lib/sse'
 import type { JobInfo, ProjectInfo } from './lib/types'
@@ -37,7 +37,7 @@ function ProjectShell() {
   return (
     <div className="app-shell">
       <nav className="app-nav">
-        <span className="brand">🎬 Montage</span>
+        <Link to="/" className="brand" title="All projects">🎬 Montage</Link>
         <NavLink to={`/p/${pid}/setup`}>Setup</NavLink>
         <NavLink to={`/p/${pid}/review`}>Review</NavLink>
         <NavLink to={`/p/${pid}/music`}>Music</NavLink>

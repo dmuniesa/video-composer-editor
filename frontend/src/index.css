@@ -54,7 +54,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   padding: 8px 16px; background: var(--bg-panel);
   border-bottom: 1px solid var(--border);
 }
-.app-nav .brand { font-weight: 700; margin-right: 16px; color: var(--accent); }
+.app-nav a.brand, .app-nav .brand { font-weight: 700; margin-right: 16px; color: var(--accent); }
 .app-nav a {
   color: var(--text-dim); text-decoration: none; padding: 6px 12px; border-radius: 6px;
 }

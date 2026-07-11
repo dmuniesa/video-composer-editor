@@ -4,6 +4,7 @@ How to go from a folder of raw vacation videos to an Adobe Premiere Pro project,
 step by step. (Screenshots use ffmpeg test footage — your real videos will look
 better.)
 
+- [Projects, autosave and switching](#projects-autosave-and-switching)
 - [1. Create a project (Setup)](#1-create-a-project-setup)
 - [2. Review and rate your clips](#2-review-and-rate-your-clips)
 - [3. Mark the interesting parts](#3-mark-the-interesting-parts)
@@ -15,6 +16,30 @@ better.)
 - [Troubleshooting](#troubleshooting)
 
 ---
+
+## Projects, autosave and switching
+
+The app is fully **multi-project** and there is no Save button — **everything
+is saved automatically, instantly**, on every action: AI descriptions and
+hashtags, your stars/rejects, in/out ranges, the song analysis with your
+section edits, and the whole timeline.
+
+Each project is simply a video folder: all of its state lives in a SQLite
+database inside `<folder>/.montage-cache/`, next to the footage. That means:
+
+- **Close anything anytime** — browser tab, server, reboot — and reopen the
+  project later exactly where you left it (background jobs that were running
+  can be re-queued with *Rescan* / *Analyze all*).
+- **Open another project** whenever you want: click the **🎬 Montage** logo
+  (top-left) to go back to the home screen, which lists your recent projects;
+  pick one or browse to a new folder. You can even work on two projects at
+  once in two browser tabs.
+- **A project travels with its folder** — move the folder to another drive and
+  open it again from the home screen (the cache moves with it).
+- **Back up / version a montage** by copying `.montage-cache/`; **reset** a
+  project by deleting it.
+
+![Home screen with recent projects](img/projects.png)
 
 ## 1. Create a project (Setup)
 
