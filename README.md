@@ -1,4 +1,9 @@
-# 🎬 Beatcut
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/logo-white.svg">
+    <img src="frontend/public/logo.svg" alt="Beatcut" width="360">
+  </picture>
+</p>
 
 Turn a folder of vacation videos + a song into an **Adobe Premiere Pro** project.
 

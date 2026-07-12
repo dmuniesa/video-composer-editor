@@ -344,7 +344,8 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
     <div className="app-shell">
       <nav className="app-nav">
         <Link to="/" className="brand" title="All projects">
-          🎬 Beatcut
+          <img src="/favicon.svg" alt="" className="brand-icon" />
+          Beatcut
         </Link>
         <span className="spacer" />
         <Link to="/">Home</Link>

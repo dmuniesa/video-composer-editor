@@ -59,13 +59,17 @@ export default function HomePage() {
   return (
     <div className="home-page">
       <nav className="home-nav">
-        <span className="brand">🎬 Beatcut</span>
+        <span className="brand">
+          <img src="/favicon.svg" alt="" className="brand-icon" />
+          Beatcut
+        </span>
         <span className="spacer" />
         <Link to="/guide">Guide</Link>
         <Link to="/settings">Settings</Link>
       </nav>
 
       <header className="home-hero">
+        <img src="/favicon.svg" alt="Beatcut" className="hero-logo" />
         <div className="hero-badge">Runs 100% on your machine</div>
         <h1>
           From a folder of clips to a<br />

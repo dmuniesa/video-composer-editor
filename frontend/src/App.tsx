@@ -41,7 +41,10 @@ function ProjectShell() {
   return (
     <div className="app-shell">
       <nav className="app-nav">
-        <Link to="/" className="brand" title="All projects">🎬 Beatcut</Link>
+        <Link to="/" className="brand" title="All projects">
+          <img src="/favicon.svg" alt="" className="brand-icon" />
+          Beatcut
+        </Link>
         <NavLink to={`/p/${pid}/setup`}>Setup</NavLink>
         <NavLink to={`/p/${pid}/review`}>Review</NavLink>
         <NavLink to={`/p/${pid}/music`}>Music</NavLink>
