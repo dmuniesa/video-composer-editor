@@ -88,6 +88,8 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
                     jobs.update(job, 0.6, "transcoding proxy")
                     frames.make_proxy(path, cache)
                     video.has_proxy = True
+                jobs.update(job, 0.7, "preview proxy")
+                frames.make_preview(path, cache)
                 video.status = "extracted"
                 video.error = None
                 db.commit()

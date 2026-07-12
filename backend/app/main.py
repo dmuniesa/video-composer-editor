@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import signal
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from .api import export, media, music, projects, settings_api, timeline, videos
 from .events import broadcaster
 from .logbuffer import BufferHandler, apply_level
+from .services import jobs
 
 
 def _configure_logging() -> None:
@@ -45,9 +48,34 @@ app.add_middleware(
 )
 
 
+def _chain_shutdown_signals() -> None:
+    """Ctrl+C left uvicorn hanging at "Waiting for connections to close":
+    its graceful shutdown waits for open connections, but browser EventSource
+    tabs hold the SSE streams open forever. Chain onto uvicorn's own signal
+    handlers (installed before the lifespan startup runs) to end the SSE
+    streams and drop queued background jobs, then let uvicorn proceed."""
+    if threading.current_thread() is not threading.main_thread():
+        return  # signals only work in the main thread (e.g. tests' TestClient)
+
+    def chain(sig: int) -> None:
+        prev = signal.getsignal(sig)
+
+        def handler(signum, frame):  # noqa: ANN001
+            broadcaster.close_all()
+            jobs.cancel_queued()
+            if callable(prev):
+                prev(signum, frame)
+
+        signal.signal(sig, handler)
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        chain(sig)
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     broadcaster.set_loop(asyncio.get_running_loop())
+    _chain_shutdown_signals()
 
 
 app.include_router(projects.router, prefix="/api")

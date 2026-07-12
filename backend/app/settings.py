@@ -33,6 +33,8 @@ class FrameSettings(BaseModel):
     jpeg_quality: int = Field(3, ge=1, le=10)  # ffmpeg -q:v (lower = better)
     filmstrip_tiles: int = Field(20, ge=5, le=60)
     proxy_height: int = Field(720, ge=240, le=1080)
+    # small silent H.264 used by the montage preview player in "SD" mode
+    preview_height: int = Field(360, ge=144, le=720)
 
 
 class AISettings(BaseModel):

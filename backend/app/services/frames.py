@@ -114,6 +114,32 @@ def make_proxy(video: Path, cache: Path) -> Path:
     return dest
 
 
+def make_preview(video: Path, cache: Path) -> Path:
+    """Small silent H.264 with dense keyframes: cheap to decode and quick to
+    seek, used by the montage preview player in low-res mode."""
+    cache.mkdir(parents=True, exist_ok=True)
+    dest = cache / "preview.mp4"
+    if dest.exists():
+        return dest
+    height = settings.get().frames.preview_height
+    tmp = cache / "preview.tmp.mp4"
+    _run_ffmpeg(
+        [
+            "-i", str(video),
+            "-vf", f"scale=-2:{height}",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+            "-g", "30",
+            "-pix_fmt", "yuv420p",
+            "-an",
+            "-movflags", "+faststart",
+            str(tmp),
+        ],
+        timeout=1800,
+    )
+    tmp.rename(dest)
+    return dest
+
+
 def clear_derived_frames(cache: Path) -> None:
     """Delete analysis frames + filmstrip + thumbnail so the next media job
     regenerates them with the current settings (the proxy is kept)."""

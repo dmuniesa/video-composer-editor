@@ -32,6 +32,11 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dropTrack, setDropTrack] = useState<number | null>(null)
   const [playhead, setPlayhead] = useState(0)
+  const [previewOpen, setPreviewOpen] = useState(true)
+  const [previewLowRes, setPreviewLowRes] = useState(true)
+  /** null = default position (anchored bottom-right via CSS) */
+  const [popPos, setPopPos] = useState<{ x: number; y: number } | null>(null)
+  const [playing, setPlaying] = useState(false)
   const [toast, setToast] = useState('')
   const [composerProvider, setComposerProvider] = useState('mcp')
   const [composerAvailable, setComposerAvailable] = useState(false)
@@ -41,6 +46,7 @@ export default function MontagePage({ pid }: { pid: string }) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
 
   const refreshTimeline = useCallback(() => {
     api.timeline(pid).then((t) => setTracks(t.tracks)).catch((e) => setToast(e.message))
@@ -146,6 +152,8 @@ export default function MontagePage({ pid }: { pid: string }) {
     [tracks],
   )
 
+  // The <audio> element only mounts once the song has loaded, so this must
+  // re-run on `song` — with [] it would bind before the element exists.
   useEffect(() => {
     const el = audioRef.current
     if (!el) return
@@ -154,28 +162,67 @@ export default function MontagePage({ pid }: { pid: string }) {
       setPlayhead(el.currentTime)
       raf = requestAnimationFrame(tick)
     }
-    const onPlay = () => (raf = requestAnimationFrame(tick))
-    const onPause = () => cancelAnimationFrame(raf)
+    const onPlay = () => {
+      setPlaying(true)
+      raf = requestAnimationFrame(tick)
+    }
+    const onPause = () => {
+      setPlaying(false)
+      cancelAnimationFrame(raf)
+    }
     el.addEventListener('play', onPlay)
     el.addEventListener('pause', onPause)
+    if (!el.paused) onPlay()
     return () => {
       el.removeEventListener('play', onPlay)
       el.removeEventListener('pause', onPause)
       cancelAnimationFrame(raf)
     }
-  }, [])
+  }, [song])
+
+  // drag the preview popup around by its header
+  const startPopDrag = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    const pop = popRef.current
+    const parent = pop?.offsetParent as HTMLElement | null
+    if (!pop || !parent) return
+    e.preventDefault()
+    const rect = pop.getBoundingClientRect()
+    const prect = parent.getBoundingClientRect()
+    const offX = e.clientX - rect.left
+    const offY = e.clientY - rect.top
+    const move = (ev: PointerEvent) => {
+      const x = Math.max(0, Math.min(ev.clientX - prect.left - offX, prect.width - rect.width))
+      const y = Math.max(0, Math.min(ev.clientY - prect.top - offY, prect.height - rect.height))
+      setPopPos({ x, y })
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  const togglePlay = () => {
+    const a = audioRef.current
+    if (!a) return
+    if (a.paused) a.play()
+    else a.pause()
+  }
 
   useEffect(() => {
     const pv = previewRef.current
     if (!pv) return
     const clip = clipAt(playhead)
+    void previewOpen // re-sync the <video> right after the popup (re)mounts
     if (!clip) {
       pv.pause()
       pv.removeAttribute('src')
       pv.load()
       return
     }
-    const src = media.video(pid, clip.video_id)
+    const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
     const want = clip.source_in + (playhead - clip.timeline_start)
     if (!pv.src.endsWith(src)) {
       pv.src = src
@@ -186,7 +233,7 @@ export default function MontagePage({ pid }: { pid: string }) {
     const playing = audioRef.current && !audioRef.current.paused
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
-  }, [playhead, clipAt, pid])
+  }, [playhead, clipAt, pid, previewOpen, previewLowRes])
 
   const seek = (t: number) => {
     if (audioRef.current) audioRef.current.currentTime = Math.max(0, t)
@@ -199,8 +246,7 @@ export default function MontagePage({ pid }: { pid: string }) {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === ' ') {
         e.preventDefault()
-        const a = audioRef.current
-        if (a) (a.paused ? a.play() : a.pause())
+        togglePlay()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClip != null) {
         api.deleteClip(pid, selectedClip).then(refreshTimeline).catch((err) => setToast(err.message))
         setSelectedClip(null)
@@ -417,14 +463,57 @@ export default function MontagePage({ pid }: { pid: string }) {
             </button>
           )}
           <span className="spacer" style={{ flex: 1 }} />
-          <video ref={previewRef} muted style={{ height: 54, borderRadius: 6, background: '#000' }} />
+          <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
+          <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
+            {playing ? '⏸' : '▶'}
+          </button>
           <span className="hint">{fmtTime(playhead)}</span>
+          <button className="small" onClick={() => setPreviewOpen((v) => !v)}>
+            {previewOpen ? '✕ preview' : '▶ preview'}
+          </button>
           <a href={`/api/projects/${pid}/export.xml`} download>
             <button className="primary">Export to Premiere</button>
           </a>
         </div>
 
         {song && <audio ref={audioRef} src={media.song(pid)} style={{ display: 'none' }} />}
+
+        {previewOpen && (
+          <div
+            className="preview-pop"
+            ref={popRef}
+            style={popPos ? { left: popPos.x, top: popPos.y, right: 'auto', bottom: 'auto' } : undefined}
+          >
+            <div className="preview-pop-head" onPointerDown={startPopDrag}>
+              <span>preview · {fmtTime(playhead)}</span>
+              <span style={{ display: 'flex', gap: 4 }}>
+                <button
+                  className="small"
+                  onClick={() => setPreviewLowRes((v) => !v)}
+                  title={previewLowRes ? 'low-res proxy (smooth) — click for full quality' : 'full quality — click for smooth low-res'}
+                >
+                  {previewLowRes ? 'SD' : 'HD'}
+                </button>
+                <button className="small" onClick={() => setPreviewOpen(false)} title="close">✕</button>
+              </span>
+            </div>
+            <video ref={previewRef} muted playsInline />
+            <div className="preview-pop-controls">
+              <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
+              <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
+                {playing ? '⏸' : '▶'}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={duration}
+                step={0.1}
+                value={playhead}
+                onChange={(e) => seek(Number(e.target.value))}
+              />
+            </div>
+          </div>
+        )}
 
         <div className="timeline-scroll" ref={scrollRef}>
           <div className="timeline-inner" style={{ width: width + 60 }}>
@@ -530,6 +619,9 @@ export default function MontagePage({ pid }: { pid: string }) {
                       style={{ left: shown.timeline_start * pxPerSec, width: Math.max(shown.duration * pxPerSec, 8) }}
                       onPointerDown={startDrag(clip, track.id, 'move')}
                     >
+                      {video && (
+                        <img className="film" src={media.thumb(pid, clip.video_id)} alt="" draggable={false} />
+                      )}
                       <div className="label">
                         {video?.filename ?? clip.video_id} · {fmtTime(shown.duration)}
                       </div>
@@ -547,7 +639,11 @@ export default function MontagePage({ pid }: { pid: string }) {
                       width: Math.max(drag.preview.duration * pxPerSec, 8),
                       opacity: 0.6,
                     }}
-                  />
+                  >
+                    {videoById.has(drag.preview.video_id) && (
+                      <img className="film" src={media.thumb(pid, drag.preview.video_id)} alt="" draggable={false} />
+                    )}
+                  </div>
                 )}
               </div>
             ))}

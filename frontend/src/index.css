@@ -202,7 +202,32 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .compose-panel textarea { resize: vertical; font-size: 12px; }
 
-.montage-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.montage-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+/* Floating program monitor: anchored to the bottom-right corner over the
+   timeline, sized relative to the viewport so it stays small on small windows. */
+.preview-pop {
+  position: absolute; right: 14px; bottom: 44px; z-index: 20;
+  width: clamp(180px, 28vw, 380px);
+  display: flex; flex-direction: column;
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55); overflow: hidden;
+  resize: both; min-width: 180px; min-height: 150px; max-width: 92%; max-height: 88%;
+}
+.preview-pop-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 4px 3px 8px; font-size: 11px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  cursor: move; user-select: none; touch-action: none;
+}
+.preview-pop video {
+  display: block; width: 100%; flex: 1; min-height: 0;
+  aspect-ratio: 16 / 9; object-fit: contain; background: #000;
+}
+.preview-pop-controls {
+  display: flex; gap: 6px; align-items: center; padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+.preview-pop-controls input[type='range'] { flex: 1; min-width: 0; accent-color: #ff5555; }
 .montage-toolbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .timeline-scroll { flex: 1; overflow: auto; position: relative; }
 .timeline-inner { position: relative; }
@@ -216,7 +241,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .tl-clip.selected { outline: 2px solid #fff; }
 .tl-clip.by-ai { background: #6a4a8c; border-color: #9b6fd0; }
-.tl-clip .label { padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.tl-clip .label { position: relative; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+/* Premiere-style single thumbnail at the head of the clip, below the label bar. */
+.tl-clip .film {
+  position: absolute; left: 0; top: 18px; height: calc(100% - 18px); width: auto;
+  pointer-events: none; user-select: none;
+}
 .tl-clip .trim { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .tl-clip .trim.l { left: 0; } .tl-clip .trim.r { right: 0; }
 .tl-playhead { position: absolute; top: 0; bottom: 0; width: 1.5px; background: #ff5555; z-index: 6; pointer-events: none; }

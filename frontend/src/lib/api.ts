@@ -143,6 +143,7 @@ export const api = {
 
 export const media = {
   video: (pid: string, vid: number) => `/media/${pid}/video/${vid}`,
+  preview: (pid: string, vid: number) => `/media/${pid}/preview/${vid}`,
   thumb: (pid: string, vid: number) => `/media/${pid}/thumb/${vid}`,
   filmstrip: (pid: string, vid: number) => `/media/${pid}/filmstrip/${vid}`,
   song: (pid: string) => `/media/${pid}/song`,

@@ -21,6 +21,7 @@ export interface AppSettings {
     jpeg_quality: number
     filmstrip_tiles: number
     proxy_height: number
+    preview_height: number
   }
   ai: {
     provider: string
