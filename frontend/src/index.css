@@ -193,6 +193,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .bin-item .meta .name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bin-item .meta .sub { font-size: 11px; color: var(--text-dim); }
 .bin-range { margin-left: 12px; font-size: 11px; color: var(--accent); cursor: grab; padding: 2px 6px; }
+.compose-panel {
+  display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px;
+  margin-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.compose-panel textarea { resize: vertical; font-size: 12px; }
 
 .montage-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .montage-toolbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
@@ -207,7 +212,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   border-radius: 6px; overflow: hidden; cursor: grab; font-size: 11px;
 }
 .tl-clip.selected { outline: 2px solid #fff; }
-.tl-clip.by-claude { background: #6a4a8c; border-color: #9b6fd0; }
+.tl-clip.by-ai { background: #6a4a8c; border-color: #9b6fd0; }
 .tl-clip .label { padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 .tl-clip .trim { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .tl-clip .trim.l { left: 0; } .tl-clip .trim.r { right: 0; }

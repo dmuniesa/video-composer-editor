@@ -111,6 +111,16 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             <option value="off">Disabled</option>
           </select>
 
+          <label>Composer provider (Montage)</label>
+          <select
+            value={settings.composer.provider}
+            onChange={(e) => set({ composer: { provider: e.target.value } })}
+          >
+            <option value="mcp">Claude via MCP (external, as before)</option>
+            <option value="agy">Antigravity CLI (Gemini) — one-shot prompt</option>
+            <option value="openai">OpenAI-compatible endpoint — one-shot prompt</option>
+          </select>
+
           <label>Antigravity command</label>
           <input
             value={a.agy_cmd}
@@ -154,6 +164,12 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <button onClick={testAI} disabled={busy}>Save & test AI</button>
           <span className="hint">{testResult}</span>
         </div>
+        <p className="hint" style={{ marginTop: 10 }}>
+          The <b>composer provider</b> powers the Auto-compose button on the Montage page: agy and
+          the OpenAI endpoint reuse the credentials above and compose through a single prompt. With{' '}
+          <b>Claude via MCP</b> the button is disabled — compose by talking to Claude with the MCP
+          server registered, as before (see README).
+        </p>
         <p className="hint" style={{ marginTop: 10 }}>
           For <b>z.ai GLM</b>, the base URL depends on your plan: API plan →{' '}
           <code>https://api.z.ai/api/paas/v4</code> (e.g. model <code>glm-4.6v-flash</code>);{' '}

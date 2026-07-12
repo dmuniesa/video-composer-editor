@@ -171,7 +171,7 @@ class TimelineClip(Base):
     timeline_start: Mapped[float] = mapped_column(Float)
     source_in: Mapped[float] = mapped_column(Float)
     source_out: Mapped[float] = mapped_column(Float)
-    placed_by: Mapped[str] = mapped_column(String, default="user")  # user | claude
+    placed_by: Mapped[str] = mapped_column(String, default="user")  # user | claude | agy | openai
 
     track: Mapped[Track] = relationship(back_populates="clips")
     video: Mapped[Video] = relationship()

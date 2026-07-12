@@ -8,6 +8,8 @@ export interface ProjectInfo {
   videos_by_status: Record<string, number>
   ai_available: boolean
   ai_provider: string | null
+  composer_provider: string
+  composer_available: boolean
 }
 
 export interface AppSettings {
@@ -27,6 +29,9 @@ export interface AppSettings {
     openai_api_key: string
     openai_model: string
     timeout_s: number
+  }
+  composer: {
+    provider: string
   }
   debug_logging: boolean
   ai_status?: { available: boolean; provider: string | null }

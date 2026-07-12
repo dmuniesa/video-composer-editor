@@ -28,7 +28,7 @@ class Broadcaster:
     def publish(self, pid: str, event: str, data: dict[str, Any] | None = None) -> None:
         """Thread-safe publish; callable from worker threads."""
         payload = {"event": event, "data": data or {}}
-        if self._loop is None:
+        if self._loop is None or self._loop.is_closed():
             return
         self._loop.call_soon_threadsafe(self._publish_now, pid, payload)
 
@@ -45,7 +45,7 @@ class Broadcaster:
         Used for global events (e.g. log lines) that aren't tied to one
         project's state."""
         payload = {"event": event, "data": data or {}}
-        if self._loop is None:
+        if self._loop is None or self._loop.is_closed():
             return
         self._loop.call_soon_threadsafe(self._publish_all_now, payload)
 
