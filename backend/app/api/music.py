@@ -7,16 +7,40 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from .. import db as dbm
+from .. import db as dbm, settings
 from ..events import broadcaster
 from ..models import Song, SongSection
-from ..services import ai, jobs, pipeline
+from ..services import ai, jobs, lyrics as lyrics_svc, pipeline
 from .deps import resolve_project
 
 router = APIRouter()
 
 
+def _lyrics_dict(song: Song) -> dict | None:
+    row = song.lyrics
+    if row is None:
+        return None
+    out = {
+        "status": row.status,
+        "error": row.error,
+        "language": row.language,
+        "model": row.model,
+        "segments": row.segments,
+        "vocal_ranges": [],
+        "instrumental_ranges": [],
+    }
+    if row.status == "ready":
+        vocals = lyrics_svc.vocal_ranges(row.segments)
+        out["vocal_ranges"] = vocals
+        out["instrumental_ranges"] = lyrics_svc.instrumental_ranges(
+            vocals, song.duration, settings.get().lyrics.min_instrumental_gap
+        )
+    return out
+
+
 def _song_dict(song: Song) -> dict:
+    lyr = _lyrics_dict(song)
+    vocals = lyr["vocal_ranges"] if lyr and lyr["status"] == "ready" else None
     return {
         "path": song.path,
         "duration": song.duration,
@@ -25,6 +49,8 @@ def _song_dict(song: Song) -> dict:
         "downbeats": song.downbeats,
         "status": song.status,
         "error": song.error,
+        "lyrics": lyr,
+        "lyrics_enabled": settings.get().lyrics.enabled,
         "sections": [
             {
                 "id": s.id,
@@ -33,6 +59,11 @@ def _song_dict(song: Song) -> dict:
                 "label": s.label,
                 "source": s.source,
                 "energy": s.energy,
+                "vocal_ratio": (
+                    lyrics_svc.vocal_ratio(s.start, s.end, vocals)
+                    if vocals is not None
+                    else None
+                ),
             }
             for s in song.sections
         ],
@@ -68,6 +99,23 @@ def song_reanalyze(pid: str) -> dict:
     return {"ok": True}
 
 
+@router.post("/projects/{pid}/song/lyrics")
+def song_transcribe(pid: str) -> dict:
+    """(Re)run the Whisper lyrics transcription for the song."""
+    video_dir = resolve_project(pid)
+    if not settings.get().lyrics.enabled:
+        raise HTTPException(409, "Lyrics analysis is disabled — enable it in Settings.")
+    if not lyrics_svc.available():
+        raise HTTPException(409, lyrics_svc.unavailable_reason())
+    with dbm.open_session(video_dir) as db:
+        song = db.scalar(select(Song))
+        if song is None or song.status != "ready":
+            raise HTTPException(409, "song not analyzed yet")
+    if not pipeline.queue_lyrics_job(pid, video_dir, force=True):
+        raise HTTPException(409, "a lyrics transcription is already running")
+    return {"ok": True}
+
+
 @router.post("/projects/{pid}/song/label")
 def song_label(pid: str) -> dict:
     """Re-run AI semantic labeling on existing sections."""
@@ -86,6 +134,8 @@ def song_label(pid: str) -> dict:
                 {"start": s.start, "end": s.end, "energy": s.energy, "cluster": 0}
                 for s in song.sections
             ]
+            if song.lyrics is not None and song.lyrics.status == "ready":
+                lyrics_svc.attach_hints(sections, song.lyrics.segments)
             labels = ai.label_sections(song.duration, song.bpm or 0.0, sections)
             for section, label in zip(song.sections, labels):
                 if label:

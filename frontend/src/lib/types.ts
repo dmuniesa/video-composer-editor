@@ -34,6 +34,12 @@ export interface AppSettings {
   composer: {
     provider: string
   }
+  lyrics: {
+    enabled: boolean
+    whisper_model: string
+    language: string
+    min_instrumental_gap: number
+  }
   debug_logging: boolean
   ai_status?: { available: boolean; provider: string | null }
 }
@@ -75,6 +81,28 @@ export interface SongSection {
   label: string
   source: string
   energy: number
+  vocal_ratio: number | null
+}
+
+export interface LyricLine {
+  start: number
+  end: number
+  text: string
+}
+
+export interface TimeRange {
+  start: number
+  end: number
+}
+
+export interface SongLyrics {
+  status: string
+  error: string | null
+  language: string
+  model: string
+  segments: LyricLine[]
+  vocal_ranges: TimeRange[]
+  instrumental_ranges: TimeRange[]
 }
 
 export interface SongInfo {
@@ -85,6 +113,8 @@ export interface SongInfo {
   downbeats: number[]
   status: string
   error: string | null
+  lyrics: SongLyrics | null
+  lyrics_enabled: boolean
   sections: SongSection[]
 }
 

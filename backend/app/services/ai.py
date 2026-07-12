@@ -48,8 +48,13 @@ Reply with ONLY a JSON array (no markdown fence), one item per section, in order
 [{{"index": 0, "label": "intro"}}, ...]
 Use labels from: intro, verse, pre-chorus, chorus, bridge, instrumental, drop, outro.
 Sections sharing a cluster id usually share a label (e.g. all choruses).
-High-energy repeated sections are usually the chorus/drop.\
+High-energy repeated sections are usually the chorus/drop.{lyrics_note}\
 """
+
+LYRICS_NOTE = """
+Some sections include vocals=<percent of the section with singing> and a lyrics
+snippet. Sections with (near) zero vocals are instrumental/intro/outro; sections
+repeating the same lyrics are the chorus; unique lyrics suggest verses."""
 
 
 def provider() -> str | None:
@@ -176,12 +181,28 @@ def analyze_video_frames(frame_paths: list[Path], workdir: Path) -> dict:
 
 def label_sections(duration: float, bpm: float, sections: list[dict]) -> list[str]:
     """Semantically label sections found by librosa. Returns one label per
-    section (same order); callers degrade gracefully on failure."""
-    table = "\n".join(
-        f"{i}: {s['start']:.1f}-{s['end']:.1f}s energy={s['energy']:.2f} cluster={s.get('cluster', 0)}"
-        for i, s in enumerate(sections)
+    section (same order); callers degrade gracefully on failure.
+
+    Sections may carry optional lyric hints from the Whisper transcription:
+    "vocal_ratio" (0-1) and "lyrics" (snippet of the sung lines)."""
+    has_lyrics = any("vocal_ratio" in s for s in sections)
+
+    def row(i: int, s: dict) -> str:
+        line = f"{i}: {s['start']:.1f}-{s['end']:.1f}s energy={s['energy']:.2f} cluster={s.get('cluster', 0)}"
+        if "vocal_ratio" in s:
+            line += f" vocals={round(s['vocal_ratio'] * 100)}%"
+            if s.get("lyrics"):
+                line += f' lyrics="{s["lyrics"]}"'
+        return line
+
+    table = "\n".join(row(i, s) for i, s in enumerate(sections))
+    prompt = SECTION_PROMPT.format(
+        duration=duration,
+        bpm=bpm or 0.0,
+        table=table,
+        lyrics_note=LYRICS_NOTE if has_lyrics else "",
     )
-    raw = _ask(SECTION_PROMPT.format(duration=duration, bpm=bpm or 0.0, table=table), [], None)
+    raw = _ask(prompt, [], None)
     data = json.loads(_extract_json(raw))
     labels = [""] * len(sections)
     for item in data:

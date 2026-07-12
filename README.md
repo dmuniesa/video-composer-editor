@@ -7,7 +7,7 @@ A locally-run web app that:
 1. **Scans** a folder of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
 2. **Analyzes every clip with AI**: description, 1–10 score, and hashtags — via Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`, Gemini) or any **OpenAI-compatible endpoint** (z.ai GLM, OpenAI, OpenRouter, Ollama…), selectable on the in-app Settings page.
 3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
-4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …).
+4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …). Optionally (Settings) it also **transcribes the lyrics locally with Whisper** and detects vocal vs. melody-only (instrumental) passages — shown on the Music page and fed to the AI composer.
 5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
 6. **Exports FCP7 XML (`xmeml` v5)** that Premiere Pro imports directly as a sequence linked to your original files, ready for final editing and color grading.
 
@@ -156,7 +156,7 @@ command template: `AGY_CMD="/path/to/agy -p" uvicorn ...`
 |---|---|
 | **Setup** | Browse to your video folder → the app scans it and queues frame extraction + AI analysis. Pick the song here too. |
 | **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. |
-| **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. |
+| **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. With lyrics enabled: timestamped lyrics (click a line to seek), a vocal/melody-only strip over the waveform, and a vocals % per section. |
 | **Montage** | Drag clips (or their ranges) from the bin onto the tracks. Drag to move, edge-drag to trim, snapping to beats/sections (**S** toggles). **Space** previews audio + a jump-cut video preview. **Del** removes the selected clip. |
 | **Export** | "Export to Premiere" downloads `montage.xml`. In Premiere: **File → Import**, and the sequence appears with your clips and the song, linked to the original files. Relink if your media moved. |
 
@@ -171,8 +171,10 @@ claude mcp add montage -- /abs/path/backend/.venv/bin/python /abs/path/backend/m
 ```
 
 Tools: `get_project_summary`, `list_videos`, `get_music_sections`, `get_beats`,
-`get_timeline`, `place_clip`, `move_clip`, `remove_clip`, `clear_track`.
-Track numbers are 0-based indexes; rejected videos are never listed.
+`get_lyrics`, `get_timeline`, `place_clip`, `move_clip`, `remove_clip`,
+`clear_track`. Track numbers are 0-based indexes; rejected videos are never
+listed. With lyrics analysis enabled, `get_lyrics` returns the timestamped
+lines and the instrumental ranges, and sections carry a `vocal_ratio`.
 
 Then ask Claude, for example:
 
@@ -209,6 +211,13 @@ golden-file test for the Premiere XML.
 
 - Antigravity CLI does not officially support audio input, so music analysis is
   local (librosa) and Gemini only labels the sections from the extracted data.
+- Lyrics transcription is optional and fully local (Whisper via
+  [faster-whisper](https://github.com/SYSTRAN/faster-whisper)). Enable it in
+  **Settings → Music analysis** and install the extra dependency:
+  `.venv/bin/pip install -e ".[lyrics]"` (or `pip install faster-whisper`).
+  The first run downloads the Whisper model. Vocal detection is derived from
+  the transcription, so a fully instrumental track simply yields one long
+  melody-only range.
 - The timeline preview is best-effort (jump cuts, not frame-accurate rendering) —
   the real render happens in Premiere.
 - HEVC/10-bit clips get a 720p H.264 proxy for browser playback; the exported
