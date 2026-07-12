@@ -8,10 +8,10 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from .. import db as dbm
+from .. import db as dbm, settings
 from ..events import broadcaster
-from ..models import Song, SongSection, Video, VideoAnalysis, VideoRating
-from . import ai, audio_analysis, frames, jobs, scanner
+from ..models import Song, SongLyrics, SongSection, Video, VideoAnalysis, VideoRating
+from . import ai, audio_analysis, frames, jobs, lyrics, scanner
 
 
 def video_cache(video_dir: Path, cache_key: str) -> Path:
@@ -212,6 +212,10 @@ def queue_song_job(pid: str, video_dir: Path) -> None:
                 if ai.available():
                     jobs.update(job, 0.8, "labeling sections (AI)")
                     try:
+                        # On re-analysis a previous transcription may already
+                        # exist; its lyrics sharpen the section labels.
+                        if song.lyrics is not None and song.lyrics.status == "ready":
+                            lyrics.attach_hints(result.sections, song.lyrics.segments)
                         labels = ai.label_sections(
                             result.duration, result.bpm, result.sections
                         )
@@ -233,4 +237,56 @@ def queue_song_job(pid: str, video_dir: Path) -> None:
             finally:
                 broadcaster.publish(pid, "song", {})
 
+        queue_lyrics_job(pid, video_dir)
+
     jobs.submit(pid, "song", "analyze song", work, pool="audio")
+
+
+def queue_lyrics_job(pid: str, video_dir: Path, force: bool = False) -> bool:
+    """Queue Whisper lyrics transcription for the song. Returns False when
+    skipped (disabled in Settings, faster-whisper missing, already done...)."""
+    conf = settings.get().lyrics
+    if not conf.enabled or not lyrics.available():
+        return False
+    if jobs.has_active(pid, "lyrics"):
+        return False
+    with dbm.open_session(video_dir) as db:
+        song = db.scalar(select(Song))
+        if song is None or song.status != "ready":
+            return False
+        existing = song.lyrics
+        if existing is not None and existing.status == "ready" and not force:
+            return False
+
+    def work(job: jobs.Job) -> None:
+        conf = settings.get().lyrics
+        with dbm.open_session(video_dir) as db:
+            song = db.scalar(select(Song))
+            if song is None:
+                return
+            row = song.lyrics or SongLyrics(song_id=song.id)
+            row.status = "transcribing"
+            row.error = None
+            row.model = conf.whisper_model
+            db.add(row)
+            db.commit()
+            broadcaster.publish(pid, "song", {})
+            try:
+                jobs.update(job, 0.1, f"transcribing lyrics (whisper {conf.whisper_model})")
+                result = lyrics.transcribe(
+                    Path(song.path), conf.whisper_model, conf.language
+                )
+                row.language = result["language"]
+                row.segments_json = json.dumps(result["segments"], ensure_ascii=False)
+                row.status = "ready"
+                db.commit()
+            except Exception as exc:
+                row.status = "error"
+                row.error = str(exc)
+                db.commit()
+                raise
+            finally:
+                broadcaster.publish(pid, "song", {})
+
+    jobs.submit(pid, "lyrics", "transcribe lyrics", work, pool="audio")
+    return True

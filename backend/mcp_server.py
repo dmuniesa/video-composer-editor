@@ -24,8 +24,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-from app import db as dbm  # noqa: E402
+from app import db as dbm, settings  # noqa: E402
 from app.models import Song, Video  # noqa: E402
+from app.services import lyrics as lyrics_svc  # noqa: E402
 from app.services import timeline_ops as ops  # noqa: E402
 
 parser = argparse.ArgumentParser()
@@ -129,15 +130,50 @@ def list_videos(
 @mcp.tool()
 def get_music_sections() -> list[dict]:
     """Song sections (intro/verse/chorus...) with start/end seconds and
-    relative energy 0-1. Cut points should usually align with these."""
+    relative energy 0-1. When lyrics were transcribed, each section also has
+    vocal_ratio (0-1, fraction with singing; ~0 = instrumental/melody-only).
+    Cut points should usually align with these."""
     with dbm.open_session(VIDEO_DIR) as db:
         song = db.scalar(select(Song))
         if song is None:
             return []
+        lyr = song.lyrics if song.lyrics is not None and song.lyrics.status == "ready" else None
+        vocals = lyrics_svc.vocal_ranges(lyr.segments) if lyr else None
         return [
-            {"start": s.start, "end": s.end, "label": s.label, "energy": s.energy}
+            {
+                "start": s.start,
+                "end": s.end,
+                "label": s.label,
+                "energy": s.energy,
+                **(
+                    {"vocal_ratio": lyrics_svc.vocal_ratio(s.start, s.end, vocals)}
+                    if vocals is not None
+                    else {}
+                ),
+            }
             for s in song.sections
         ]
+
+
+@mcp.tool()
+def get_lyrics() -> dict:
+    """Timestamped lyrics of the song (Whisper transcription) plus the
+    melody-only passages. Use them to match footage to what the lyrics say
+    and to place calmer/scenic shots over instrumental_ranges. Empty when
+    lyrics analysis is disabled in Settings or not transcribed yet."""
+    with dbm.open_session(VIDEO_DIR) as db:
+        song = db.scalar(select(Song))
+        if song is None or song.lyrics is None or song.lyrics.status != "ready":
+            return {"available": False, "lines": [], "instrumental_ranges": []}
+        vocals = lyrics_svc.vocal_ranges(song.lyrics.segments)
+        return {
+            "available": True,
+            "language": song.lyrics.language,
+            "lines": song.lyrics.segments,
+            "instrumental_ranges": lyrics_svc.instrumental_ranges(
+                vocals, song.duration, settings.get().lyrics.min_instrumental_gap
+            ),
+        }
 
 
 @mcp.tool()

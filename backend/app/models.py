@@ -120,6 +120,9 @@ class Song(Base):
     sections: Mapped[list[SongSection]] = relationship(
         back_populates="song", cascade="all, delete-orphan", order_by="SongSection.start"
     )
+    lyrics: Mapped[SongLyrics | None] = relationship(
+        back_populates="song", cascade="all, delete-orphan", uselist=False
+    )
 
     @property
     def beats(self) -> list[float]:
@@ -132,6 +135,32 @@ class Song(Base):
     def downbeats(self) -> list[float]:
         try:
             return json.loads(self.downbeats_json)
+        except (ValueError, TypeError):
+            return []
+
+
+class SongLyrics(Base):
+    """Whisper transcription of the song, one row per song. Lives in its own
+    table (not columns on Song) so existing project databases keep working
+    without a migration — create_all only adds new tables."""
+
+    __tablename__ = "song_lyrics"
+
+    song_id: Mapped[int] = mapped_column(ForeignKey("song.id"), primary_key=True)
+    # pending -> transcribing -> ready | error
+    status: Mapped[str] = mapped_column(String, default="pending")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    language: Mapped[str] = mapped_column(String, default="")
+    model: Mapped[str] = mapped_column(String, default="")
+    # [{"start": s, "end": s, "text": "..."}] — one item per sung line
+    segments_json: Mapped[str] = mapped_column(Text, default="[]")
+
+    song: Mapped[Song] = relationship(back_populates="lyrics")
+
+    @property
+    def segments(self) -> list[dict]:
+        try:
+            return json.loads(self.segments_json)
         except (ValueError, TypeError):
             return []
 

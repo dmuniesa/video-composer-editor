@@ -136,6 +136,25 @@ If the Antigravity CLI is available the sections come pre-labeled by Gemini
 Good section boundaries matter: they're snap targets on the timeline and the
 main hint Claude uses to decide where each kind of clip belongs.
 
+### Lyrics & vocals (optional)
+
+Enable **Settings → Music analysis — lyrics & vocals** (and install
+`faster-whisper` in the backend environment) to transcribe the song locally
+with Whisper. It runs automatically after the song analysis, or on demand with
+**Transcribe lyrics**. You get:
+
+- a **Lyrics** panel with every sung line and its timestamp — click a line to
+  jump there; the current line is highlighted during playback,
+- a thin strip over the waveform: **green** where there are vocals, **teal**
+  for melody-only (instrumental) passages,
+- a **vocals** column per section (🎸 melody = no singing) — handy to place
+  scenic footage on instrumental parts and people/action on the verses,
+- better AI labels (repeated lyrics reveal the chorus), and the AI composer
+  (Claude via MCP, agy or GLM) receives the lyrics and instrumental ranges to
+  match footage to what the song says.
+
+Everything stays on your machine; nothing is uploaded.
+
 ## 5. Build the montage
 
 The **Montage** page has the **bin** on the left (all non-rejected videos,

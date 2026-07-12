@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from .. import db as dbm
 from .. import settings
 from ..models import Song, Video
-from . import gemini, jobs, openai_client
+from . import gemini, jobs, lyrics as lyrics_svc, openai_client
 from . import timeline_ops as ops
 from .ai import AIError, _extract_json
 
@@ -27,6 +27,7 @@ log = logging.getLogger(__name__)
 
 MAX_ACTIONS = 300
 MAX_BEATS_IN_PROMPT = 500
+MAX_LYRIC_LINES_IN_PROMPT = 200
 
 COMPOSE_PROMPT = """\
 You are composing a video montage timeline synced to a song. Below is the
@@ -59,7 +60,11 @@ Rules:
 - Clips on the same track must not overlap; source_in/source_out must stay
   within the video's duration; the montage should not run past the song's end.
 - Prefer high-star and high-score videos and their hand-picked ranges; vary
-  the footage instead of reusing one video back to back.\
+  the footage instead of reusing one video back to back.
+- If the song includes lyrics/vocal data (timestamped lines, per-section
+  vocal_ratio, instrumental_ranges): match footage to what the lyrics say or
+  evoke, use calmer/scenic shots over melody-only instrumental passages, and
+  save the most striking footage for the chorus.\
 """
 
 
@@ -106,6 +111,8 @@ def build_context(db: Session) -> dict:
     song_ctx = None
     if song is not None:
         beats = song.beats
+        lyr = song.lyrics if song.lyrics is not None and song.lyrics.status == "ready" else None
+        vocals = lyrics_svc.vocal_ranges(lyr.segments) if lyr else None
         song_ctx = {
             "duration": _round(song.duration),
             "bpm": _round(song.bpm),
@@ -115,11 +122,25 @@ def build_context(db: Session) -> dict:
                     "end": _round(s.end),
                     "label": s.label,
                     "energy": _round(s.energy),
+                    **(
+                        {"vocal_ratio": lyrics_svc.vocal_ratio(s.start, s.end, vocals)}
+                        if vocals is not None
+                        else {}
+                    ),
                 }
                 for s in song.sections
             ],
             "downbeats": [_round(b) for b in song.downbeats],
         }
+        if lyr:
+            song_ctx["lyrics_language"] = lyr.language
+            song_ctx["lyrics"] = [
+                {"start": _round(s["start"]), "end": _round(s["end"]), "text": s["text"]}
+                for s in lyr.segments[:MAX_LYRIC_LINES_IN_PROMPT]
+            ]
+            song_ctx["instrumental_ranges"] = lyrics_svc.instrumental_ranges(
+                vocals, song.duration, settings.get().lyrics.min_instrumental_gap
+            )
         if len(beats) <= MAX_BEATS_IN_PROMPT:
             song_ctx["beats"] = [_round(b) for b in beats]
         else:

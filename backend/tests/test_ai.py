@@ -56,6 +56,31 @@ def test_label_sections_with_fake_cli(fake_agy):
     assert labels == ["intro", "verse", "chorus", "outro"]
 
 
+def test_label_sections_includes_lyric_hints(monkeypatch):
+    """When sections carry Whisper hints, the prompt shows vocals% + lyrics
+    and the explanatory note; without hints the prompt stays as before."""
+    prompts = []
+
+    def fake_ask(prompt, images, workdir):
+        prompts.append(prompt)
+        return '[{"index": 0, "label": "instrumental"}, {"index": 1, "label": "verse"}]'
+
+    monkeypatch.setattr(ai, "_ask", fake_ask)
+    sections = [
+        {"start": 0, "end": 10, "energy": 0.4, "cluster": 0, "vocal_ratio": 0.0, "lyrics": ""},
+        {"start": 10, "end": 20, "energy": 0.8, "cluster": 1, "vocal_ratio": 0.72, "lyrics": "hello sun"},
+    ]
+    labels = ai.label_sections(20.0, 120.0, sections)
+    assert labels == ["instrumental", "verse"]
+    assert "vocals=0%" in prompts[0]
+    assert 'vocals=72% lyrics="hello sun"' in prompts[0]
+    assert "zero vocals are instrumental" in prompts[0]
+
+    ai.label_sections(20.0, 120.0, [{"start": 0, "end": 20, "energy": 1.0, "cluster": 0}])
+    assert "vocals=" not in prompts[1]
+    assert "zero vocals" not in prompts[1]
+
+
 def test_agy_missing_binary(monkeypatch, tmp_path):
     monkeypatch.setenv("AGY_CMD", "definitely-not-a-real-binary --headless -p")
     assert not gemini.agy_available()

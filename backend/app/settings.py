@@ -53,6 +53,25 @@ class AISettings(BaseModel):
     timeout_s: int = Field(300, ge=10, le=1800)
 
 
+class LyricsSettings(BaseModel):
+    """Optional deeper music analysis: transcribe the song's lyrics locally
+    with Whisper (faster-whisper) and derive where the vocals are, so both
+    the Music page and the AI composer know verses/choruses by their words
+    and can spot melody-only (instrumental) passages.
+
+    Requires the optional dependency: pip install faster-whisper
+    Disabled by default because the model download + transcription are slow."""
+
+    enabled: bool = False
+    # Whisper model size: tiny/base/small/medium/large-v3 (or any CTranslate2
+    # model name faster-whisper accepts). Bigger = better lyrics, slower.
+    whisper_model: str = "small"
+    # ISO-639-1 code ("es", "en"...); empty = auto-detect.
+    language: str = ""
+    # A gap without vocals at least this long counts as an instrumental part.
+    min_instrumental_gap: float = Field(5.0, ge=2, le=60)
+
+
 class ComposerSettings(BaseModel):
     """Who auto-composes the timeline from the Montage page.
 
@@ -72,6 +91,7 @@ class Settings(BaseModel):
     frames: FrameSettings = Field(default_factory=FrameSettings)
     ai: AISettings = Field(default_factory=AISettings)
     composer: ComposerSettings = Field(default_factory=ComposerSettings)
+    lyrics: LyricsSettings = Field(default_factory=LyricsSettings)
     # Verbose backend logging: captures full AI prompts and raw model responses
     # in the Logs tab. Env var MONTAGE_LOG_LEVEL, when set, overrides this.
     debug_logging: bool = False

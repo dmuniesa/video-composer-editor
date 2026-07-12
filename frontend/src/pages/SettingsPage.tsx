@@ -20,6 +20,8 @@ export default function SettingsPage({ pid }: { pid?: string }) {
   const setAI = (patch: Partial<AppSettings['ai']>) => set({ ai: { ...settings.ai, ...patch } })
   const setFrames = (patch: Partial<AppSettings['frames']>) =>
     set({ frames: { ...settings.frames, ...patch } })
+  const setLyrics = (patch: Partial<AppSettings['lyrics']>) =>
+    set({ lyrics: { ...settings.lyrics, ...patch } })
 
   const save = async () => {
     setBusy(true)
@@ -244,6 +246,65 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             Re-extract frames for this project
           </button>
         )}
+      </div>
+
+      <div className="panel">
+        <h2>Music analysis — lyrics & vocals</h2>
+        <p className="hint">
+          Transcribes the song's lyrics locally with Whisper and detects where the vocals are.
+          The Music page then shows the timestamped lyrics and the melody-only (instrumental)
+          passages, and the AI composer/labeler uses them to match footage to the song. Nothing
+          leaves your machine.
+        </p>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.lyrics.enabled}
+            onChange={(e) => setLyrics({ enabled: e.target.checked })}
+          />
+          <span>
+            <b>Transcribe lyrics when analyzing the song</b>
+            <br />
+            <span className="hint">
+              Requires <code>pip install faster-whisper</code> in the backend environment. The
+              first run downloads the Whisper model. You can also run it on demand from the Music
+              page.
+            </span>
+          </span>
+        </label>
+        <div className="settings-grid" style={{ marginTop: 10 }}>
+          <label>Whisper model</label>
+          <select
+            value={settings.lyrics.whisper_model}
+            onChange={(e) => setLyrics({ whisper_model: e.target.value })}
+          >
+            <option value="tiny">tiny — fastest, rough</option>
+            <option value="base">base</option>
+            <option value="small">small — good default</option>
+            <option value="medium">medium</option>
+            <option value="large-v3">large-v3 — best, slow</option>
+          </select>
+
+          <label>Language (ISO code, empty = auto)</label>
+          <input
+            value={settings.lyrics.language}
+            onChange={(e) => setLyrics({ language: e.target.value })}
+            placeholder="auto (or es, en, fr…)"
+          />
+
+          <label>Min. instrumental gap (s)</label>
+          <input
+            type="number"
+            min={2}
+            max={60}
+            value={settings.lyrics.min_instrumental_gap}
+            onChange={(e) => setLyrics({ min_instrumental_gap: num(e.target.value, 5) })}
+          />
+        </div>
+        <p className="hint" style={{ marginTop: 10 }}>
+          A stretch without vocals at least this long is marked as an instrumental
+          (melody-only) part — useful spots for scenic footage.
+        </p>
       </div>
 
       <div className="panel">

@@ -99,6 +99,8 @@ export const api = {
     req<{ ok: boolean }>(`/api/projects/${pid}/song/reanalyze`, { method: 'POST' }),
   songLabel: (pid: string) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/song/label`, { method: 'POST' }),
+  songTranscribe: (pid: string) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/song/lyrics`, { method: 'POST' }),
   updateSection: (pid: string, sid: number, patch: { label?: string; start?: number; end?: number }) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/song/sections/${sid}`, {
       method: 'PATCH',
