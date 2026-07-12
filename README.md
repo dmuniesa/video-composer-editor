@@ -211,10 +211,9 @@ golden-file test for the Premiere XML.
 
 - Antigravity CLI does not officially support audio input, so music analysis is
   local (librosa) and Gemini only labels the sections from the extracted data.
-- Lyrics transcription is optional and fully local (Whisper via
-  [faster-whisper](https://github.com/SYSTRAN/faster-whisper)). Enable it in
-  **Settings → Music analysis** and install the extra dependency:
-  `.venv/bin/pip install -e ".[lyrics]"` (or `pip install faster-whisper`).
+- Lyrics transcription is fully local (Whisper via
+  [faster-whisper](https://github.com/SYSTRAN/faster-whisper), installed as a
+  regular dependency). Enable it in **Settings → Music analysis**.
   The first run downloads the Whisper model. Vocal detection is derived from
   the transcription, so a fully instrumental track simply yields one long
   melody-only range.
