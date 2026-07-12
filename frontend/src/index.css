@@ -202,7 +202,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .compose-panel textarea { resize: vertical; font-size: 12px; }
 
-.montage-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.montage-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+/* Floating program monitor: anchored to the bottom-right corner over the
+   timeline, sized relative to the viewport so it stays small on small windows. */
+.preview-pop {
+  position: absolute; right: 14px; bottom: 44px; z-index: 20;
+  width: clamp(180px, 28vw, 380px);
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55); overflow: hidden;
+}
+.preview-pop-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 3px 4px 3px 8px; font-size: 11px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+}
+.preview-pop video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
 .montage-toolbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .timeline-scroll { flex: 1; overflow: auto; position: relative; }
 .timeline-inner { position: relative; }

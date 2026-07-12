@@ -32,6 +32,7 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dropTrack, setDropTrack] = useState<number | null>(null)
   const [playhead, setPlayhead] = useState(0)
+  const [previewOpen, setPreviewOpen] = useState(true)
   const [toast, setToast] = useState('')
   const [composerProvider, setComposerProvider] = useState('mcp')
   const [composerAvailable, setComposerAvailable] = useState(false)
@@ -146,6 +147,8 @@ export default function MontagePage({ pid }: { pid: string }) {
     [tracks],
   )
 
+  // The <audio> element only mounts once the song has loaded, so this must
+  // re-run on `song` — with [] it would bind before the element exists.
   useEffect(() => {
     const el = audioRef.current
     if (!el) return
@@ -158,17 +161,19 @@ export default function MontagePage({ pid }: { pid: string }) {
     const onPause = () => cancelAnimationFrame(raf)
     el.addEventListener('play', onPlay)
     el.addEventListener('pause', onPause)
+    if (!el.paused) onPlay()
     return () => {
       el.removeEventListener('play', onPlay)
       el.removeEventListener('pause', onPause)
       cancelAnimationFrame(raf)
     }
-  }, [])
+  }, [song])
 
   useEffect(() => {
     const pv = previewRef.current
     if (!pv) return
     const clip = clipAt(playhead)
+    void previewOpen // re-sync the <video> right after the popup (re)mounts
     if (!clip) {
       pv.pause()
       pv.removeAttribute('src')
@@ -186,7 +191,7 @@ export default function MontagePage({ pid }: { pid: string }) {
     const playing = audioRef.current && !audioRef.current.paused
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
-  }, [playhead, clipAt, pid])
+  }, [playhead, clipAt, pid, previewOpen])
 
   const seek = (t: number) => {
     if (audioRef.current) audioRef.current.currentTime = Math.max(0, t)
@@ -417,7 +422,9 @@ export default function MontagePage({ pid }: { pid: string }) {
             </button>
           )}
           <span className="spacer" style={{ flex: 1 }} />
-          <video ref={previewRef} muted style={{ height: 54, borderRadius: 6, background: '#000' }} />
+          <button className="small" onClick={() => setPreviewOpen((v) => !v)}>
+            {previewOpen ? '✕ preview' : '▶ preview'}
+          </button>
           <span className="hint">{fmtTime(playhead)}</span>
           <a href={`/api/projects/${pid}/export.xml`} download>
             <button className="primary">Export to Premiere</button>
@@ -425,6 +432,16 @@ export default function MontagePage({ pid }: { pid: string }) {
         </div>
 
         {song && <audio ref={audioRef} src={media.song(pid)} style={{ display: 'none' }} />}
+
+        {previewOpen && (
+          <div className="preview-pop">
+            <div className="preview-pop-head">
+              <span>preview · {fmtTime(playhead)}</span>
+              <button className="small" onClick={() => setPreviewOpen(false)} title="close">✕</button>
+            </div>
+            <video ref={previewRef} muted playsInline />
+          </div>
+        )}
 
         <div className="timeline-scroll" ref={scrollRef}>
           <div className="timeline-inner" style={{ width: width + 60 }}>
