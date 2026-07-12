@@ -59,7 +59,7 @@ export default function HomePage() {
   return (
     <div className="home-page">
       <nav className="home-nav">
-        <span className="brand">🎬 Montage</span>
+        <span className="brand">🎬 Beatcut</span>
         <span className="spacer" />
         <Link to="/guide">Guide</Link>
         <Link to="/settings">Settings</Link>

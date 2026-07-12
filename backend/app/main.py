@@ -38,7 +38,7 @@ def _configure_logging() -> None:
 
 _configure_logging()
 
-app = FastAPI(title="Video Montage Composer")
+app = FastAPI(title="Beatcut")
 
 app.add_middleware(
     CORSMiddleware,

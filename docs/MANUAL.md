@@ -31,7 +31,7 @@ database inside `<folder>/.montage-cache/`, next to the footage. That means:
 - **Close anything anytime** — browser tab, server, reboot — and reopen the
   project later exactly where you left it (background jobs that were running
   can be re-queued with *Rescan* / *Analyze all*).
-- **Open another project** whenever you want: click the **🎬 Montage** logo
+- **Open another project** whenever you want: click the **🎬 Beatcut** logo
   (top-left) to go back to the home screen, which lists your recent projects;
   pick one or browse to a new folder. You can even work on two projects at
   once in two browser tabs.

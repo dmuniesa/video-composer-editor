@@ -335,7 +335,7 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
     <div className="app-shell">
       <nav className="app-nav">
         <Link to="/" className="brand" title="All projects">
-          🎬 Montage
+          🎬 Beatcut
         </Link>
         <span className="spacer" />
         <Link to="/">Home</Link>

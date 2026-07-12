@@ -1,4 +1,4 @@
-# 🎬 Video Montage Composer
+# 🎬 Beatcut
 
 Turn a folder of vacation videos + a song into an **Adobe Premiere Pro** project.
 
