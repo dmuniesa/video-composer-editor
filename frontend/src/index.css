@@ -216,7 +216,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .tl-clip.selected { outline: 2px solid #fff; }
 .tl-clip.by-ai { background: #6a4a8c; border-color: #9b6fd0; }
-.tl-clip .label { padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.tl-clip .label { position: relative; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+/* Premiere-style filmstrip below the label bar: the whole source video's strip
+   is scaled to timeline pixels and shifted by source_in, so the frame under any
+   point of the clip matches that moment of the footage. */
+.tl-clip .film {
+  position: absolute; left: 0; right: 0; top: 18px; bottom: 0;
+  background-repeat: no-repeat; pointer-events: none;
+}
 .tl-clip .trim { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .tl-clip .trim.l { left: 0; } .tl-clip .trim.r { right: 0; }
 .tl-playhead { position: absolute; top: 0; bottom: 0; width: 1.5px; background: #ff5555; z-index: 6; pointer-events: none; }

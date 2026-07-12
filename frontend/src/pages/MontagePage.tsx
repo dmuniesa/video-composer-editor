@@ -530,6 +530,16 @@ export default function MontagePage({ pid }: { pid: string }) {
                       style={{ left: shown.timeline_start * pxPerSec, width: Math.max(shown.duration * pxPerSec, 8) }}
                       onPointerDown={startDrag(clip, track.id, 'move')}
                     >
+                      {video && video.duration > 0 && (
+                        <div
+                          className="film"
+                          style={{
+                            backgroundImage: `url(${media.filmstrip(pid, clip.video_id)})`,
+                            backgroundSize: `${video.duration * pxPerSec}px 100%`,
+                            backgroundPosition: `${-shown.source_in * pxPerSec}px 0`,
+                          }}
+                        />
+                      )}
                       <div className="label">
                         {video?.filename ?? clip.video_id} · {fmtTime(shown.duration)}
                       </div>
@@ -547,7 +557,21 @@ export default function MontagePage({ pid }: { pid: string }) {
                       width: Math.max(drag.preview.duration * pxPerSec, 8),
                       opacity: 0.6,
                     }}
-                  />
+                  >
+                    {(() => {
+                      const v = videoById.get(drag.preview.video_id)
+                      return v && v.duration > 0 ? (
+                        <div
+                          className="film"
+                          style={{
+                            backgroundImage: `url(${media.filmstrip(pid, drag.preview.video_id)})`,
+                            backgroundSize: `${v.duration * pxPerSec}px 100%`,
+                            backgroundPosition: `${-drag.preview.source_in * pxPerSec}px 0`,
+                          }}
+                        />
+                      ) : null
+                    })()}
+                  </div>
                 )}
               </div>
             ))}
