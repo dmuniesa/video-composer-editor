@@ -217,6 +217,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   border-bottom: 1px solid var(--border);
 }
 .preview-pop video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+.preview-pop-controls {
+  display: flex; gap: 6px; align-items: center; padding: 4px 8px;
+  border-top: 1px solid var(--border);
+}
+.preview-pop-controls input[type='range'] { flex: 1; min-width: 0; accent-color: #ff5555; }
 .montage-toolbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .timeline-scroll { flex: 1; overflow: auto; position: relative; }
 .timeline-inner { position: relative; }

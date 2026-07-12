@@ -33,6 +33,8 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [dropTrack, setDropTrack] = useState<number | null>(null)
   const [playhead, setPlayhead] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(true)
+  const [previewLowRes, setPreviewLowRes] = useState(true)
+  const [playing, setPlaying] = useState(false)
   const [toast, setToast] = useState('')
   const [composerProvider, setComposerProvider] = useState('mcp')
   const [composerAvailable, setComposerAvailable] = useState(false)
@@ -157,8 +159,14 @@ export default function MontagePage({ pid }: { pid: string }) {
       setPlayhead(el.currentTime)
       raf = requestAnimationFrame(tick)
     }
-    const onPlay = () => (raf = requestAnimationFrame(tick))
-    const onPause = () => cancelAnimationFrame(raf)
+    const onPlay = () => {
+      setPlaying(true)
+      raf = requestAnimationFrame(tick)
+    }
+    const onPause = () => {
+      setPlaying(false)
+      cancelAnimationFrame(raf)
+    }
     el.addEventListener('play', onPlay)
     el.addEventListener('pause', onPause)
     if (!el.paused) onPlay()
@@ -168,6 +176,13 @@ export default function MontagePage({ pid }: { pid: string }) {
       cancelAnimationFrame(raf)
     }
   }, [song])
+
+  const togglePlay = () => {
+    const a = audioRef.current
+    if (!a) return
+    if (a.paused) a.play()
+    else a.pause()
+  }
 
   useEffect(() => {
     const pv = previewRef.current
@@ -180,7 +195,7 @@ export default function MontagePage({ pid }: { pid: string }) {
       pv.load()
       return
     }
-    const src = media.video(pid, clip.video_id)
+    const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
     const want = clip.source_in + (playhead - clip.timeline_start)
     if (!pv.src.endsWith(src)) {
       pv.src = src
@@ -191,7 +206,7 @@ export default function MontagePage({ pid }: { pid: string }) {
     const playing = audioRef.current && !audioRef.current.paused
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
-  }, [playhead, clipAt, pid, previewOpen])
+  }, [playhead, clipAt, pid, previewOpen, previewLowRes])
 
   const seek = (t: number) => {
     if (audioRef.current) audioRef.current.currentTime = Math.max(0, t)
@@ -204,8 +219,7 @@ export default function MontagePage({ pid }: { pid: string }) {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === ' ') {
         e.preventDefault()
-        const a = audioRef.current
-        if (a) (a.paused ? a.play() : a.pause())
+        togglePlay()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClip != null) {
         api.deleteClip(pid, selectedClip).then(refreshTimeline).catch((err) => setToast(err.message))
         setSelectedClip(null)
@@ -422,10 +436,14 @@ export default function MontagePage({ pid }: { pid: string }) {
             </button>
           )}
           <span className="spacer" style={{ flex: 1 }} />
+          <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
+          <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
+            {playing ? '⏸' : '▶'}
+          </button>
+          <span className="hint">{fmtTime(playhead)}</span>
           <button className="small" onClick={() => setPreviewOpen((v) => !v)}>
             {previewOpen ? '✕ preview' : '▶ preview'}
           </button>
-          <span className="hint">{fmtTime(playhead)}</span>
           <a href={`/api/projects/${pid}/export.xml`} download>
             <button className="primary">Export to Premiere</button>
           </a>
@@ -437,9 +455,32 @@ export default function MontagePage({ pid }: { pid: string }) {
           <div className="preview-pop">
             <div className="preview-pop-head">
               <span>preview · {fmtTime(playhead)}</span>
-              <button className="small" onClick={() => setPreviewOpen(false)} title="close">✕</button>
+              <span style={{ display: 'flex', gap: 4 }}>
+                <button
+                  className="small"
+                  onClick={() => setPreviewLowRes((v) => !v)}
+                  title={previewLowRes ? 'low-res proxy (smooth) — click for full quality' : 'full quality — click for smooth low-res'}
+                >
+                  {previewLowRes ? 'SD' : 'HD'}
+                </button>
+                <button className="small" onClick={() => setPreviewOpen(false)} title="close">✕</button>
+              </span>
             </div>
             <video ref={previewRef} muted playsInline />
+            <div className="preview-pop-controls">
+              <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
+              <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
+                {playing ? '⏸' : '▶'}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={duration}
+                step={0.1}
+                value={playhead}
+                onChange={(e) => seek(Number(e.target.value))}
+              />
+            </div>
           </div>
         )}
 

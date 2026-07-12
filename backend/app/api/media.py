@@ -80,6 +80,20 @@ def media_video(pid: str, vid: int, request: Request) -> Response:
     return _ranged(request, path)
 
 
+@router.get("/media/{pid}/preview/{vid}")
+def media_preview(pid: str, vid: int, request: Request) -> Response:
+    """Low-res preview proxy; falls back to the normal playback file while the
+    preview hasn't been generated yet (older scans, job still running)."""
+    video_dir, video = _get_video(pid, vid)
+    path = dbm.cache_dir_for(video_dir) / video.cache_key / "preview.mp4"
+    if not path.is_file():
+        if video.has_proxy:
+            path = dbm.cache_dir_for(video_dir) / video.cache_key / "proxy.mp4"
+        else:
+            path = video_dir / video.rel_path
+    return _ranged(request, path)
+
+
 @router.get("/media/{pid}/thumb/{vid}")
 def media_thumb(pid: str, vid: int) -> FileResponse:
     video_dir, video = _get_video(pid, vid)

@@ -234,6 +234,10 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <label>Proxy height (px)</label>
           <input type="number" min={240} max={1080} step={120} value={f.proxy_height}
             onChange={(e) => setFrames({ proxy_height: num(e.target.value, 720) })} />
+
+          <label>Preview height (px, montage SD mode)</label>
+          <input type="number" min={144} max={720} step={36} value={f.preview_height}
+            onChange={(e) => setFrames({ preview_height: num(e.target.value, 360) })} />
         </div>
         <p className="hint" style={{ marginTop: 10 }}>
           Example: min 3, max 10, +1 every 5 s → a 20 s clip gets 7 frames. Changes apply to
