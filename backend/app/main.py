@@ -31,7 +31,7 @@ def _configure_logging() -> None:
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s", "%H:%M:%S")
         )
         logger.addHandler(console)
-        logger.addHandler(BufferHandler())  # feeds /api/logs + the Logs tab
+        logger.addHandler(BufferHandler())  # persists + streams to the Logs tab
     logger.propagate = False  # don't double-log through the root logger
     apply_level()
 

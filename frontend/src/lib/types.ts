@@ -160,4 +160,5 @@ export interface LogRecord {
   level: string
   logger: string
   message: string
+  project_id?: string | null
 }

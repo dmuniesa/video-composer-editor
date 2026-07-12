@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from .. import logbuffer
 from ..events import broadcaster
 
 _id_counter = itertools.count(1)
@@ -71,7 +72,8 @@ def submit(
         job.status = "running"
         _emit(job)
         try:
-            fn(job)
+            with logbuffer.use_project(job.pid):
+                fn(job)
             job.status = "done"
             job.progress = 1.0
         except Exception as exc:  # noqa: BLE001 - report any failure to the UI

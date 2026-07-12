@@ -1,26 +1,44 @@
-"""In-memory ring buffer of the app's recent log records.
+"""Bridge from Python logging to the in-app Logs tab.
 
-Exposed to the UI (the Logs tab) and pushed live over SSE, so you can debug
-AI analysis (the agy/OpenAI calls, prompts, raw responses, parse failures)
-from the browser without watching the server terminal. Bounded so it never
-grows without limit."""
+Every record the app logs is persisted per-project (see logstore) and pushed
+live over SSE, so you can debug AI analysis (the agy/OpenAI calls, prompts, raw
+responses, parse failures) from the browser without watching the server
+terminal — and the history survives an app restart.
+
+Each record is tagged with the project it belongs to via a context var set
+around background jobs (where all the AI work runs); use_project() opens that
+scope. Records emitted outside any project scope (e.g. server startup/errors)
+are stored unattributed and shown in every project's tab."""
 from __future__ import annotations
 
-import itertools
+import contextlib
+import contextvars
 import logging
 import os
-import threading
 import traceback
-from collections import deque
 
-from . import settings
+from . import logstore, settings
 from .events import broadcaster
 
 LOGGER_NAME = "app"
-_MAX = 1000
-_records: deque[dict] = deque(maxlen=_MAX)
-_lock = threading.Lock()
-_seq = itertools.count(1)
+
+# The project a log record should be attributed to, for the duration of a job.
+_current_pid: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_pid", default=None)
+
+
+@contextlib.contextmanager
+def use_project(pid: str):
+    """Tag every log record emitted in this scope with `pid`. Wrapped around a
+    job's work so its AI logs land in that project's Logs tab."""
+    token = _current_pid.set(pid)
+    try:
+        yield
+    finally:
+        _current_pid.reset(token)
+
+
+def current_project() -> str | None:
+    return _current_pid.get()
 
 
 def effective_level() -> str:
@@ -38,32 +56,35 @@ def apply_level() -> None:
 
 
 class BufferHandler(logging.Handler):
-    """Keeps records in memory and streams each one to the UI over SSE."""
+    """Persists each record (tagged with its project) and streams it to the UI."""
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
             message = record.getMessage()
             if record.exc_info:
                 message += "\n" + "".join(traceback.format_exception(*record.exc_info))
-            entry = {
-                "seq": next(_seq),
-                "time": record.created,
-                "level": record.levelname,
-                "logger": record.name,
-                "message": message,
-            }
+            ts = record.created
+            level = record.levelname
+            logger = record.name
+            pid = current_project()
         except Exception:  # noqa: BLE001 - logging must never raise
             return
-        with _lock:
-            _records.append(entry)
-        broadcaster.publish_all("log", entry)
+        try:
+            seq = logstore.append(ts, level, logger, message, pid)
+        except Exception:  # noqa: BLE001 - a storage hiccup must not break logging
+            seq = -1
+        entry = {"seq": seq, "time": ts, "level": level, "logger": logger, "message": message, "project_id": pid}
+        # Attributed records go to their project's tab; unattributed (global)
+        # ones fan out to every open tab, matching what recent() returns.
+        if pid:
+            broadcaster.publish(pid, "log", entry)
+        else:
+            broadcaster.publish_all("log", entry)
 
 
-def records() -> list[dict]:
-    with _lock:
-        return list(_records)
+def records(pid: str) -> list[dict]:
+    return logstore.recent(pid)
 
 
-def clear() -> None:
-    with _lock:
-        _records.clear()
+def clear(pid: str) -> None:
+    logstore.clear(pid)
