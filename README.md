@@ -182,6 +182,19 @@ Then ask Claude, for example:
 
 Keep the web app open: clips placed by Claude appear on the timeline live (purple).
 
+## Or let agy / GLM build the montage (in-app)
+
+Claude via MCP is not the only option: in **Settings → Composer provider** you
+can pick the **Antigravity CLI (agy)** or any **OpenAI-compatible endpoint**
+(e.g. z.ai GLM Coding Plan) instead — they reuse the credentials from the AI
+provider section. The Montage page then shows an **Auto-compose** panel: write
+your instructions (same style as the Claude prompt above) and the whole project
+(videos, song sections, beats, current timeline) is sent as a single prompt;
+the model replies with clip placements that are validated and applied, live.
+Clips placed this way are purple too, tagged with the provider name. With the
+provider set to *Claude via MCP* (the default) the button stays disabled and
+composing works through Claude as before.
+
 ## Tests
 
 ```bash

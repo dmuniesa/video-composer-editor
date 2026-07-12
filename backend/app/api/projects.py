@@ -13,7 +13,7 @@ from .. import db as dbm
 from .. import logbuffer
 from ..events import broadcaster, sse_format
 from ..models import Project, Song, Video
-from ..services import ai, jobs, pipeline
+from ..services import ai, composer, jobs, pipeline
 from .deps import resolve_project
 
 router = APIRouter()
@@ -103,6 +103,8 @@ def project_get(pid: str) -> dict:
             "videos_by_status": by_status,
             "ai_available": ai.available(),
             "ai_provider": ai.provider(),
+            "composer_provider": composer.provider(),
+            "composer_available": composer.available(),
         }
 
 
@@ -131,6 +133,35 @@ def project_analyze(pid: str, body: AnalyzeRequest) -> dict:
         1 for vid in ids if pipeline.queue_analysis_job(pid, video_dir, vid, force=body.force)
     )
     return {"queued": queued}
+
+
+class ComposeRequest(BaseModel):
+    instructions: str = ""
+
+
+@router.post("/projects/{pid}/compose")
+def project_compose(pid: str, body: ComposeRequest) -> dict:
+    """Auto-compose the timeline with the configured composer provider
+    (agy/OpenAI one-shot prompt). Claude via MCP composes externally and
+    never goes through here."""
+    video_dir = resolve_project(pid)
+    if not composer.available():
+        raise HTTPException(409, composer.unavailable_reason())
+    if jobs.has_active(pid, "compose"):
+        raise HTTPException(409, "a compose job is already running")
+
+    def work(job: jobs.Job) -> None:
+        try:
+            result = composer.run_compose(pid, video_dir, body.instructions, job)
+            broadcaster.publish(pid, "compose", {"status": "done", **result})
+        except Exception as exc:
+            broadcaster.publish(pid, "compose", {"status": "error", "error": str(exc)})
+            raise
+        finally:
+            broadcaster.publish(pid, "timeline", {"source": "compose"})
+
+    job = jobs.submit(pid, "compose", "auto-compose", work, pool="ai")
+    return {"job_id": job.id}
 
 
 class SongRequest(BaseModel):

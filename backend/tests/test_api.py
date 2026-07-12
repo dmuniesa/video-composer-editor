@@ -184,6 +184,52 @@ def test_clear_analysis(client, project):
     assert all(v["description"] and v["ai_score"] is not None for v in redone)
 
 
+def test_compose_endpoint(client, project):
+    """Auto-compose through the fake agy: queues a job, applies the model's
+    actions, and marks the clips with the provider name."""
+    from app import settings
+
+    pid, _videos_dir = project
+
+    client.post(f"/api/projects/{pid}/scan")
+    wait_until(
+        lambda: all(
+            v["status"] in ("extracted", "ready", "error")
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+
+    # default provider is mcp: composing in-app is rejected
+    res = client.post(f"/api/projects/{pid}/compose", json={"instructions": "x"})
+    assert res.status_code == 409
+    assert "MCP" in res.json()["detail"]
+
+    s = settings.get()
+    s.composer.provider = "agy"
+    settings.save(s)
+    assert client.get(f"/api/projects/{pid}").json()["composer_provider"] == "agy"
+
+    res = client.post(f"/api/projects/{pid}/compose", json={"instructions": "beach first"})
+    assert res.status_code == 200
+    job_id = res.json()["job_id"]
+
+    def compose_done():
+        jobs_ = client.get(f"/api/projects/{pid}/jobs").json()
+        job = next(j for j in jobs_ if j["id"] == job_id)
+        return job["status"] in ("done", "error")
+
+    wait_until(compose_done)
+    job = next(j for j in client.get(f"/api/projects/{pid}/jobs").json() if j["id"] == job_id)
+    assert job["status"] == "done", job["message"]
+
+    tl = client.get(f"/api/projects/{pid}/timeline").json()
+    clips = tl["tracks"][0]["clips"]
+    # fake reply: video 1 placed ok, video 999 rejected (doesn't exist)
+    assert len(clips) == 1
+    assert clips[0]["placed_by"] == "agy"
+    assert clips[0]["source_in"] == 1.0 and clips[0]["source_out"] == 4.0
+
+
 def test_fs_browser(client, tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "a.mp4").touch()

@@ -53,9 +53,25 @@ class AISettings(BaseModel):
     timeout_s: int = Field(300, ge=10, le=1800)
 
 
+class ComposerSettings(BaseModel):
+    """Who auto-composes the timeline from the Montage page.
+
+    provider:
+      mcp    - external Claude via MCP (backend/mcp_server.py); the in-app
+               Auto-compose button stays disabled
+      agy    - one-shot prompt through the Antigravity CLI
+      openai - one-shot prompt through the OpenAI-compatible endpoint
+
+    agy/openai reuse the credentials from AISettings (agy_cmd,
+    openai_base_url/api_key/model, timeout_s)."""
+
+    provider: str = Field("mcp", pattern="^(mcp|agy|openai)$")
+
+
 class Settings(BaseModel):
     frames: FrameSettings = Field(default_factory=FrameSettings)
     ai: AISettings = Field(default_factory=AISettings)
+    composer: ComposerSettings = Field(default_factory=ComposerSettings)
     # Verbose backend logging: captures full AI prompts and raw model responses
     # in the Logs tab. Env var MONTAGE_LOG_LEVEL, when set, overrides this.
     debug_logging: bool = False

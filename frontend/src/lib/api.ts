@@ -112,6 +112,12 @@ export const api = {
   deleteSection: (pid: string, sid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/song/sections/${sid}`, { method: 'DELETE' }),
 
+  compose: (pid: string, instructions: string) =>
+    req<{ job_id: number }>(`/api/projects/${pid}/compose`, {
+      method: 'POST',
+      body: JSON.stringify({ instructions }),
+    }),
+
   timeline: (pid: string) => req<{ tracks: Track[] }>(`/api/projects/${pid}/timeline`),
   addTrack: (pid: string) => req<Track>(`/api/projects/${pid}/tracks`, { method: 'POST' }),
   removeTrack: (pid: string, tid: number) =>

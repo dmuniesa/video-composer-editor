@@ -33,6 +33,11 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [dropTrack, setDropTrack] = useState<number | null>(null)
   const [playhead, setPlayhead] = useState(0)
   const [toast, setToast] = useState('')
+  const [composerProvider, setComposerProvider] = useState('mcp')
+  const [composerAvailable, setComposerAvailable] = useState(false)
+  const [instructions, setInstructions] = useState('')
+  const [composing, setComposing] = useState(false)
+  const [composeResult, setComposeResult] = useState('')
   const audioRef = useRef<HTMLAudioElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -45,13 +50,41 @@ export default function MontagePage({ pid }: { pid: string }) {
     api.videos(pid).then(setVideos).catch(() => {})
     api.song(pid).then(setSong).catch(() => {})
     api.songPeaks(pid).then((p) => setPeaks(p.peaks)).catch(() => {})
+    api.getProject(pid).then((p) => {
+      setComposerProvider(p.composer_provider)
+      setComposerAvailable(p.composer_available)
+    }).catch(() => {})
     refreshTimeline()
   }, [pid, refreshTimeline])
 
   useProjectEvents(pid, (e) => {
     if (e.event === 'timeline') refreshTimeline()
     if (e.event === 'videos' || e.event === 'video') api.videos(pid).then(setVideos).catch(() => {})
+    if (e.event === 'compose') {
+      setComposing(false)
+      const d = e.data as {
+        status: string
+        applied?: number
+        errors?: string[]
+        summary?: string
+        error?: string
+      }
+      setComposeResult(
+        d.status === 'done'
+          ? `✓ ${d.applied} action(s) applied${d.errors?.length ? `, ${d.errors.length} rejected` : ''}${d.summary ? ` — ${d.summary}` : ''}`
+          : `✗ ${d.error}`,
+      )
+    }
   })
+
+  const compose = () => {
+    setComposeResult('')
+    setComposing(true)
+    api.compose(pid, instructions).catch((err) => {
+      setComposing(false)
+      setToast(err.message)
+    })
+  }
 
   useEffect(() => {
     if (!toast) return
@@ -295,8 +328,37 @@ export default function MontagePage({ pid }: { pid: string }) {
   return (
     <div className="montage-layout">
       <div className="bin">
+        <div className="compose-panel">
+          <textarea
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
+            placeholder="Instructions for the AI, e.g. “use the best clips on the choruses, calm shots on the verses”"
+            rows={3}
+          />
+          <button
+            className="primary"
+            onClick={compose}
+            disabled={composing || !composerAvailable}
+            title={composerProvider === 'mcp' ? 'Composer provider is Claude via MCP — see Settings' : ''}
+          >
+            {composing ? 'Composing…' : `Auto-compose (${composerProvider})`}
+          </button>
+          {composerProvider === 'mcp' && (
+            <div className="hint">
+              Composer provider is set to Claude via MCP — compose by talking to Claude as before,
+              or switch provider in Settings.
+            </div>
+          )}
+          {composerProvider !== 'mcp' && !composerAvailable && (
+            <div className="hint">
+              Composer provider “{composerProvider}” is not available — check Settings.
+            </div>
+          )}
+          {composeResult && <div className="hint">{composeResult}</div>}
+        </div>
         <div className="hint">
-          Drag a video (full clip) or one of its ranges onto a track. Purple clips were placed by Claude via MCP.
+          Drag a video (full clip) or one of its ranges onto a track. Purple clips were placed by
+          AI (Claude/agy/OpenAI).
         </div>
         {binVideos.map((v) => (
           <div key={v.id}>
@@ -464,7 +526,7 @@ export default function MontagePage({ pid }: { pid: string }) {
                   return (
                     <div
                       key={clip.id}
-                      className={`tl-clip ${selectedClip === clip.id ? 'selected' : ''} ${clip.placed_by === 'claude' ? 'by-claude' : ''}`}
+                      className={`tl-clip ${selectedClip === clip.id ? 'selected' : ''} ${clip.placed_by !== 'user' ? 'by-ai' : ''}`}
                       style={{ left: shown.timeline_start * pxPerSec, width: Math.max(shown.duration * pxPerSec, 8) }}
                       onPointerDown={startDrag(clip, track.id, 'move')}
                     >
@@ -515,7 +577,7 @@ export default function MontagePage({ pid }: { pid: string }) {
           ) : (
             <span>
               Space = play · click clip to select · drag edges to trim · Del = delete ·
-              connect Claude via MCP to auto-place clips (see README)
+              auto-compose with the panel on the left, or connect Claude via MCP (see README)
             </span>
           )}
         </div>
