@@ -530,15 +530,8 @@ export default function MontagePage({ pid }: { pid: string }) {
                       style={{ left: shown.timeline_start * pxPerSec, width: Math.max(shown.duration * pxPerSec, 8) }}
                       onPointerDown={startDrag(clip, track.id, 'move')}
                     >
-                      {video && video.duration > 0 && (
-                        <div
-                          className="film"
-                          style={{
-                            backgroundImage: `url(${media.filmstrip(pid, clip.video_id)})`,
-                            backgroundSize: `${video.duration * pxPerSec}px 100%`,
-                            backgroundPosition: `${-shown.source_in * pxPerSec}px 0`,
-                          }}
-                        />
+                      {video && (
+                        <img className="film" src={media.thumb(pid, clip.video_id)} alt="" draggable={false} />
                       )}
                       <div className="label">
                         {video?.filename ?? clip.video_id} · {fmtTime(shown.duration)}
@@ -558,19 +551,9 @@ export default function MontagePage({ pid }: { pid: string }) {
                       opacity: 0.6,
                     }}
                   >
-                    {(() => {
-                      const v = videoById.get(drag.preview.video_id)
-                      return v && v.duration > 0 ? (
-                        <div
-                          className="film"
-                          style={{
-                            backgroundImage: `url(${media.filmstrip(pid, drag.preview.video_id)})`,
-                            backgroundSize: `${v.duration * pxPerSec}px 100%`,
-                            backgroundPosition: `${-drag.preview.source_in * pxPerSec}px 0`,
-                          }}
-                        />
-                      ) : null
-                    })()}
+                    {videoById.has(drag.preview.video_id) && (
+                      <img className="film" src={media.thumb(pid, drag.preview.video_id)} alt="" draggable={false} />
+                    )}
                   </div>
                 )}
               </div>
