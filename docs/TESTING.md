@@ -58,9 +58,9 @@ The suite generates fixture media with ffmpeg and fakes the Antigravity CLI
 (`tests/fake_agy.py`) — no AI provider or Google account needed to run it.
 Includes a golden-file test for the Premiere XML export
 (`tests/golden_montage.xml`). The lyrics tests (`tests/test_lyrics.py`)
-monkeypatch the Whisper transcription, so `faster-whisper` does not need to be
-installed to run them — it's only required to actually use the feature
-(Settings → Music analysis).
+monkeypatch the Whisper transcription and use the fake agy for the Antigravity
+engine, so `faster-whisper` does not need to be installed to run them — it's
+only required to actually use the Whisper engine (Settings → Music analysis).
 
 Useful flags: `-k <name>` to filter, `-x` to stop on first failure, `-v` for
 verbose output.

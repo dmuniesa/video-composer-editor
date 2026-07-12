@@ -56,15 +56,24 @@ class AISettings(BaseModel):
 
 
 class LyricsSettings(BaseModel):
-    """Optional deeper music analysis: transcribe the song's lyrics locally
-    with Whisper (faster-whisper) and derive where the vocals are, so both
-    the Music page and the AI composer know verses/choruses by their words
-    and can spot melody-only (instrumental) passages.
+    """Optional deeper music analysis: transcribe the song's lyrics and derive
+    where the vocals are, so both the Music page and the AI composer know
+    verses/choruses by their words and can spot melody-only (instrumental)
+    passages.
 
-    Requires the optional dependency: pip install faster-whisper
-    Disabled by default because the model download + transcription are slow."""
+    provider:
+      auto    - local Whisper if faster-whisper is installed, else the
+                Antigravity CLI (Gemini) if available
+      whisper - local faster-whisper (pip install faster-whisper); private,
+                precise timestamps, but slow on CPU
+      agy     - Gemini listens to the song through the Antigravity CLI;
+                fast and needs no local model, but the audio is uploaded to
+                Google and timestamps are approximate (~1s)
+
+    Disabled by default because transcription takes a while either way."""
 
     enabled: bool = False
+    provider: str = Field("auto", pattern="^(auto|whisper|agy)$")
     # Whisper model size: tiny/base/small/medium/large-v3 (or any CTranslate2
     # model name faster-whisper accepts). Bigger = better lyrics, slower.
     whisper_model: str = "small"

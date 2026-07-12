@@ -255,10 +255,9 @@ export default function SettingsPage({ pid }: { pid?: string }) {
       <div className="panel">
         <h2>Music analysis — lyrics & vocals</h2>
         <p className="hint">
-          Transcribes the song's lyrics locally with Whisper and detects where the vocals are.
-          The Music page then shows the timestamped lyrics and the melody-only (instrumental)
-          passages, and the AI composer/labeler uses them to match footage to the song. Nothing
-          leaves your machine.
+          Transcribes the song's lyrics and detects where the vocals are. The Music page then
+          shows the timestamped lyrics and the melody-only (instrumental) passages, and the AI
+          composer/labeler uses them to match footage to the song.
         </p>
         <label className="toggle-row">
           <input
@@ -270,16 +269,25 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             <b>Transcribe lyrics when analyzing the song</b>
             <br />
             <span className="hint">
-              Requires <code>pip install faster-whisper</code> in the backend environment. The
-              first run downloads the Whisper model. You can also run it on demand from the Music
-              page.
+              You can also run it on demand from the Music page.
             </span>
           </span>
         </label>
         <div className="settings-grid" style={{ marginTop: 10 }}>
+          <label>Engine</label>
+          <select
+            value={settings.lyrics.provider}
+            onChange={(e) => setLyrics({ provider: e.target.value })}
+          >
+            <option value="auto">Auto — local Whisper if installed, else agy</option>
+            <option value="whisper">Whisper (local) — private, precise timestamps</option>
+            <option value="agy">Antigravity CLI (Gemini) — no local model needed</option>
+          </select>
+
           <label>Whisper model</label>
           <select
             value={settings.lyrics.whisper_model}
+            disabled={settings.lyrics.provider === 'agy'}
             onChange={(e) => setLyrics({ whisper_model: e.target.value })}
           >
             <option value="tiny">tiny — fastest, rough</option>
@@ -308,6 +316,11 @@ export default function SettingsPage({ pid }: { pid?: string }) {
         <p className="hint" style={{ marginTop: 10 }}>
           A stretch without vocals at least this long is marked as an instrumental
           (melody-only) part — useful spots for scenic footage.
+        </p>
+        <p className="hint">
+          Whisper runs fully on this machine (requires <code>pip install faster-whisper</code>;
+          the first run downloads the model). The Antigravity CLI engine uploads the song's
+          audio to Google and returns approximate (~1s) timestamps, but needs no local model.
         </p>
       </div>
 

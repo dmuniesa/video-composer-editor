@@ -75,7 +75,7 @@ export default function MusicPage({ pid }: { pid: string }) {
           disabled={lyrics?.status === 'transcribing'}
           title={
             song.lyrics_enabled
-              ? 'Transcribe the lyrics locally with Whisper'
+              ? 'Transcribe the lyrics (engine chosen in Settings)'
               : 'Enable lyrics analysis in Settings first'
           }
           onClick={() => api.songTranscribe(pid).catch((e) => setError(e.message))}
@@ -258,7 +258,7 @@ export default function MusicPage({ pid }: { pid: string }) {
           <h2>
             Lyrics{' '}
             <span className="hint" style={{ fontWeight: 'normal' }}>
-              (Whisper {lyrics.model || ''}
+              ({lyrics.model || 'whisper'}
               {lyrics.language ? `, ${lyrics.language}` : ''} — click a line to seek)
             </span>
           </h2>

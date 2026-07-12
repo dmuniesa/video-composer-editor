@@ -36,6 +36,7 @@ export interface AppSettings {
   }
   lyrics: {
     enabled: boolean
+    provider: string
     whisper_model: string
     language: string
     min_instrumental_gap: number

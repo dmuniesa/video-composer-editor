@@ -58,6 +58,45 @@ def test_attach_hints_annotates_sections():
     assert sections[1]["lyrics"] == "hello sun / over the sea"
 
 
+# ---- agy engine ----
+
+def test_transcribe_agy(fake_agy, sample_song):
+    """The agy engine converts the song to a temp AAC .mp4 (real ffmpeg) and
+    parses/normalizes Gemini's JSON (drops empty and backwards segments)."""
+    s = settings.get()
+    s.lyrics.provider = "agy"
+    settings.save(s)
+    assert lyrics.provider() == "agy"
+    assert lyrics.available()
+
+    result = lyrics.transcribe(sample_song)
+    assert result["language"] == "es"
+    assert result["segments"] == [
+        {"start": 13.0, "end": 16.0, "text": "pasos sobre el camino"},
+        {"start": 30.0, "end": 33.0, "text": "un secreto en la ciudad"},
+    ]
+
+
+def test_provider_resolution(fake_agy, monkeypatch):
+    # auto prefers local whisper; falls back to agy when it is missing
+    monkeypatch.setattr(lyrics, "whisper_available", lambda: True)
+    assert lyrics.provider() == "whisper"
+    monkeypatch.setattr(lyrics, "whisper_available", lambda: False)
+    assert lyrics.provider() == "agy"
+
+    s = settings.get()
+    s.lyrics.provider = "whisper"
+    settings.save(s)
+    assert lyrics.provider() is None
+    assert "faster-whisper" in lyrics.unavailable_reason()
+
+    s.lyrics.provider = "agy"
+    settings.save(s)
+    monkeypatch.setenv("AGY_CMD", "definitely-not-a-real-binary -p")
+    assert lyrics.provider() is None
+    assert "Antigravity" in lyrics.unavailable_reason()
+
+
 # ---- API flow ----
 
 def wait_until(predicate, timeout=120):

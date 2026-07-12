@@ -138,10 +138,19 @@ main hint Claude uses to decide where each kind of clip belongs.
 
 ### Lyrics & vocals (optional)
 
-Enable **Settings → Music analysis — lyrics & vocals** (and install
-`faster-whisper` in the backend environment) to transcribe the song locally
-with Whisper. It runs automatically after the song analysis, or on demand with
-**Transcribe lyrics**. You get:
+Enable **Settings → Music analysis — lyrics & vocals** to transcribe the song.
+It runs automatically after the song analysis, or on demand with
+**Transcribe lyrics**. Two engines (the **Engine** selector in Settings):
+
+- **Whisper (local)** — requires `faster-whisper` in the backend environment.
+  Private (nothing is uploaded) and with precise timestamps; the first run
+  downloads the model.
+- **Antigravity CLI (Gemini)** — no local model needed: the app re-encodes the
+  song to a temporary AAC `.mp4` and Gemini listens to it natively. The audio
+  is uploaded to Google and timestamps are approximate (~1s).
+- **Auto** picks Whisper when installed, else the Antigravity CLI.
+
+You get:
 
 - a **Lyrics** panel with every sung line and its timestamp — click a line to
   jump there; the current line is highlighted during playback,
@@ -153,7 +162,8 @@ with Whisper. It runs automatically after the song analysis, or on demand with
   (Claude via MCP, agy or GLM) receives the lyrics and instrumental ranges to
   match footage to what the song says.
 
-Everything stays on your machine; nothing is uploaded.
+With the Whisper engine everything stays on your machine; with the Antigravity
+CLI engine the song's audio is sent to Google for the transcription.
 
 ## 5. Build the montage
 

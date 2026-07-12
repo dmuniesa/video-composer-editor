@@ -1,17 +1,27 @@
-"""Lyrics + vocal analysis of the song with a local Whisper model
-(faster-whisper): transcribes the sung lines with timestamps and derives
-where the vocals are, so the UI and the AI composer can tell verses from
-melody-only (instrumental) passages.
+"""Lyrics + vocal analysis of the song: transcribes the sung lines with
+timestamps and derives where the vocals are, so the UI and the AI composer
+can tell verses from melody-only (instrumental) passages.
 
-faster-whisper is an optional dependency (pip install faster-whisper) and its
-import is deferred, mirroring how librosa is handled in audio_analysis."""
+Two engines, selected in Settings (lyrics.provider):
+- whisper: local faster-whisper. Optional dependency (pip install
+  faster-whisper), import deferred like librosa in audio_analysis. Private,
+  precise timestamps.
+- agy: Gemini via the Antigravity CLI listens to the song natively. agy's
+  file reader rejects raw audio formats (mp3/wav report an audio/* MIME type
+  and it refuses them) but accepts MP4 containers, so the song is first
+  re-encoded to a temporary AAC .mp4. Timestamps are approximate (~1s)."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
+import tempfile
 from importlib import util as importlib_util
 from pathlib import Path
+
+from .. import settings
+from . import gemini
 
 log = logging.getLogger(__name__)
 
@@ -40,21 +50,115 @@ MAX_NO_SPEECH_PROB = 0.6
 JOIN_GAP_SECONDS = 2.0
 
 
-def available() -> bool:
+class LyricsError(RuntimeError):
+    pass
+
+
+def whisper_available() -> bool:
     return importlib_util.find_spec("faster_whisper") is not None
 
 
+def provider() -> str | None:
+    """Resolve the effective transcription engine, or None when unavailable."""
+    conf = settings.get().lyrics
+    if conf.provider == "whisper":
+        return "whisper" if whisper_available() else None
+    if conf.provider == "agy":
+        return "agy" if gemini.agy_available() else None
+    # auto: prefer the local engine (private, precise timestamps)
+    if whisper_available():
+        return "whisper"
+    if gemini.agy_available():
+        return "agy"
+    return None
+
+
+def available() -> bool:
+    return provider() is not None
+
+
 def unavailable_reason() -> str:
+    conf = settings.get().lyrics
+    if conf.provider == "whisper":
+        return (
+            "faster-whisper is not installed. Install it in the backend environment "
+            "(pip install faster-whisper), or switch the transcription engine in Settings."
+        )
+    if conf.provider == "agy":
+        return (
+            "The Antigravity CLI (agy) is not available. Install it and sign in, "
+            "or switch the transcription engine in Settings."
+        )
     return (
-        "faster-whisper is not installed. Install it in the backend environment "
-        "(pip install faster-whisper) to transcribe lyrics."
+        "No transcription engine available. Install faster-whisper in the backend "
+        "environment (pip install faster-whisper) or the Antigravity CLI (agy)."
     )
 
 
 def transcribe(path: Path, model_name: str = "small", language: str = "") -> dict:
-    """Transcribe the song. Returns {"language": str, "segments": [...]}, where
-    each segment is {"start", "end", "text"} for one sung line. The first call
-    downloads the Whisper model, so it can take a while."""
+    """Transcribe the song with the engine from Settings. Returns
+    {"language": str, "segments": [...]}, where each segment is
+    {"start", "end", "text"} for one sung line."""
+    if provider() == "agy":
+        return transcribe_agy(path, language)
+    return transcribe_whisper(path, model_name, language)
+
+
+AGY_LYRICS_PROMPT = """\
+Listen to the audio of the file @{ref} using your native multimodal audio
+understanding (you may read/open that file, but do NOT install packages or
+run any transcription code).{language_note} Transcribe the sung lyrics.
+Reply with ONLY a JSON object (no markdown fence, no prose):
+{{"language": "<two-letter code>", "segments": [{{"start": <seconds>, "end": <seconds>, "text": "<one sung line>"}}]}}
+with one segment per sung line, in order, approximate start/end timestamps in
+seconds. If the song has no sung lyrics, reply with an empty segments array.
+If you cannot hear the audio, reply with ONLY {{"error": "<why>"}}.\
+"""
+
+
+def transcribe_agy(path: Path, language: str = "") -> dict:
+    """Transcription by Gemini through the Antigravity CLI. The song is
+    re-encoded to a temporary AAC .mp4 (the only container agy attaches as
+    audio) which Gemini then listens to natively — no local model needed."""
+    from . import ai  # for the shared JSON extraction; ai does not import us
+    from .frames import _run_ffmpeg
+
+    log.info("transcribing lyrics via agy: language=%s file=%s", language or "auto", path)
+    fd, tmp_name = tempfile.mkstemp(prefix="lyrics_", suffix=".mp4")
+    os.close(fd)
+    tmp = Path(tmp_name)
+    try:
+        _run_ffmpeg(["-i", str(path), "-vn", "-c:a", "aac", "-b:a", "128k", str(tmp)])
+        prompt = AGY_LYRICS_PROMPT.format(
+            # Absolute path: agy ignores the cwd (see gemini.py).
+            ref=tmp.resolve(),
+            language_note=f" The lyrics are in language {language!r}." if language else "",
+        )
+        raw = gemini.run_prompt(prompt)
+        data = json.loads(ai._extract_json(raw))
+    finally:
+        tmp.unlink(missing_ok=True)
+    if not isinstance(data, dict):
+        raise LyricsError(f"unexpected agy transcription output: {str(data)[:200]}")
+    if "error" in data and not data.get("segments"):
+        raise LyricsError(f"agy could not transcribe the song: {data['error']}")
+    segments = []
+    for seg in data.get("segments", []):
+        try:
+            start, end = float(seg["start"]), float(seg["end"])
+            text = str(seg.get("text", "")).strip()
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not text or end <= start:
+            continue
+        segments.append({"start": round(start, 2), "end": round(end, 2), "text": text})
+    segments.sort(key=lambda s: s["start"])
+    return {"language": str(data.get("language", "")).strip().lower(), "segments": segments}
+
+
+def transcribe_whisper(path: Path, model_name: str = "small", language: str = "") -> dict:
+    """Local transcription with faster-whisper. The first call downloads the
+    Whisper model, so it can take a while."""
     _register_cuda_dll_dirs()
     from faster_whisper import WhisperModel
 

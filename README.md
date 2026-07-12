@@ -7,7 +7,7 @@ A locally-run web app that:
 1. **Scans** a folder of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
 2. **Analyzes every clip with AI**: description, 1–10 score, and hashtags — via Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`, Gemini) or any **OpenAI-compatible endpoint** (z.ai GLM, OpenAI, OpenRouter, Ollama…), selectable on the in-app Settings page.
 3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
-4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …). Optionally (Settings) it also **transcribes the lyrics locally with Whisper** and detects vocal vs. melody-only (instrumental) passages — shown on the Music page and fed to the AI composer.
+4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …). Optionally (Settings) it also **transcribes the lyrics** — locally with Whisper, or with Gemini listening to the song through the Antigravity CLI — and detects vocal vs. melody-only (instrumental) passages — shown on the Music page and fed to the AI composer.
 5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
 6. **Exports FCP7 XML (`xmeml` v5)** that Premiere Pro imports directly as a sequence linked to your original files, ready for final editing and color grading.
 
@@ -209,14 +209,18 @@ golden-file test for the Premiere XML.
 
 ## Notes & limitations
 
-- Antigravity CLI does not officially support audio input, so music analysis is
-  local (librosa) and Gemini only labels the sections from the extracted data.
-- Lyrics transcription is fully local (Whisper via
-  [faster-whisper](https://github.com/SYSTRAN/faster-whisper), installed as a
-  regular dependency). Enable it in **Settings → Music analysis**.
-  The first run downloads the Whisper model. Vocal detection is derived from
-  the transcription, so a fully instrumental track simply yields one long
-  melody-only range.
+- Music analysis (BPM, beats, structure) is local (librosa); Gemini only labels
+  the sections from the extracted data.
+- Lyrics transcription (enable it in **Settings → Music analysis**) offers two
+  engines. **Whisper** runs fully locally via
+  [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (installed as a
+  regular dependency; the first run downloads the model). **Antigravity CLI**
+  has Gemini listen to the song natively — no local model, but the audio is
+  uploaded to Google and timestamps are approximate. agy refuses raw audio
+  files by MIME type, so the app first re-encodes the song to a temporary AAC
+  `.mp4`, the one container its file reader attaches. Vocal detection is
+  derived from the transcription, so a fully instrumental track simply yields
+  one long melody-only range.
 - The timeline preview is best-effort (jump cuts, not frame-accurate rendering) —
   the real render happens in Premiere.
 - HEVC/10-bit clips get a 720p H.264 proxy for browser playback; the exported

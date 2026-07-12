@@ -101,7 +101,8 @@ def song_reanalyze(pid: str) -> dict:
 
 @router.post("/projects/{pid}/song/lyrics")
 def song_transcribe(pid: str) -> dict:
-    """(Re)run the Whisper lyrics transcription for the song."""
+    """(Re)run the lyrics transcription for the song (local Whisper or
+    Gemini via agy, per Settings)."""
     video_dir = resolve_project(pid)
     if not settings.get().lyrics.enabled:
         raise HTTPException(409, "Lyrics analysis is disabled — enable it in Settings.")

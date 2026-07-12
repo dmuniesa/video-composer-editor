@@ -4,7 +4,9 @@ Gemini is reached by shelling out to Google's Antigravity CLI in
 non-interactive mode (`-p`/`--print`). The command template comes from
 Settings (AGY_CMD env overrides it,
 which tests use to substitute a fake). Files are pulled into context with the
-CLI's @path syntax inside the prompt; prompts live in services/ai.py.
+CLI's @path syntax inside the prompt; prompts live in services/ai.py and
+services/lyrics.py. @ refs work for images and MP4 containers, but raw audio
+files (mp3/wav) are refused by MIME type — remux audio to .mp4 first.
 
 @path references must be ABSOLUTE: agy does not honor the subprocess cwd — it
 executes in a global scratch dir (~/.gemini/antigravity-cli/scratch) shared by
@@ -55,7 +57,16 @@ def run_prompt(prompt: str, cwd: Path | None = None) -> str:
     started = time.monotonic()
     try:
         out = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd
+            cmd,
+            capture_output=True,
+            text=True,
+            # agy emits UTF-8 regardless of the console codepage; without this,
+            # Windows decodes with cp1252 and any accented character kills the
+            # reader thread, leaving stdout=None.
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            cwd=cwd,
         )
     except FileNotFoundError as exc:
         raise AgyError(

@@ -19,6 +19,16 @@ if "composing a video montage" in prompt:
         '"source_in": 0.0, "source_out": 2.0}'
         ']}'
     )
+elif "Transcribe the sung lyrics" in prompt:
+    print(
+        'Transcription done.\n'
+        '{"language": "es", "segments": ['
+        '{"start": 13, "end": 16, "text": "pasos sobre el camino"}, '
+        '{"start": 30, "end": 33, "text": "un secreto en la ciudad"}, '
+        '{"start": 33, "end": 30, "text": "backwards segment dropped"}, '
+        '{"start": 40, "end": 42, "text": "  "}'
+        ']}'
+    )
 elif "labeling the structure of a song" in prompt:
     print(
         'Here you go:\n'

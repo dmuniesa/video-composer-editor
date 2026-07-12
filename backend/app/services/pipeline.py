@@ -245,8 +245,9 @@ def queue_song_job(pid: str, video_dir: Path) -> None:
 
 
 def queue_lyrics_job(pid: str, video_dir: Path, force: bool = False) -> bool:
-    """Queue Whisper lyrics transcription for the song. Returns False when
-    skipped (disabled in Settings, faster-whisper missing, already done...)."""
+    """Queue the lyrics transcription for the song (local Whisper or Gemini
+    via agy, per Settings). Returns False when skipped (disabled in Settings,
+    no engine available, already done...)."""
     conf = settings.get().lyrics
     if not conf.enabled or not lyrics.available():
         return False
@@ -269,12 +270,13 @@ def queue_lyrics_job(pid: str, video_dir: Path, force: bool = False) -> bool:
             row = song.lyrics or SongLyrics(song_id=song.id)
             row.status = "transcribing"
             row.error = None
-            row.model = conf.whisper_model
+            engine = lyrics.provider()
+            row.model = "gemini (agy)" if engine == "agy" else f"whisper {conf.whisper_model}"
             db.add(row)
             db.commit()
             broadcaster.publish(pid, "song", {})
             try:
-                jobs.update(job, 0.1, f"transcribing lyrics (whisper {conf.whisper_model})")
+                jobs.update(job, 0.1, f"transcribing lyrics ({row.model})")
                 result = lyrics.transcribe(
                     Path(song.path), conf.whisper_model, conf.language
                 )
