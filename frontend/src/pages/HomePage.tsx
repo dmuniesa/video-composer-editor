@@ -32,7 +32,7 @@ const STEPS = [
   {
     icon: '📤',
     title: 'Export',
-    text: 'One click gives you an FCP7 XML that Premiere Pro opens as a ready sequence.',
+    text: 'One click gives you a ready sequence for Premiere Pro, DaVinci Resolve or Final Cut Pro.',
   },
 ]
 
@@ -73,7 +73,8 @@ export default function HomePage() {
         </h1>
         <p className="hero-sub">
           Scan your footage, let AI rate and describe every clip, cut them to the beat of your
-          song on a real timeline, and export straight to Adobe Premiere Pro.
+          song on a real timeline, and export straight to Premiere Pro, DaVinci Resolve or Final
+          Cut Pro.
         </p>
         <div className="hero-actions">
           {!browsing && (

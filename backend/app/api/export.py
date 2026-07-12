@@ -1,4 +1,5 @@
-"""Premiere Pro project export (FCP7 XML / xmeml v5)."""
+"""Timeline export: Premiere Pro / DaVinci Resolve (FCP7 XML / xmeml v5)
+and Final Cut Pro X (FCPXML 1.9)."""
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
@@ -7,14 +8,14 @@ from sqlalchemy import select
 
 from .. import db as dbm
 from ..models import Song, Track, Video
-from ..services import xmeml
+from ..services import fcpxml, xmeml
 from .deps import resolve_project
 
 router = APIRouter()
 
 
-@router.get("/projects/{pid}/export.xml")
-def export_xml(pid: str) -> Response:
+def _gather(pid: str) -> dict:
+    """Collect everything the XML builders need from the project DB."""
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
         tracks = list(db.scalars(select(Track).order_by(Track.index)))
@@ -23,20 +24,19 @@ def export_xml(pid: str) -> Response:
             raise HTTPException(409, "timeline is empty — place some clips first")
         song = db.scalar(select(Song))
         used_ids = {c.video_id for c in clips}
-        videos = {
-            v.id: {
-                "path": str(video_dir / v.rel_path),
-                "fps": v.fps,
-                "width": v.width,
-                "height": v.height,
-                "duration": v.duration,
-            }
-            for v in db.scalars(select(Video).where(Video.id.in_(used_ids)))
-        }
-        xml = xmeml.build_xmeml(
-            sequence_name=f"{video_dir.name} montage",
-            videos=videos,
-            tracks=[
+        return {
+            "sequence_name": f"{video_dir.name} montage",
+            "videos": {
+                v.id: {
+                    "path": str(video_dir / v.rel_path),
+                    "fps": v.fps,
+                    "width": v.width,
+                    "height": v.height,
+                    "duration": v.duration,
+                }
+                for v in db.scalars(select(Video).where(Video.id.in_(used_ids)))
+            },
+            "tracks": [
                 {
                     "name": t.name,
                     "clips": [
@@ -51,10 +51,35 @@ def export_xml(pid: str) -> Response:
                 }
                 for t in tracks
             ],
-            song={"path": song.path, "duration": song.duration} if song and song.duration else None,
-        )
+            "song": {"path": song.path, "duration": song.duration}
+            if song and song.duration
+            else None,
+        }
+
+
+def _attachment(content: str, filename: str) -> Response:
     return Response(
-        content=xml,
+        content=content,
         media_type="application/xml",
-        headers={"Content-Disposition": 'attachment; filename="montage.xml"'},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/projects/{pid}/export.xml")
+def export_premiere(pid: str) -> Response:
+    data = _gather(pid)
+    return _attachment(xmeml.build_xmeml(**data), "montage.xml")
+
+
+@router.get("/projects/{pid}/export-resolve.xml")
+def export_resolve(pid: str) -> Response:
+    # DaVinci Resolve imports FCP7 XML natively (File > Import > Timeline),
+    # so it gets the same xmeml document under a distinct name.
+    data = _gather(pid)
+    return _attachment(xmeml.build_xmeml(**data), "montage-resolve.xml")
+
+
+@router.get("/projects/{pid}/export.fcpxml")
+def export_fcpx(pid: str) -> Response:
+    data = _gather(pid)
+    return _attachment(fcpxml.build_fcpxml(**data), "montage.fcpxml")

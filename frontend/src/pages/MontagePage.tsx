@@ -37,6 +37,7 @@ export default function MontagePage({ pid }: { pid: string }) {
   /** null = default position (anchored bottom-right via CSS) */
   const [popPos, setPopPos] = useState<{ x: number; y: number } | null>(null)
   const [playing, setPlaying] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [toast, setToast] = useState('')
   const [composerProvider, setComposerProvider] = useState('mcp')
   const [composerAvailable, setComposerAvailable] = useState(false)
@@ -471,9 +472,27 @@ export default function MontagePage({ pid }: { pid: string }) {
           <button className="small" onClick={() => setPreviewOpen((v) => !v)}>
             {previewOpen ? '✕ preview' : '▶ preview'}
           </button>
-          <a href={`/api/projects/${pid}/export.xml`} download>
-            <button className="primary">Export to Premiere</button>
-          </a>
+          <div className="export-menu">
+            <button className="primary" onClick={() => setExportOpen((v) => !v)}>
+              Export ▾
+            </button>
+            {exportOpen && (
+              <div className="export-dropdown" onClick={() => setExportOpen(false)}>
+                <a href={`/api/projects/${pid}/export.xml`} download>
+                  <b>Premiere Pro</b>
+                  <span className="hint">montage.xml · File → Import</span>
+                </a>
+                <a href={`/api/projects/${pid}/export-resolve.xml`} download>
+                  <b>DaVinci Resolve</b>
+                  <span className="hint">montage-resolve.xml · File → Import → Timeline</span>
+                </a>
+                <a href={`/api/projects/${pid}/export.fcpxml`} download>
+                  <b>Final Cut Pro</b>
+                  <span className="hint">montage.fcpxml · File → Import → XML</span>
+                </a>
+              </div>
+            )}
+          </div>
         </div>
 
         {song && <audio ref={audioRef} src={media.song(pid)} style={{ display: 'none' }} />}

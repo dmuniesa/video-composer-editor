@@ -377,6 +377,20 @@ kbd {
 }
 .preview-pop-controls input[type='range'] { flex: 1; min-width: 0; accent-color: #ff5555; }
 .montage-toolbar { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.export-menu { position: relative; }
+.export-dropdown {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 260px; padding: 4px;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column;
+}
+.export-dropdown a {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 8px 10px; border-radius: 6px;
+  color: var(--text); text-decoration: none; font-size: 13px;
+}
+.export-dropdown a:hover { background: var(--accent-soft); }
 .timeline-scroll { flex: 1; overflow: auto; position: relative; }
 .timeline-inner { position: relative; }
 .tl-ruler { position: sticky; top: 0; height: 26px; background: var(--bg-panel); border-bottom: 1px solid var(--border); z-index: 5; }

@@ -11,7 +11,7 @@ better.)
 - [4. Analyze the song (Music)](#4-analyze-the-song-music)
 - [5. Build the montage](#5-build-the-montage)
 - [6. Let Claude place the clips for you](#6-let-claude-place-the-clips-for-you)
-- [7. Export to Premiere Pro](#7-export-to-premiere-pro)
+- [7. Export your montage](#7-export-your-montage)
 - [8. Settings: AI provider and frame extraction](#8-settings-ai-provider-and-frame-extraction)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Troubleshooting](#troubleshooting)
@@ -202,19 +202,25 @@ real time while the web app is open. Anything it gets wrong you can drag around
 or delete like any other clip, or tell Claude to fix it (`move_clip`,
 `clear_track`).
 
-## 7. Export to Premiere Pro
+## 7. Export your montage
 
-Click **Export to Premiere** (top right of the Montage page) to download
-`montage.xml` (FCP7 XML / xmeml v5).
+Click **Export** (top right of the Montage page) and pick your editor. All
+three exports contain the same sequence — every cut at the right frame and the
+song on the audio tracks — linked to the **original** files on disk:
 
-In Premiere Pro:
+- **Premiere Pro** → `montage.xml` (FCP7 XML / xmeml v5). In Premiere:
+  **File → Import** and select the file; a bin appears with the sequence.
+- **DaVinci Resolve** → `montage-resolve.xml` (the same FCP7 XML, which
+  Resolve reads natively). In Resolve: **File → Import → Timeline**.
+- **Final Cut Pro** → `montage.fcpxml` (FCPXML 1.9). In Final Cut:
+  **File → Import → XML**. FCP has a magnetic storyline instead of free
+  tracks, so the clips arrive as connected clips above the primary storyline
+  (track 1 = lane 1, higher tracks on top) with the song underneath — the
+  timeline positions are preserved exactly.
 
-1. **File → Import** and select `montage.xml`.
-2. A bin appears with the sequence: your video tracks, every cut at the right
-   frame, and the song on the audio tracks — all linked to the **original**
-   files on disk.
-3. If Premiere shows clips offline (e.g. different drive letter/mount), select
-   them and use **Link Media** to point at the folder.
+If the editor shows clips offline (e.g. different drive letter/mount), relink
+them: **Link Media** in Premiere, **Relink Media** in Resolve, **File →
+Relink Files** in Final Cut.
 
 From there, finish it: transitions, color grading, reframes, audio mix.
 

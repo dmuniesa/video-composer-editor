@@ -9,7 +9,7 @@ const TOC = [
   ['music', '4 · Analyze the song'],
   ['montage', '5 · Build the montage'],
   ['ai-compose', '6 · AI auto-placement'],
-  ['export', '7 · Export to Premiere'],
+  ['export', '7 · Export your montage'],
   ['settings', 'Settings & AI providers'],
   ['shortcuts', 'Keyboard shortcuts'],
   ['troubleshooting', 'Troubleshooting'],
@@ -219,23 +219,32 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           delete them like any other clip.
         </p>
 
-        <h2 id="export">7 · Export to Premiere Pro</h2>
-        <ol>
+        <h2 id="export">7 · Export your montage</h2>
+        <p>
+          Click <b>Export</b> (top right of the Montage tab) and pick your editor. All three
+          exports reference your <b>original</b> files on disk, with every cut at the right frame
+          and the song on the audio tracks:
+        </p>
+        <ul>
           <li>
-            Click <b>Export to Premiere</b> (top right of the Montage tab) to download{' '}
-            <code>montage.xml</code> (FCP7 XML).
+            <b>Premiere Pro</b> — downloads <code>montage.xml</code> (FCP7 XML). In Premiere:{' '}
+            <b>File → Import</b>; a bin appears with the sequence.
           </li>
           <li>
-            In Premiere Pro: <b>File → Import</b> and select the file. A bin appears with the
-            sequence — every cut at the right frame, the song on the audio tracks, all linked to
-            your <b>original</b> files.
+            <b>DaVinci Resolve</b> — downloads <code>montage-resolve.xml</code> (same FCP7 XML,
+            which Resolve reads natively). In Resolve: <b>File → Import → Timeline</b>.
           </li>
           <li>
-            If clips show offline (different drive letter/mount), select them and use{' '}
-            <b>Link Media</b>.
+            <b>Final Cut Pro</b> — downloads <code>montage.fcpxml</code> (FCPXML). In Final Cut:{' '}
+            <b>File → Import → XML</b>. Video tracks arrive as connected clips above the primary
+            storyline (track 1 = lane 1) with the song underneath, keeping the exact positions.
           </li>
-        </ol>
-        <p>From there, finish it in Premiere: transitions, color grading, reframes, audio mix.</p>
+        </ul>
+        <p>
+          If clips show offline (different drive letter/mount), relink them: <b>Link Media</b> in
+          Premiere, <b>Relink Media</b> in Resolve, or <b>File → Relink Files</b> in Final Cut.
+          From there, finish it in your editor: transitions, color grading, reframes, audio mix.
+        </p>
 
         <h2 id="settings">Settings &amp; AI providers</h2>
         <p>

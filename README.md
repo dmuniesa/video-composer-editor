@@ -9,7 +9,7 @@ A locally-run web app that:
 3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
 4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …). Optionally (Settings) it also **transcribes the lyrics** — locally with Whisper, or with Gemini listening to the song through the Antigravity CLI — and detects vocal vs. melody-only (instrumental) passages — shown on the Music page and fed to the AI composer.
 5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
-6. **Exports FCP7 XML (`xmeml` v5)** that Premiere Pro imports directly as a sequence linked to your original files, ready for final editing and color grading.
+6. **Exports to Adobe Premiere Pro, DaVinci Resolve (FCP7 XML / `xmeml` v5) and Final Cut Pro (FCPXML)** — a sequence linked to your original files, ready for final editing and color grading.
 
 ## Preparing the environment
 
@@ -159,7 +159,7 @@ available inside the app under the **Guide** tab.
 | **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. |
 | **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. With lyrics enabled: timestamped lyrics (click a line to seek), a vocal/melody-only strip over the waveform, and a vocals % per section. |
 | **Montage** | Drag clips (or their ranges) from the bin onto the tracks. Drag to move, edge-drag to trim, snapping to beats/sections (**S** toggles). **Space** previews audio + a jump-cut video preview. **Del** removes the selected clip. |
-| **Export** | "Export to Premiere" downloads `montage.xml`. In Premiere: **File → Import**, and the sequence appears with your clips and the song, linked to the original files. Relink if your media moved. |
+| **Export** | The **Export** menu downloads the sequence for your editor: Premiere Pro (`montage.xml`, **File → Import**), DaVinci Resolve (`montage-resolve.xml`, **File → Import → Timeline**) or Final Cut Pro (`montage.fcpxml`, **File → Import → XML**) — linked to the original files. Relink if your media moved. |
 
 All derived media and the project database live in `<your video folder>/.montage-cache/` — delete that folder to reset a project.
 
