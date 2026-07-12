@@ -8,10 +8,30 @@ import is deferred, mirroring how librosa is handled in audio_analysis."""
 from __future__ import annotations
 
 import logging
+import os
+import sys
 from importlib import util as importlib_util
 from pathlib import Path
 
 log = logging.getLogger(__name__)
+
+
+def _register_cuda_dll_dirs() -> None:
+    """On Windows, ctranslate2 (faster-whisper's backend) loads CUDA/cuDNN
+    with a raw LoadLibrary call that only honors the process PATH, not
+    os.add_dll_directory. pip installs the nvidia-cublas-cu12 /
+    nvidia-cudnn-cu12 wheels' DLLs under site-packages, which is never on
+    PATH -- GPU transcription fails with "cublas64_12.dll is not found" even
+    though the file is right there. Prepend those dirs to PATH."""
+    if sys.platform != "win32":
+        return
+    dirs = []
+    for pkg in ("nvidia.cublas.bin", "nvidia.cudnn.bin", "nvidia.cuda_nvrtc.bin"):
+        spec = importlib_util.find_spec(pkg)
+        if spec and spec.submodule_search_locations:
+            dirs.extend(spec.submodule_search_locations)
+    if dirs:
+        os.environ["PATH"] = os.pathsep.join([*dirs, os.environ.get("PATH", "")])
 
 # Whisper marks segments it suspects are not speech; above this we drop them.
 MAX_NO_SPEECH_PROB = 0.6
@@ -35,6 +55,7 @@ def transcribe(path: Path, model_name: str = "small", language: str = "") -> dic
     """Transcribe the song. Returns {"language": str, "segments": [...]}, where
     each segment is {"start", "end", "text"} for one sung line. The first call
     downloads the Whisper model, so it can take a while."""
+    _register_cuda_dll_dirs()
     from faster_whisper import WhisperModel
 
     log.info("transcribing lyrics: model=%s language=%s file=%s", model_name, language or "auto", path)
