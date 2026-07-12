@@ -13,12 +13,16 @@ class Broadcaster:
     def __init__(self) -> None:
         self._subscribers: dict[str, set[asyncio.Queue]] = defaultdict(set)
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._closed = False
 
     def set_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
+        self._closed = False
 
     def subscribe(self, pid: str) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=256)
+        if self._closed:
+            q.put_nowait(None)
         self._subscribers[pid].add(q)
         return q
 
@@ -54,6 +58,23 @@ class Broadcaster:
             for q in list(subscribers):
                 try:
                     q.put_nowait(payload)
+                except asyncio.QueueFull:
+                    pass
+
+    def close_all(self) -> None:
+        """Thread/signal-safe: wake every subscriber with a None sentinel so
+        the SSE streams end. Browsers hold EventSource connections open
+        forever, and uvicorn's graceful shutdown waits for them."""
+        if self._loop is None or self._loop.is_closed():
+            return
+        self._loop.call_soon_threadsafe(self._close_all_now)
+
+    def _close_all_now(self) -> None:
+        self._closed = True
+        for subscribers in list(self._subscribers.values()):
+            for q in list(subscribers):
+                try:
+                    q.put_nowait(None)
                 except asyncio.QueueFull:
                     pass
 

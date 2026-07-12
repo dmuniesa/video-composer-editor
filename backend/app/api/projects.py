@@ -223,6 +223,8 @@ async def project_events(pid: str) -> StreamingResponse:
             while True:
                 try:
                     payload = await asyncio.wait_for(q.get(), timeout=25)
+                    if payload is None:  # server shutting down
+                        break
                     yield sse_format(payload)
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"

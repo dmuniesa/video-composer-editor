@@ -100,6 +100,15 @@ def list_jobs(pid: str, active_only: bool = False) -> list[dict]:
     return [j.to_dict() for j in sorted(jobs, key=lambda j: j.id)]
 
 
+def cancel_queued() -> None:
+    """Drop queued (not yet started) jobs so process exit isn't held up by a
+    long backlog; the pools' worker threads are non-daemon and the interpreter
+    joins them at exit. Jobs already running finish their current step.
+    Only called from the shutdown signal handler — pools are unusable after."""
+    for pool in _pools.values():
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
 def has_active(pid: str, kind: str, video_id: int | None = None) -> bool:
     with _jobs_lock:
         return any(
