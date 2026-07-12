@@ -208,15 +208,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .preview-pop {
   position: absolute; right: 14px; bottom: 44px; z-index: 20;
   width: clamp(180px, 28vw, 380px);
+  display: flex; flex-direction: column;
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55); overflow: hidden;
+  resize: both; min-width: 180px; min-height: 150px; max-width: 92%; max-height: 88%;
 }
 .preview-pop-head {
   display: flex; justify-content: space-between; align-items: center;
   padding: 3px 4px 3px 8px; font-size: 11px; color: var(--text-dim);
   border-bottom: 1px solid var(--border);
+  cursor: move; user-select: none; touch-action: none;
 }
-.preview-pop video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; }
+.preview-pop video {
+  display: block; width: 100%; flex: 1; min-height: 0;
+  aspect-ratio: 16 / 9; object-fit: contain; background: #000;
+}
 .preview-pop-controls {
   display: flex; gap: 6px; align-items: center; padding: 4px 8px;
   border-top: 1px solid var(--border);

@@ -34,6 +34,8 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [playhead, setPlayhead] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(true)
   const [previewLowRes, setPreviewLowRes] = useState(true)
+  /** null = default position (anchored bottom-right via CSS) */
+  const [popPos, setPopPos] = useState<{ x: number; y: number } | null>(null)
   const [playing, setPlaying] = useState(false)
   const [toast, setToast] = useState('')
   const [composerProvider, setComposerProvider] = useState('mcp')
@@ -44,6 +46,7 @@ export default function MontagePage({ pid }: { pid: string }) {
   const audioRef = useRef<HTMLAudioElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
 
   const refreshTimeline = useCallback(() => {
     api.timeline(pid).then((t) => setTracks(t.tracks)).catch((e) => setToast(e.message))
@@ -176,6 +179,30 @@ export default function MontagePage({ pid }: { pid: string }) {
       cancelAnimationFrame(raf)
     }
   }, [song])
+
+  // drag the preview popup around by its header
+  const startPopDrag = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    const pop = popRef.current
+    const parent = pop?.offsetParent as HTMLElement | null
+    if (!pop || !parent) return
+    e.preventDefault()
+    const rect = pop.getBoundingClientRect()
+    const prect = parent.getBoundingClientRect()
+    const offX = e.clientX - rect.left
+    const offY = e.clientY - rect.top
+    const move = (ev: PointerEvent) => {
+      const x = Math.max(0, Math.min(ev.clientX - prect.left - offX, prect.width - rect.width))
+      const y = Math.max(0, Math.min(ev.clientY - prect.top - offY, prect.height - rect.height))
+      setPopPos({ x, y })
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
 
   const togglePlay = () => {
     const a = audioRef.current
@@ -452,8 +479,12 @@ export default function MontagePage({ pid }: { pid: string }) {
         {song && <audio ref={audioRef} src={media.song(pid)} style={{ display: 'none' }} />}
 
         {previewOpen && (
-          <div className="preview-pop">
-            <div className="preview-pop-head">
+          <div
+            className="preview-pop"
+            ref={popRef}
+            style={popPos ? { left: popPos.x, top: popPos.y, right: 'auto', bottom: 'auto' } : undefined}
+          >
+            <div className="preview-pop-head" onPointerDown={startPopDrag}>
               <span>preview · {fmtTime(playhead)}</span>
               <span style={{ display: 'flex', gap: 4 }}>
                 <button
