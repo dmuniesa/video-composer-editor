@@ -76,7 +76,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .jobs-bar .bar {
   width: 120px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
 }
-.jobs-bar .bar > div { height: 100%; background: var(--accent); }
+.jobs-bar .bar > div { height: 100%; background: var(--accent); transition: width 0.4s; }
+.jobs-idle { display: inline-flex; align-items: center; gap: 6px; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; }
+.status-dot.ok { background: var(--ok); }
+.status-dot.busy { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+.jobs-bar .job {
+  display: inline-flex; gap: 8px; align-items: center;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 10px;
+}
+.jobs-bar .job-label { color: var(--text); font-weight: 600; }
+.jobs-bar .job-msg { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jobs-bar .job-pct { font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
 
 /* ---- Home page ---- */
 .home-page { min-height: 100vh; display: flex; flex-direction: column; }
@@ -297,6 +310,24 @@ kbd {
   display: grid; grid-template-columns: 240px 1fr; gap: 8px 14px; align-items: center;
 }
 .settings-grid label { color: var(--text-dim); font-size: 13px; }
+
+.save-bar {
+  position: sticky; bottom: 12px; z-index: 20;
+  display: flex; gap: 10px; align-items: center;
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.project-actions { display: flex; flex-direction: column; }
+.project-action {
+  display: flex; gap: 16px; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.project-action:last-child { border-bottom: none; padding-bottom: 0; }
+.project-action b { font-size: 13px; }
+.project-action .hint { margin: 2px 0 0; }
+.project-action button { flex-shrink: 0; }
+.project-action.danger-zone b { color: var(--danger); }
 
 /* ---- Review page ---- */
 .review-layout { display: flex; height: 100%; }

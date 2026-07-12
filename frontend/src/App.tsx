@@ -69,18 +69,27 @@ function ProjectShell() {
       </main>
       <footer className="jobs-bar">
         {active.length === 0 ? (
-          <span>idle</span>
+          <span className="jobs-idle">
+            <span className="status-dot ok" /> idle
+          </span>
         ) : (
-          active.slice(0, 3).map((j) => (
-            <span key={j.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {j.label} {j.message && `· ${j.message}`}
-              <span className="bar">
-                <div style={{ width: `${Math.round(j.progress * 100)}%` }} />
-              </span>
+          <>
+            <span className="jobs-idle">
+              <span className="status-dot busy" /> {active.length} job{active.length > 1 ? 's' : ''}
             </span>
-          ))
+            {active.slice(0, 3).map((j) => (
+              <span key={j.id} className="job">
+                <span className="job-label">{j.label}</span>
+                {j.message && <span className="job-msg">{j.message}</span>}
+                <span className="bar">
+                  <div style={{ width: `${Math.round(j.progress * 100)}%` }} />
+                </span>
+                <span className="job-pct">{Math.round(j.progress * 100)}%</span>
+              </span>
+            ))}
+            {active.length > 3 && <span>+{active.length - 3} more</span>}
+          </>
         )}
-        {active.length > 3 && <span>+{active.length - 3} more</span>}
       </footer>
     </div>
   )

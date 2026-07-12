@@ -9,6 +9,7 @@ export default function SettingsPage({ pid }: { pid?: string }) {
   const [status, setStatus] = useState('')
   const [testResult, setTestResult] = useState('')
   const [busy, setBusy] = useState(false)
+  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     api.settings().then(setSettings).catch((e) => setStatus(e.message))
@@ -16,7 +17,10 @@ export default function SettingsPage({ pid }: { pid?: string }) {
 
   if (!settings) return <div className="empty-note">{status || 'Loading…'}</div>
 
-  const set = (patch: Partial<AppSettings>) => setSettings({ ...settings, ...patch })
+  const set = (patch: Partial<AppSettings>) => {
+    setSettings({ ...settings, ...patch })
+    setDirty(true)
+  }
   const setAI = (patch: Partial<AppSettings['ai']>) => set({ ai: { ...settings.ai, ...patch } })
   const setFrames = (patch: Partial<AppSettings['frames']>) =>
     set({ frames: { ...settings.frames, ...patch } })
@@ -29,6 +33,7 @@ export default function SettingsPage({ pid }: { pid?: string }) {
     try {
       const saved = await api.saveSettings(settings)
       setSettings(saved)
+      setDirty(false)
       setStatus('✓ Saved')
     } catch (e) {
       setStatus(String((e as Error).message))
@@ -42,6 +47,7 @@ export default function SettingsPage({ pid }: { pid?: string }) {
     setTestResult('testing…')
     try {
       await api.saveSettings(settings)
+      setDirty(false)
       const r = await api.testAI()
       setTestResult(r.ok ? `✓ OK — provider: ${r.provider}` : `✗ ${r.error}`)
     } catch (e) {
@@ -92,17 +98,24 @@ export default function SettingsPage({ pid }: { pid?: string }) {
   const providerStatus = settings.ai_status
   const f = settings.frames
   const a = settings.ai
+  const showAgy =
+    a.provider === 'auto' || a.provider === 'agy' || settings.composer.provider === 'agy'
+  const showOpenAI =
+    a.provider === 'auto' || a.provider === 'openai' || settings.composer.provider === 'openai'
 
   return (
     <div className="setup-page">
       <div className="panel">
-        <h2>AI provider</h2>
-        <p className="hint">
+        <div className="panel-title-row">
+          <h2>AI provider</h2>
+          {providerStatus?.available ? (
+            <span className="chip ok">active: {providerStatus.provider}</span>
+          ) : (
+            <span className="chip warn">none active</span>
+          )}
+        </div>
+        <p className="hint" style={{ marginTop: 0 }}>
           Who analyzes the video frames (description, score, hashtags) and labels song sections.
-          Currently active:{' '}
-          <b style={{ color: providerStatus?.available ? 'var(--ok)' : 'var(--danger)' }}>
-            {providerStatus?.provider ?? 'none'}
-          </b>
         </p>
         <div className="settings-grid">
           <label>Provider</label>
@@ -123,35 +136,43 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             <option value="openai">OpenAI-compatible endpoint — one-shot prompt</option>
           </select>
 
-          <label>Antigravity command</label>
-          <input
-            value={a.agy_cmd}
-            onChange={(e) => setAI({ agy_cmd: e.target.value })}
-            placeholder="agy -p"
-          />
+          {showAgy && (
+            <>
+              <label>Antigravity command</label>
+              <input
+                value={a.agy_cmd}
+                onChange={(e) => setAI({ agy_cmd: e.target.value })}
+                placeholder="agy -p"
+              />
+            </>
+          )}
 
-          <label>OpenAI base URL</label>
-          <input
-            value={a.openai_base_url}
-            onChange={(e) => setAI({ openai_base_url: e.target.value })}
-            placeholder="https://api.z.ai/api/coding/paas/v4"
-          />
+          {showOpenAI && (
+            <>
+              <label>OpenAI base URL</label>
+              <input
+                value={a.openai_base_url}
+                onChange={(e) => setAI({ openai_base_url: e.target.value })}
+                placeholder="https://api.z.ai/api/coding/paas/v4"
+              />
 
-          <label>API key</label>
-          <input
-            type="password"
-            value={a.openai_api_key}
-            onChange={(e) => setAI({ openai_api_key: e.target.value })}
-            placeholder="sk-…"
-            autoComplete="off"
-          />
+              <label>API key</label>
+              <input
+                type="password"
+                value={a.openai_api_key}
+                onChange={(e) => setAI({ openai_api_key: e.target.value })}
+                placeholder="sk-…"
+                autoComplete="off"
+              />
 
-          <label>Model (vision-capable)</label>
-          <input
-            value={a.openai_model}
-            onChange={(e) => setAI({ openai_model: e.target.value })}
-            placeholder="glm-4.6v-flash"
-          />
+              <label>Model (vision-capable)</label>
+              <input
+                value={a.openai_model}
+                onChange={(e) => setAI({ openai_model: e.target.value })}
+                placeholder="glm-4.6v-flash"
+              />
+            </>
+          )}
 
           <label>Timeout (s)</label>
           <input
@@ -172,33 +193,17 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <b>Claude via MCP</b> the button is disabled — compose by talking to Claude with the MCP
           server registered, as before (see README).
         </p>
-        <p className="hint" style={{ marginTop: 10 }}>
-          For <b>z.ai GLM</b>, the base URL depends on your plan: API plan →{' '}
-          <code>https://api.z.ai/api/paas/v4</code> (e.g. model <code>glm-4.6v-flash</code>);{' '}
-          <b>Coding Plan</b> → <code>https://api.z.ai/api/coding/paas/v4</code> (e.g. model{' '}
-          <code>glm-4.7</code> or <code>glm-4.6v</code> — these accept images too). A Coding Plan
-          key only works on the coding endpoint. Any endpoint speaking the OpenAI{' '}
-          <code>/chat/completions</code> protocol with image input works (OpenAI, OpenRouter,
-          Ollama, LM Studio…). Frames are sent to that provider — use a local endpoint if you
-          prefer to keep them on your machine.
-        </p>
-        {pid && (
-          <div
-            style={{
-              marginTop: 12,
-              paddingTop: 12,
-              borderTop: '1px solid var(--border)',
-            }}
-          >
-            <button onClick={clearAnalysis} disabled={busy}>
-              Clear AI analysis for this project
-            </button>
-            <p className="hint" style={{ marginTop: 8 }}>
-              Wipes the description, score and hashtags the AI produced for every clip — when they
-              came out wrong or mixed up. Extracted frames are kept; clips go back to "extracted" so
-              you can re-run analysis from the Library when you’re ready. Does not re-run the AI.
-            </p>
-          </div>
+        {showOpenAI && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            For <b>z.ai GLM</b>, the base URL depends on your plan: API plan →{' '}
+            <code>https://api.z.ai/api/paas/v4</code> (e.g. model <code>glm-4.6v-flash</code>);{' '}
+            <b>Coding Plan</b> → <code>https://api.z.ai/api/coding/paas/v4</code> (e.g. model{' '}
+            <code>glm-4.7</code> or <code>glm-4.6v</code> — these accept images too). A Coding Plan
+            key only works on the coding endpoint. Any endpoint speaking the OpenAI{' '}
+            <code>/chat/completions</code> protocol with image input works (OpenAI, OpenRouter,
+            Ollama, LM Studio…). Frames are sent to that provider — use a local endpoint if you
+            prefer to keep them on your machine.
+          </p>
         )}
       </div>
 
@@ -245,11 +250,6 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           Example: min 3, max 10, +1 every 5 s → a 20 s clip gets 7 frames. Changes apply to
           videos scanned from now on{pid ? ' — or re-extract this project below' : ''}.
         </p>
-        {pid && (
-          <button onClick={reextract} disabled={busy} style={{ marginTop: 6 }}>
-            Re-extract frames for this project
-          </button>
-        )}
       </div>
 
       <div className="panel">
@@ -347,8 +347,41 @@ export default function SettingsPage({ pid }: { pid?: string }) {
         </label>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      {pid && (
+        <div className="panel">
+          <h2>This project</h2>
+          <p className="hint">
+            Maintenance actions that only affect the project you have open — global settings above
+            are not touched.
+          </p>
+          <div className="project-actions">
+            <div className="project-action">
+              <div>
+                <b>Re-extract frames</b>
+                <p className="hint">
+                  Regenerates frames, thumbnails and filmstrips with the extraction settings above.
+                  Runs in the background; originals are untouched.
+                </p>
+              </div>
+              <button onClick={reextract} disabled={busy}>Re-extract</button>
+            </div>
+            <div className="project-action danger-zone">
+              <div>
+                <b>Clear AI analysis</b>
+                <p className="hint">
+                  Wipes the AI description, score and hashtags from every clip (frames are kept;
+                  clips go back to "extracted"). Cannot be undone.
+                </p>
+              </div>
+              <button className="danger" onClick={clearAnalysis} disabled={busy}>Clear…</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="save-bar">
         <button className="primary" onClick={save} disabled={busy}>Save settings</button>
+        {dirty && <span className="chip warn">unsaved changes</span>}
         <span className="hint">{status}</span>
       </div>
     </div>
