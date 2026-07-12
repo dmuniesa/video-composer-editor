@@ -186,16 +186,18 @@ def project_jobs(pid: str, active: bool = False) -> list[dict]:
     return jobs.list_jobs(pid, active_only=active)
 
 
-@router.get("/logs")
-def logs_list() -> dict:
-    """Recent backend log records (AI calls, prompts, errors). Global, not
-    per-project. New records also stream live over the SSE 'log' event."""
-    return {"records": logbuffer.records()}
+@router.get("/projects/{pid}/logs")
+def logs_list(pid: str) -> dict:
+    """This project's persisted backend log records (AI calls, prompts, errors).
+    Survives restarts. New records also stream live over the SSE 'log' event."""
+    resolve_project(pid)
+    return {"records": logbuffer.records(pid)}
 
 
-@router.post("/logs/clear")
-def logs_clear() -> dict:
-    logbuffer.clear()
+@router.post("/projects/{pid}/logs/clear")
+def logs_clear(pid: str) -> dict:
+    resolve_project(pid)
+    logbuffer.clear(pid)
     return {"ok": True}
 
 

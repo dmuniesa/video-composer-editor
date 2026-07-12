@@ -34,8 +34,8 @@ export default function LogsPage({ pid }: { pid: string }) {
   pausedRef.current = paused
 
   useEffect(() => {
-    api.logs().then((r) => setRecords(r.records)).catch(() => {})
-  }, [])
+    api.logs(pid).then((r) => setRecords(r.records)).catch(() => {})
+  }, [pid])
 
   useProjectEvents(pid, (e) => {
     if (e.event !== 'log' || pausedRef.current) return
@@ -60,7 +60,7 @@ export default function LogsPage({ pid }: { pid: string }) {
 
   const clear = async () => {
     try {
-      await api.clearLogs()
+      await api.clearLogs(pid)
     } catch {
       /* ignore */
     }

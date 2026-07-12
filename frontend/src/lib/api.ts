@@ -52,8 +52,9 @@ export const api = {
   jobs: (pid: string, active = true) =>
     req<JobInfo[]>(`/api/projects/${pid}/jobs?active=${active}`),
 
-  logs: () => req<{ records: LogRecord[] }>('/api/logs'),
-  clearLogs: () => req<{ ok: boolean }>('/api/logs/clear', { method: 'POST' }),
+  logs: (pid: string) => req<{ records: LogRecord[] }>(`/api/projects/${pid}/logs`),
+  clearLogs: (pid: string) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/logs/clear`, { method: 'POST' }),
 
   settings: () => req<AppSettings>('/api/settings'),
   saveSettings: (s: AppSettings) => {
