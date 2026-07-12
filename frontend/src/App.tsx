@@ -3,12 +3,14 @@ import { Link, NavLink, Navigate, Route, Routes, useParams } from 'react-router-
 import { api } from './lib/api'
 import { useProjectEvents } from './lib/sse'
 import type { JobInfo, ProjectInfo } from './lib/types'
+import HomePage from './pages/HomePage'
 import SetupPage from './pages/SetupPage'
 import ReviewPage from './pages/ReviewPage'
 import MusicPage from './pages/MusicPage'
 import MontagePage from './pages/MontagePage'
 import SettingsPage from './pages/SettingsPage'
 import LogsPage from './pages/LogsPage'
+import GuidePage from './pages/GuidePage'
 
 function ProjectShell() {
   const { pid = '' } = useParams()
@@ -44,6 +46,7 @@ function ProjectShell() {
         <NavLink to={`/p/${pid}/review`}>Review</NavLink>
         <NavLink to={`/p/${pid}/music`}>Music</NavLink>
         <NavLink to={`/p/${pid}/montage`}>Montage</NavLink>
+        <NavLink to={`/p/${pid}/guide`}>Guide</NavLink>
         <NavLink to={`/p/${pid}/logs`}>Logs</NavLink>
         <NavLink to={`/p/${pid}/settings`}>Settings</NavLink>
         <span className="spacer" />
@@ -55,6 +58,7 @@ function ProjectShell() {
           <Route path="review" element={<ReviewPage pid={pid} />} />
           <Route path="music" element={<MusicPage pid={pid} />} />
           <Route path="montage" element={<MontagePage pid={pid} />} />
+          <Route path="guide" element={<GuidePage />} />
           <Route path="logs" element={<LogsPage pid={pid} />} />
           <Route path="settings" element={<SettingsPage pid={pid} />} />
           <Route path="*" element={<Navigate to="setup" replace />} />
@@ -82,7 +86,8 @@ function ProjectShell() {
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<SetupPage project={null} onChanged={() => {}} standalone />} />
+      <Route path="/" element={<HomePage />} />
+      <Route path="/guide" element={<GuidePage standalone />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/p/:pid/*" element={<ProjectShell />} />
     </Routes>

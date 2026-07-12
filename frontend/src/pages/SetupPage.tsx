@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { api } from '../lib/api'
 import type { ProjectInfo } from '../lib/types'
 import FileBrowser from '../components/FileBrowser'
@@ -7,53 +6,14 @@ import FileBrowser from '../components/FileBrowser'
 interface Props {
   project: ProjectInfo | null
   onChanged: () => void
-  standalone?: boolean
 }
 
-export default function SetupPage({ project, onChanged, standalone }: Props) {
-  const navigate = useNavigate()
-  const [recent, setRecent] = useState<{ id: string; video_dir: string; name: string }[]>([])
+export default function SetupPage({ project, onChanged }: Props) {
   const [pickingSong, setPickingSong] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (standalone) api.listProjects().then(setRecent).catch(() => {})
-  }, [standalone])
-
-  const openDir = async (dir: string) => {
-    try {
-      const p = await api.createProject(dir)
-      await api.scan(p.id)
-      navigate(`/p/${p.id}/setup`)
-    } catch (e) {
-      setError(String((e as Error).message))
-    }
-  }
-
-  if (standalone || !project) {
-    return (
-      <div className="setup-page">
-        <div className="panel">
-          <h2>🎬 Video Montage Composer</h2>
-          <p className="hint">
-            Pick the folder that contains your trip videos. The app scans it, extracts frames,
-            and (with the Antigravity CLI installed) asks Gemini to describe and score every clip.
-          </p>
-          {recent.length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <h2>Recent projects</h2>
-              {recent.map((r) => (
-                <button key={r.id} style={{ marginRight: 8, marginBottom: 8 }} onClick={() => navigate(`/p/${r.id}/setup`)}>
-                  {r.name} <span className="hint">{r.video_dir}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          <FileBrowser mode="dir" onPick={openDir} />
-          {error && <div className="error-text">{error}</div>}
-        </div>
-      </div>
-    )
+  if (!project) {
+    return <div className="empty-note">loading project…</div>
   }
 
   const byStatus = project.videos_by_status
