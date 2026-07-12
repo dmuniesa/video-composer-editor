@@ -1,0 +1,30 @@
+<svg width="480" height="120" viewBox="0 0 480 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <g id="bars">
+      <rect x="9" y="40" width="14" height="40" rx="7" />
+      <rect x="31" y="25" width="14" height="70" rx="7" />
+      <rect x="53" y="10" width="14" height="100" rx="7" />
+      <rect x="75" y="25" width="14" height="70" rx="7" />
+      <rect x="97" y="40" width="14" height="40" rx="7" />
+    </g>
+
+    <clipPath id="top-clip">
+      <polygon points="-20,-20 140,-20 140,20 -20,100" />
+    </clipPath>
+    
+    <clipPath id="bottom-clip">
+      <polygon points="-20,100 140,20 140,140 -20,140" />
+    </clipPath>
+  </defs>
+
+  <g>
+    <g transform="translate(-3, -2)">
+      <use href="#bars" fill="#FFFFFF" clip-path="url(#top-clip)" />
+    </g>
+    <g transform="translate(3, 2)">
+      <use href="#bars" fill="#FFFFFF" clip-path="url(#bottom-clip)" />
+    </g>
+  </g>
+
+  <text x="135" y="82" font-family="'Inter', system-ui, sans-serif" font-weight="700" font-size="68" fill="#FFFFFF" letter-spacing="-2">Beatcut</text>
+</svg>
