@@ -150,7 +150,8 @@ command template: `AGY_CMD="/path/to/agy -p" uvicorn ...`
 
 ## Workflow
 
-📖 **Full user manual with screenshots: [docs/MANUAL.md](docs/MANUAL.md)**
+📖 **Full user manual with screenshots: [docs/MANUAL.md](docs/MANUAL.md)** — also
+available inside the app under the **Guide** tab.
 
 | Page | What you do |
 |---|---|
