@@ -153,8 +153,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .detail-header { display: flex; align-items: center; gap: 12px; }
 .detail-header h3 { margin: 0; flex: 1; font-size: 15px; word-break: break-all; }
 
-.trimbar { position: relative; height: 64px; border-radius: 6px; overflow: hidden; background: #000; user-select: none; }
-.trimbar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; opacity: 0.85; }
+.trimbar { position: relative; min-height: 24px; border-radius: 6px; overflow: hidden; background: #000; user-select: none; }
+/* Filmstrip drives the bar height so each frame keeps the video's aspect ratio
+   (width:100% preserves the left=0 → right=duration temporal mapping).
+   min-height only holds the bar open while the filmstrip is still being generated. */
+.trimbar img { display: block; width: 100%; height: auto; opacity: 0.85; }
 .trimbar .playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; pointer-events: none; }
 .trimbar .range { position: absolute; top: 0; bottom: 0; background: var(--accent-soft); border: 1px solid var(--accent); }
 .trimbar .range.active { background: rgba(79,140,255,0.35); }
@@ -170,7 +173,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .music-page { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 .wave-wrap { position: relative; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
 .section-table { width: 100%; border-collapse: collapse; }
-.section-table th, .section-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.section-table th, .section-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 13px; font-variant-numeric: tabular-nums; }
 .section-table th { color: var(--text-dim); font-weight: 500; }
 
 /* ---- Montage page ---- */

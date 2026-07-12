@@ -37,11 +37,17 @@ export default function MusicPage({ pid }: { pid: string }) {
     if (e.event === 'song') refresh()
   })
 
+  // The wave-wrap sits behind the `if (!song) return` early returns, so on
+  // first mount wrapRef.current is null and an empty-deps effect never
+  // attaches the observer — leaving `width` stuck at 900 and the waveform
+  // compressed. Re-run once `song` is present so the ref is bound.
   useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
     const obs = new ResizeObserver((entries) => setWidth(entries[0].contentRect.width))
-    if (wrapRef.current) obs.observe(wrapRef.current)
+    obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  }, [song])
 
   if (error && !song) return <div className="empty-note">{error} — choose a song on the Setup page.</div>
   if (!song) return <div className="empty-note">Loading…</div>
