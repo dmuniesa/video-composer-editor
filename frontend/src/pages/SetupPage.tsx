@@ -25,6 +25,8 @@ function basename(p: string) {
 export default function SetupPage({ project, onChanged }: Props) {
   const [pickingSong, setPickingSong] = useState(false)
   const [error, setError] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
   const [song, setSong] = useState<SongInfo | null>(null)
   const [reviewed, setReviewed] = useState<{ rated: number; total: number } | null>(null)
   const [placedClips, setPlacedClips] = useState<number | null>(null)
@@ -52,6 +54,22 @@ export default function SetupPage({ project, onChanged }: Props) {
 
   if (!project) {
     return <div className="empty-note">loading project…</div>
+  }
+
+  const startEditName = () => {
+    setNameDraft(project.name)
+    setEditingName(true)
+    setError('')
+  }
+
+  const saveName = () => {
+    const name = nameDraft.trim()
+    setEditingName(false)
+    if (!name || name === project.name) return
+    api
+      .updateProject(project.id, { name })
+      .then(onChanged)
+      .catch((e) => setError(e.message))
   }
 
   const byStatus = project.videos_by_status
@@ -103,7 +121,25 @@ export default function SetupPage({ project, onChanged }: Props) {
     <div className="setup-page">
       <header className="setup-header">
         <div className="setup-title">
-          <h1>{project.name}</h1>
+          {editingName ? (
+            <input
+              className="name-edit"
+              autoFocus
+              value={nameDraft}
+              maxLength={200}
+              onChange={(e) => setNameDraft(e.target.value)}
+              onBlur={saveName}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveName()
+                else if (e.key === 'Escape') setEditingName(false)
+              }}
+            />
+          ) : (
+            <h1 className="name-title" onClick={startEditName} title="Click to rename">
+              {project.name}
+              <span className="name-edit-icon" aria-hidden>✎</span>
+            </h1>
+          )}
           <div className="crumb" style={{ marginBottom: 0 }}>{project.video_dir}</div>
         </div>
         <button onClick={() => api.scan(project.id).then(onChanged).catch((e) => setError(e.message))}>

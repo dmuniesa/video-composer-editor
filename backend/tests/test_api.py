@@ -243,6 +243,12 @@ def test_clip_speed_split_and_composition_fps(client, project):
     assert client.patch(f"/api/projects/{pid}", json={"composition_fps": 500}).status_code == 400
     assert client.patch(f"/api/projects/{pid}", json={"composition_width": 4}).status_code == 400
 
+    # rename round-trip + validation
+    res = client.patch(f"/api/projects/{pid}", json={"name": "  My Montage  "})
+    assert res.status_code == 200 and res.json()["name"] == "My Montage"
+    assert client.get(f"/api/projects/{pid}").json()["name"] == "My Montage"
+    assert client.patch(f"/api/projects/{pid}", json={"name": "   "}).status_code == 400
+
     client.post(f"/api/projects/{pid}/scan")
     wait_until(
         lambda: all(

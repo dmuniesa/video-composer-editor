@@ -112,6 +112,7 @@ def project_get(pid: str) -> dict:
 
 
 class ProjectUpdate(BaseModel):
+    name: str | None = None
     composition_fps: float | None = None
     composition_width: int | None = None
     composition_height: int | None = None
@@ -125,6 +126,13 @@ def project_update(pid: str, body: ProjectUpdate) -> dict:
         if project is None:
             project = Project(name=video_dir.name, video_dir=str(video_dir))
             db.add(project)
+        if body.name is not None:
+            name = body.name.strip()
+            if not name:
+                raise HTTPException(400, "name must not be empty")
+            if len(name) > 200:
+                raise HTTPException(400, "name must be 200 characters or fewer")
+            project.name = name
         if body.composition_fps is not None:
             if not (10 <= body.composition_fps <= 120):
                 raise HTTPException(400, "composition_fps must be between 10 and 120")

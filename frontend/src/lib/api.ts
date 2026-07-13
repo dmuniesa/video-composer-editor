@@ -37,7 +37,7 @@ export const api = {
   getProject: (pid: string) => req<ProjectInfo>(`/api/projects/${pid}`),
   updateProject: (
     pid: string,
-    patch: { composition_fps?: number; composition_width?: number; composition_height?: number },
+    patch: { name?: string; composition_fps?: number; composition_width?: number; composition_height?: number },
   ) => req<ProjectInfo>(`/api/projects/${pid}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   scan: (pid: string) =>
     req<{ added: number; removed: number; total: number }>(`/api/projects/${pid}/scan`, {
