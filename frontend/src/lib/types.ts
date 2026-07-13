@@ -1,7 +1,16 @@
+export interface Source {
+  id: number
+  path: string
+  label: string
+  online: boolean
+  video_count: number
+}
+
 export interface ProjectInfo {
   id: string
   name: string
   video_dir: string
+  sources: Source[]
   composition_fps: number
   composition_width: number
   composition_height: number
@@ -58,6 +67,8 @@ export interface VideoRange {
 export interface Video {
   id: number
   rel_path: string
+  source_id: number | null
+  source_label: string
   filename: string
   duration: number
   fps: number

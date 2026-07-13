@@ -7,7 +7,7 @@ const STEPS = [
   {
     icon: '📁',
     title: 'Scan',
-    text: 'Point at a folder of videos. Frames, thumbnails and proxies are extracted automatically.',
+    text: 'Add one or more folders of videos. Frames, thumbnails and proxies are extracted automatically.',
   },
   {
     icon: '✨',
@@ -39,18 +39,33 @@ const STEPS = [
 export default function HomePage() {
   const navigate = useNavigate()
   const [recent, setRecent] = useState<{ id: string; video_dir: string; name: string }[]>([])
-  const [browsing, setBrowsing] = useState(false)
+  const [browsing, setBrowsing] = useState<null | 'new' | 'import'>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     api.listProjects().then(setRecent).catch(() => {})
   }, [])
 
-  const openDir = async (dir: string) => {
+  const importDir = async (dir: string) => {
     try {
-      const p = await api.createProject(dir)
-      await api.scan(p.id)
+      const p = await api.importProject(dir)
       navigate(`/p/${p.id}/setup`)
+    } catch (e) {
+      setError(String((e as Error).message))
+    }
+  }
+
+  // Import opens the native OS folder dialog directly; fall back to the in-app
+  // browser panel when no native dialog is available (headless Linux w/o Tk).
+  const chooseImport = async () => {
+    setError('')
+    try {
+      const r = await api.pickPath('dir')
+      if (!r.ok) {
+        setBrowsing('import')
+        return
+      }
+      if (r.path) importDir(r.path)
     } catch (e) {
       setError(String((e as Error).message))
     }
@@ -82,9 +97,14 @@ export default function HomePage() {
         </p>
         <div className="hero-actions">
           {!browsing && (
-            <button className="primary big" onClick={() => setBrowsing(true)}>
-              ＋ New project
-            </button>
+            <>
+              <button className="primary big" onClick={() => navigate('/new')}>
+                ＋ New project
+              </button>
+              <button className="big" onClick={chooseImport}>
+                Import project
+              </button>
+            </>
           )}
           <Link to="/guide" className="ghost-link">
             Read the guide →
@@ -93,20 +113,20 @@ export default function HomePage() {
       </header>
 
       <div className="home-body">
-        {browsing && (
+        {browsing === 'import' && (
           <section className="panel">
             <div className="panel-title-row">
-              <h2>Pick your video folder</h2>
-              <button className="small" onClick={() => setBrowsing(false)}>
+              <h2>Import an existing project</h2>
+              <button className="small" onClick={() => setBrowsing(null)}>
                 Cancel
               </button>
             </div>
             <p className="hint" style={{ marginTop: 0 }}>
-              Choose the folder that contains your footage. It is scanned recursively; everything
-              the app generates is kept in a <code>.montage-cache/</code> subfolder — your original
-              files are never touched.
+              Pick the project's storage folder — the one that contains its{' '}
+              <code>.montage-cache/</code> subfolder. It is re-registered here with all its clips,
+              ratings and timeline intact.
             </p>
-            <FileBrowser mode="dir" onPick={openDir} />
+            <FileBrowser mode="dir" onPick={importDir} />
             {error && <div className="error-text" style={{ marginTop: 8 }}>{error}</div>}
           </section>
         )}

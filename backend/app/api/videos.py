@@ -1,13 +1,15 @@
 """Video listing, ratings (single + batch), manual analysis edits, ranges."""
 from __future__ import annotations
 
+import shutil
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from .. import db as dbm
 from ..events import broadcaster
-from ..models import Video, VideoAnalysis, VideoRange, VideoRating
+from ..models import TimelineClip, Video, VideoAnalysis, VideoRange, VideoRating
 from .deps import resolve_project
 
 router = APIRouter()
@@ -17,6 +19,8 @@ def video_dict(v: Video) -> dict:
     return {
         "id": v.id,
         "rel_path": v.rel_path,
+        "source_id": v.source_id,
+        "source_label": (v.source.label or v.source.path) if v.source else "",
         "filename": v.filename,
         "duration": v.duration,
         "fps": v.fps,
@@ -73,6 +77,29 @@ def videos_rate(pid: str, body: RatingRequest) -> dict:
             db.add(rating)
         db.commit()
     broadcaster.publish(pid, "videos", {})
+    return {"ok": True}
+
+
+@router.delete("/projects/{pid}/videos/{vid}")
+def video_delete(pid: str, vid: int) -> dict:
+    """Remove a video from the project: drops its DB row (analysis, rating,
+    ranges cascade), any timeline clips using it, and its cache folder. The
+    source file on disk is left untouched — but note a later rescan of its
+    source will re-add the file."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        video = db.get(Video, vid)
+        if video is None:
+            raise HTTPException(404, "video not found")
+        # TimelineClip has no cascade to Video; remove clips referencing it.
+        for clip in db.scalars(select(TimelineClip).where(TimelineClip.video_id == vid)):
+            db.delete(clip)
+        cache = dbm.cache_dir_for(video_dir) / video.cache_key
+        shutil.rmtree(cache, ignore_errors=True)
+        db.delete(video)
+        db.commit()
+    broadcaster.publish(pid, "videos", {})
+    broadcaster.publish(pid, "timeline", {"source": "video-removed"})
     return {"ok": True}
 
 

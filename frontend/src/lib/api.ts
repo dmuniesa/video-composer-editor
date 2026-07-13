@@ -5,6 +5,7 @@ import type {
   LogRecord,
   ProjectInfo,
   SongInfo,
+  Source,
   Track,
   Video,
   VideoRange,
@@ -31,10 +32,51 @@ export const api = {
   fsList: (path: string) =>
     req<FsListing>(`/api/fs/list?path=${encodeURIComponent(path)}`),
 
+  /** Open the OS-native folder/file dialog. Returns `{ ok: false }` when no
+   *  native dialog is available so the caller can fall back to the in-app
+   *  browser; on success `path` is null if the user cancelled. */
+  pickPath: async (
+    kind: 'dir' | 'audio',
+    initial = '',
+  ): Promise<{ ok: true; path: string | null } | { ok: false }> => {
+    const res = await fetch('/api/fs/pick', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, initial }),
+    })
+    if (res.status === 501) return { ok: false }
+    if (!res.ok) {
+      let detail = res.statusText
+      try {
+        detail = (await res.json()).detail ?? detail
+      } catch {
+        /* not json */
+      }
+      throw new Error(detail)
+    }
+    return { ok: true, path: (await res.json()).path }
+  },
+
   listProjects: () => req<{ id: string; video_dir: string; name: string }[]>('/api/projects'),
-  createProject: (video_dir: string) =>
-    req<ProjectInfo>('/api/projects', { method: 'POST', body: JSON.stringify({ video_dir }) }),
+  createProject: (project_dir: string, name = '') =>
+    req<ProjectInfo>('/api/projects', { method: 'POST', body: JSON.stringify({ project_dir, name }) }),
+  importProject: (project_dir: string) =>
+    req<ProjectInfo>('/api/projects/import', { method: 'POST', body: JSON.stringify({ project_dir }) }),
   getProject: (pid: string) => req<ProjectInfo>(`/api/projects/${pid}`),
+
+  sources: (pid: string) => req<Source[]>(`/api/projects/${pid}/sources`),
+  addSource: (pid: string, path: string, label?: string) =>
+    req<ProjectInfo>(`/api/projects/${pid}/sources`, {
+      method: 'POST',
+      body: JSON.stringify({ path, label }),
+    }),
+  updateSource: (pid: string, sid: number, patch: { path?: string; label?: string }) =>
+    req<ProjectInfo>(`/api/projects/${pid}/sources/${sid}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  removeSource: (pid: string, sid: number) =>
+    req<ProjectInfo>(`/api/projects/${pid}/sources/${sid}`, { method: 'DELETE' }),
   updateProject: (
     pid: string,
     patch: { name?: string; composition_fps?: number; composition_width?: number; composition_height?: number },
@@ -80,6 +122,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ video_ids, ...patch }),
     }),
+  deleteVideo: (pid: string, vid: number) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/videos/${vid}`, { method: 'DELETE' }),
   editAnalysis: (pid: string, vid: number, patch: { description?: string; hashtags?: string[] }) =>
     req<Video>(`/api/projects/${pid}/videos/${vid}/analysis`, {
       method: 'PATCH',

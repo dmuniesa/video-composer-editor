@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from .. import db as dbm, settings
 from ..events import broadcaster
-from ..models import Song, SongLyrics, SongSection, Video, VideoAnalysis, VideoRating
+from ..models import Song, SongLyrics, SongSection, Source, Video, VideoAnalysis, VideoRating
 from . import ai, audio_analysis, frames, jobs, lyrics, scanner
 
 
@@ -18,39 +18,61 @@ def video_cache(video_dir: Path, cache_key: str) -> Path:
     return dbm.cache_dir_for(video_dir) / cache_key
 
 
+def source_root(video: Video) -> Path:
+    """Absolute root directory of the video's source. Falls back to '.' if the
+    source row is somehow missing (should not happen after migration)."""
+    return Path(video.source.path) if video.source else Path(".")
+
+
 def scan_project(pid: str, video_dir: Path) -> dict:
-    """Synchronously register video files, then queue per-video media jobs."""
+    """Scan every source directory, register new video files and drop rows whose
+    file disappeared, then queue per-video media jobs."""
     new_ids: list[int] = []
+    added = removed = total = 0
     with dbm.open_session(video_dir) as db:
-        known = {v.rel_path: v for v in db.scalars(select(Video))}
-        found = scanner.find_videos(video_dir)
-        for path in found:
-            rel = str(path.relative_to(video_dir))
-            if rel in known:
+        sources = list(db.scalars(select(Source)))
+        # Existing rows keyed per source so identical rel_paths in different
+        # sources don't collide.
+        known: dict[tuple[int, str], Video] = {
+            (v.source_id, v.rel_path): v for v in db.scalars(select(Video))
+        }
+        for source in sources:
+            root = Path(source.path)
+            if not root.is_dir():
+                # Source moved/offline: leave its videos untouched (relink later).
+                total += sum(1 for k in known if k[0] == source.id)
                 continue
-            video = Video(
-                rel_path=rel,
-                filename=path.name,
-                size=path.stat().st_size,
-                cache_key=scanner.cache_key_for(rel),
-                status="pending",
-            )
-            db.add(video)
-            db.flush()
-            db.add(VideoRating(video_id=video.id))
-            new_ids.append(video.id)
-        # Drop DB rows whose file disappeared.
-        found_rels = {str(p.relative_to(video_dir)) for p in found}
-        removed = 0
-        for rel, video in known.items():
-            if rel not in found_rels:
-                db.delete(video)
-                removed += 1
+            found = scanner.find_videos(root)
+            total += len(found)
+            found_rels: set[str] = set()
+            for path in found:
+                rel = str(path.relative_to(root))
+                found_rels.add(rel)
+                if (source.id, rel) in known:
+                    continue
+                video = Video(
+                    rel_path=rel,
+                    source_id=source.id,
+                    filename=path.name,
+                    size=path.stat().st_size,
+                    cache_key=scanner.cache_key_for(f"{source.id}/{rel}"),
+                    status="pending",
+                )
+                db.add(video)
+                db.flush()
+                db.add(VideoRating(video_id=video.id))
+                new_ids.append(video.id)
+            # Drop DB rows of this source whose file disappeared.
+            for (sid, rel), video in known.items():
+                if sid == source.id and rel not in found_rels:
+                    db.delete(video)
+                    removed += 1
+        added = len(new_ids)
         db.commit()
 
     for vid in new_ids:
         queue_media_job(pid, video_dir, vid)
-    return {"added": len(new_ids), "removed": removed, "total": len(found)}
+    return {"added": added, "removed": removed, "total": total}
 
 
 def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
@@ -62,7 +84,7 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
             video = db.get(Video, video_id)
             if video is None:
                 return
-            path = video_dir / video.rel_path
+            path = source_root(video) / video.rel_path
             cache = video_cache(video_dir, video.cache_key)
             try:
                 video.status = "extracting"

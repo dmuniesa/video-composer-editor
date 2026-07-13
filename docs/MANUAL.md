@@ -25,18 +25,22 @@ is saved automatically, instantly**, on every action: AI descriptions and
 hashtags, your stars/rejects, in/out ranges, the song analysis with your
 section edits, and the whole timeline.
 
-Each project is simply a video folder: all of its state lives in a SQLite
-database inside `<folder>/.montage-cache/`, next to the footage. That means:
+Each project has a **storage folder** you choose and one or more **source
+folders** of footage. All of its state lives in a SQLite database inside
+`<storage>/.montage-cache/`, decoupled from the footage. That means:
 
+- **Pull footage from several folders** — add as many source folders as you
+  like (even on different drives), remove them, or **repoint** one that moved
+  without losing a single clip's ratings, ranges or timeline placement.
 - **Close anything anytime** — browser tab, server, reboot — and reopen the
   project later exactly where you left it (background jobs that were running
   can be re-queued with *Rescan* / *Analyze all*).
 - **Open another project** whenever you want: click the **Beatcut** logo
-  (top-left) to go back to the home screen, which lists your recent projects;
-  pick one or browse to a new folder. You can even work on two projects at
-  once in two browser tabs.
-- **A project travels with its folder** — move the folder to another drive and
-  open it again from the home screen (the cache moves with it).
+  (top-left) to go back to the home screen, which lists your recent projects.
+  You can even work on two projects at once in two browser tabs.
+- **Move or import a project** — the storage folder is self-contained: copy it
+  elsewhere and **Import project** from the home screen re-registers it with
+  everything intact.
 - **Back up / version a montage** by copying `.montage-cache/`; **reset** a
   project by deleting it.
 
@@ -45,10 +49,17 @@ database inside `<folder>/.montage-cache/`, next to the footage. That means:
 ## 1. Create a project (Setup)
 
 Start the server (`uvicorn app.main:app --port 8765` from `backend/`) and open
-<http://127.0.0.1:8765>. Use the built-in file browser to navigate to the folder
-that contains your trip videos and click **"Use this folder"**.
+<http://127.0.0.1:8765>. Click **New project**. On the page that opens, click
+**Choose folder…** — your operating system's native dialog appears — to pick a
+**storage folder** for the project (where its database will live; it can be
+empty and separate from your footage; use the dialog's *New folder* button to
+make one), optionally set a name, and hit **Create project**. Then, on the Setup
+page, use the **Source folders** panel and **Add folder** to attach each folder
+of footage (the same native dialog). If a native dialog isn't available (e.g. a
+headless Linux box without `python3-tk`), an in-app folder browser is shown
+instead.
 
-The app immediately:
+For every source the app immediately:
 
 1. scans the folder recursively for video files (`.mp4`, `.mov`, `.mts`, `.mkv`…),
 2. reads duration/fps/resolution with ffprobe,
@@ -59,18 +70,26 @@ The app immediately:
    writes a description, a 1–10 score and hashtags for every clip.
 
 Progress appears in the **status bar at the bottom** — you can already open the
-Review page while jobs run; results pop in live.
+Review page while jobs run; results pop in live. Two clips with the same name in
+different source folders coexist without clashing.
 
 ![Setup page](img/setup.png)
 
 The Setup page shows counters per state (`pending → extracting → extracted →
-analyzing → ready`). **Rescan folder** picks up files you added later; **Analyze
-all with Gemini** re-queues AI analysis (e.g. after installing `agy`).
+analyzing → ready`). In the **Source folders** panel, **Add folder** attaches
+another source, **✕** removes one (its clips leave the project; the files on disk
+are untouched), and **Repoint…** relinks a source that moved. **Rescan all**
+picks up files you added to or removed from any source later; **Analyze all with
+Gemini** re-queues AI analysis (e.g. after installing `agy`).
 
 Pick your **song** here too (bottom panel) — analysis starts right away.
 
-> Everything the app generates lives in `<your folder>/.montage-cache/`. Your
+> Everything the app generates lives in `<storage>/.montage-cache/`. Your
 > original videos are never touched.
+
+To bring in an existing project from another machine or a backup, click
+**Import project** on the home screen and pick its storage folder (the one that
+contains `.montage-cache/`).
 
 ## 2. Review and rate your clips
 
@@ -303,12 +322,17 @@ descriptions).
   isn't on the PATH of the shell that started the server. Install it, run `agy`
   once to sign in, restart the server (or set `AGY_CMD`).
 - **A video shows status `error`** — hover the card to read the message; usually
-  a corrupt file or unsupported stream. Fix/remove the file and **Rescan**.
+  a corrupt file or unsupported stream. Fix/remove the file and **Rescan all**.
+- **A source folder shows ⚠ "not found"** — it was moved or its drive isn't
+  mounted. Click **Repoint…** on that source and pick its new location; the clips
+  keep all their data.
 - **Video won't play in the browser** — proxies are generated in the background;
   wait for the `media` job to finish. Check the status bar.
 - **Song analysis is slow** — librosa takes ~10–30 s for a typical song on the
   first run; watch the status bar.
 - **Claude doesn't see my project** — the `--project` path of `mcp_server.py`
-  must be exactly your video folder (the one with `.montage-cache/` inside).
-- **Reset a project** — delete `<your folder>/.montage-cache/` and scan again
-  (ratings, ranges and timeline live there too, so export first if you care).
+  must be exactly the project's storage folder (the one with `.montage-cache/`
+  inside).
+- **Reset a project** — delete `<storage>/.montage-cache/` and add your source
+  folders again (ratings, ranges and timeline live there too, so export first if
+  you care).

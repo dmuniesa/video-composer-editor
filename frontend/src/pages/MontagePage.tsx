@@ -8,7 +8,7 @@ import ScrubThumb from '../components/ScrubThumb'
 import StarRating from '../components/StarRating'
 import VideoDetail from '../components/VideoDetail'
 import Waveform from '../components/Waveform'
-import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
+import { folderKey, folderKeyList, matchesQuery } from '../lib/videoFilter'
 import { sectionColor } from './MusicPage'
 
 const RULER_H = 26
@@ -198,12 +198,12 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   const videoById = useMemo(() => new Map(videos.map((v) => [v.id, v])), [videos])
   const kept = useMemo(() => videos.filter((v) => !v.rejected), [videos])
-  const folders = useMemo(() => folderList(kept), [kept])
+  const folders = useMemo(() => folderKeyList(kept), [kept])
   const binVideos = useMemo(
     () =>
       kept
         .filter((v) => matchesQuery(v, binQuery))
-        .filter((v) => binFolder === '*' || folderOf(v.rel_path) === binFolder)
+        .filter((v) => binFolder === '*' || folderKey(v) === binFolder)
         .sort((a, b) => b.stars - a.stars || (b.ai_score ?? 0) - (a.ai_score ?? 0)),
     [kept, binQuery, binFolder],
   )
@@ -1202,6 +1202,11 @@ export default function MontagePage({ pid }: { pid: string }) {
           onChanged={refreshVideos}
           onRate={(stars) => rateVideo(detailId, { stars })}
           onReject={(rejected) => rateVideo(detailId, { rejected })}
+          onDelete={() => {
+            const id = detailId
+            setDetailId(null)
+            api.deleteVideo(pid, id).then(() => { refreshVideos(); refreshTimeline() }).catch((e) => setToast(e.message))
+          }}
         />
       )}
       {toast && <div className="toast">{toast}</div>}

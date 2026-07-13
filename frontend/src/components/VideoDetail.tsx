@@ -10,11 +10,12 @@ interface Props {
   onChanged: () => void
   onRate: (stars: number) => void
   onReject: (rejected: boolean) => void
+  onDelete: () => void
 }
 
 /** Detail drawer: player + trim bar with in/out handles over a filmstrip.
  *  Keyboard: I = set in, O = set out, Enter = save range, L = loop range. */
-export default function VideoDetail({ pid, video, onClose, onChanged, onRate, onReject }: Props) {
+export default function VideoDetail({ pid, video, onClose, onChanged, onRate, onReject, onDelete }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const [playhead, setPlayhead] = useState(0)
@@ -110,6 +111,15 @@ export default function VideoDetail({ pid, video, onClose, onChanged, onRate, on
           <StarRating stars={video.stars} onChange={onRate} />
           <button className={video.rejected ? 'danger' : ''} onClick={() => onReject(!video.rejected)}>
             {video.rejected ? 'Rejected ✕' : 'Reject'}
+          </button>
+          <button
+            className="danger"
+            title="Remove this clip from the project (the source file on disk is kept)"
+            onClick={() => {
+              if (confirm(`Remove "${video.filename}" from the project?\n\nThe source file on disk is not deleted, but a later rescan will re-add it.`)) onDelete()
+            }}
+          >
+            Delete
           </button>
           <button onClick={onClose}>Close</button>
         </div>

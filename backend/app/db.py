@@ -1,8 +1,9 @@
 """Per-project SQLite engines plus a small registry of known projects.
 
-Each project's database lives in <video_dir>/.montage-cache/montage.db.
-A JSON registry in the user's home dir maps short project ids to video dirs
-so the API can address projects as /api/projects/{pid}/... across restarts.
+Each project's database lives in <project_dir>/.montage-cache/montage.db, where
+<project_dir> is the storage folder the user chose (decoupled from the footage).
+A JSON registry in the user's home dir maps short project ids to those storage
+dirs so the API can address projects as /api/projects/{pid}/... across restarts.
 """
 from __future__ import annotations
 
@@ -83,6 +84,35 @@ def _ensure_columns(engine) -> None:
                 conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN {spec}')
 
 
+def _seed_sources(engine) -> None:
+    """Back-fill a Source for legacy databases. A pre-multi-source project has
+    videos with source_id IS NULL; give them a single source pointing at the
+    project's original folder (project.video_dir) so everything keeps resolving.
+    New projects start with zero videos, so nothing is seeded for them."""
+    from datetime import datetime, timezone
+
+    with engine.begin() as conn:
+        orphan = conn.exec_driver_sql(
+            "SELECT COUNT(*) FROM video WHERE source_id IS NULL"
+        ).scalar()
+        if not orphan:
+            return
+        row = conn.exec_driver_sql("SELECT video_dir FROM project LIMIT 1").fetchone()
+        if row is None or not row[0]:
+            return
+        path = str(Path(row[0]).resolve())
+        label = Path(path).name
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
+        conn.exec_driver_sql(
+            "INSERT INTO source (path, label, added_at) VALUES (?, ?, ?)",
+            (path, label, now),
+        )
+        sid = conn.exec_driver_sql("SELECT last_insert_rowid()").scalar()
+        conn.exec_driver_sql(
+            "UPDATE video SET source_id = ? WHERE source_id IS NULL", (sid,)
+        )
+
+
 def session_factory(video_dir: str | Path) -> sessionmaker:
     resolved = str(Path(video_dir).resolve())
     with _lock:
@@ -95,6 +125,7 @@ def session_factory(video_dir: str | Path) -> sessionmaker:
             )
             Base.metadata.create_all(engine)
             _ensure_columns(engine)
+            _seed_sources(engine)
             _engines[resolved] = sessionmaker(bind=engine, expire_on_commit=False)
         return _engines[resolved]
 

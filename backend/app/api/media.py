@@ -61,22 +61,26 @@ def _ranged(request: Request, path: Path) -> Response:
     return StreamingResponse(iterator(), status_code=status, media_type=content_type, headers=headers)
 
 
-def _get_video(pid: str, vid: int) -> tuple[Path, Video]:
+def _get_video(pid: str, vid: int) -> tuple[Path, Video, Path]:
+    """Returns (project_dir, video, original_file_path). The original path is
+    resolved from the video's source inside the session, since the source is
+    lazy-loaded and the row is detached once the session closes."""
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
         video = db.get(Video, vid)
-    if video is None:
-        raise HTTPException(404, "video not found")
-    return video_dir, video
+        if video is None:
+            raise HTTPException(404, "video not found")
+        orig = (Path(video.source.path) if video.source else video_dir) / video.rel_path
+    return video_dir, video, orig
 
 
 @router.get("/media/{pid}/video/{vid}")
 def media_video(pid: str, vid: int, request: Request) -> Response:
-    video_dir, video = _get_video(pid, vid)
+    video_dir, video, orig = _get_video(pid, vid)
     if video.has_proxy:
         path = dbm.cache_dir_for(video_dir) / video.cache_key / "proxy.mp4"
     else:
-        path = video_dir / video.rel_path
+        path = orig
     return _ranged(request, path)
 
 
@@ -84,19 +88,19 @@ def media_video(pid: str, vid: int, request: Request) -> Response:
 def media_preview(pid: str, vid: int, request: Request) -> Response:
     """Low-res preview proxy; falls back to the normal playback file while the
     preview hasn't been generated yet (older scans, job still running)."""
-    video_dir, video = _get_video(pid, vid)
+    video_dir, video, orig = _get_video(pid, vid)
     path = dbm.cache_dir_for(video_dir) / video.cache_key / "preview.mp4"
     if not path.is_file():
         if video.has_proxy:
             path = dbm.cache_dir_for(video_dir) / video.cache_key / "proxy.mp4"
         else:
-            path = video_dir / video.rel_path
+            path = orig
     return _ranged(request, path)
 
 
 @router.get("/media/{pid}/thumb/{vid}")
 def media_thumb(pid: str, vid: int) -> FileResponse:
-    video_dir, video = _get_video(pid, vid)
+    video_dir, video, _orig = _get_video(pid, vid)
     path = dbm.cache_dir_for(video_dir) / video.cache_key / "thumb.jpg"
     if not path.is_file():
         raise HTTPException(404, "thumbnail not ready")
@@ -105,7 +109,7 @@ def media_thumb(pid: str, vid: int) -> FileResponse:
 
 @router.get("/media/{pid}/filmstrip/{vid}")
 def media_filmstrip(pid: str, vid: int) -> FileResponse:
-    video_dir, video = _get_video(pid, vid)
+    video_dir, video, _orig = _get_video(pid, vid)
     path = dbm.cache_dir_for(video_dir) / video.cache_key / "filmstrip.jpg"
     if not path.is_file():
         raise HTTPException(404, "filmstrip not ready")
@@ -114,7 +118,7 @@ def media_filmstrip(pid: str, vid: int) -> FileResponse:
 
 @router.get("/media/{pid}/frame/{vid}/{n}")
 def media_frame(pid: str, vid: int, n: int) -> FileResponse:
-    video_dir, video = _get_video(pid, vid)
+    video_dir, video, _orig = _get_video(pid, vid)
     path = dbm.cache_dir_for(video_dir) / video.cache_key / f"frame_{n:02d}.jpg"
     if not path.is_file():
         raise HTTPException(404, "frame not found")

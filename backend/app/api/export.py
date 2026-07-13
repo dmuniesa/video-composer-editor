@@ -2,6 +2,8 @@
 and Final Cut Pro X (FCPXML 1.9)."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from sqlalchemy import select
@@ -32,7 +34,7 @@ def _gather(pid: str) -> dict:
             "sequence_height": (project.composition_height if project else None) or 0,
             "videos": {
                 v.id: {
-                    "path": str(video_dir / v.rel_path),
+                    "path": str((Path(v.source.path) if v.source else video_dir) / v.rel_path),
                     "fps": v.fps,
                     "width": v.width,
                     "height": v.height,

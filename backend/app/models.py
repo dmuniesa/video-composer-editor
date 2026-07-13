@@ -1,5 +1,7 @@
 """SQLAlchemy ORM models. One SQLite database per project, stored in
-<video_dir>/.montage-cache/montage.db so a project travels with its footage."""
+<project_dir>/.montage-cache/montage.db, where <project_dir> is the storage
+folder the user picked for the project (decoupled from the footage, which lives
+in one or more Source directories)."""
 from __future__ import annotations
 
 import json
@@ -22,6 +24,8 @@ class Project(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String, default="")
+    # Storage folder of the project: where montage.db and all cache live. It is
+    # chosen by the user and decoupled from the footage (see Source below).
     video_dir: Mapped[str] = mapped_column(String)
     song_path: Mapped[str | None] = mapped_column(String, nullable=True)
     composition_fps: Mapped[float] = mapped_column(Float, default=25.0)
@@ -30,11 +34,30 @@ class Project(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
+class Source(Base):
+    """A footage directory attached to the project. A project has zero or more
+    sources; each video belongs to exactly one. Sources can be added, removed
+    and re-pointed (relink) freely without touching the project's storage."""
+
+    __tablename__ = "source"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    path: Mapped[str] = mapped_column(String)
+    label: Mapped[str] = mapped_column(String, default="")
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    videos: Mapped[list[Video]] = relationship(back_populates="source")
+
+
 class Video(Base):
     __tablename__ = "video"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    rel_path: Mapped[str] = mapped_column(String, unique=True)
+    # rel_path is relative to this video's source root. Uniqueness is
+    # (source_id, rel_path); enforced in the scanner, not by the DB, so two
+    # sources may hold the same relative path.
+    rel_path: Mapped[str] = mapped_column(String)
+    source_id: Mapped[int | None] = mapped_column(ForeignKey("source.id"), nullable=True)
     filename: Mapped[str] = mapped_column(String)
     duration: Mapped[float] = mapped_column(Float, default=0.0)
     fps: Mapped[float] = mapped_column(Float, default=0.0)
@@ -51,6 +74,7 @@ class Video(Base):
     has_proxy: Mapped[bool] = mapped_column(Boolean, default=False)
     frame_count: Mapped[int] = mapped_column(Integer, default=0)
 
+    source: Mapped[Source | None] = relationship(back_populates="videos")
     analysis: Mapped[VideoAnalysis | None] = relationship(
         back_populates="video", cascade="all, delete-orphan", uselist=False
     )

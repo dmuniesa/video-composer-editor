@@ -84,6 +84,23 @@ export default function ReviewPage({ pid }: { pid: string }) {
     [pid, refresh],
   )
 
+  const remove = useCallback(
+    (ids: number[]) => {
+      // Optimistic removal; server confirms via SSE.
+      setVideos((prev) => prev.filter((v) => !ids.includes(v.id)))
+      setSelected((prev) => {
+        const next = new Set(prev)
+        ids.forEach((id) => next.delete(id))
+        return next
+      })
+      Promise.all(ids.map((id) => api.deleteVideo(pid, id))).catch((e) => {
+        setToast(e.message)
+        refresh()
+      })
+    },
+    [pid, refresh],
+  )
+
   const clickCard = (video: Video, e: React.MouseEvent) => {
     const next = new Set(selected)
     if (e.shiftKey && lastClicked != null) {
@@ -134,11 +151,14 @@ export default function ReviewPage({ pid }: { pid: string }) {
       else if (e.key === 'x' || e.key === 'X') {
         const anyKept = videos.some((v) => ids.includes(v.id) && !v.rejected)
         rate(ids, { rejected: anyKept })
+      } else if (e.key === 'Delete') {
+        const label = ids.length === 1 ? '1 clip' : `${ids.length} clips`
+        if (confirm(`Remove ${label} from the project?\n\nThe source files on disk are kept, but a later rescan will re-add them.`)) remove(ids)
       } else if (e.key === 'Escape') setSelected(new Set())
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected, videos, rate, openId])
+  }, [selected, videos, rate, remove, openId])
 
   const open = openId != null ? videos.find((v) => v.id === openId) : undefined
 
@@ -204,7 +224,7 @@ export default function ReviewPage({ pid }: { pid: string }) {
             <ul>
               <li><b>Click</b> a clip opens the player · <b>Shift/Ctrl-click</b> multi-select.</li>
               <li><kbd>1</kbd>–<kbd>5</kbd> rate the selection · <kbd>0</kbd> clear.</li>
-              <li><kbd>X</kbd> toggle reject · <kbd>Esc</kbd> clear selection.</li>
+              <li><kbd>X</kbd> toggle reject · <kbd>Del</kbd> remove from project · <kbd>Esc</kbd> clear selection.</li>
               <li>In the player, <kbd>←</kbd>/<kbd>→</kbd> step to the previous/next clip.</li>
               <li>Hover a thumbnail to scrub · click a <b>#hashtag</b> to filter.</li>
             </ul>
@@ -243,6 +263,11 @@ export default function ReviewPage({ pid }: { pid: string }) {
           onChanged={refresh}
           onRate={(stars) => rate([open.id], { stars })}
           onReject={(rejected) => rate([open.id], { rejected })}
+          onDelete={() => {
+            const id = open.id
+            setOpenId(null)
+            remove([id])
+          }}
         />
       )}
       {toast && <div className="toast">{toast}</div>}

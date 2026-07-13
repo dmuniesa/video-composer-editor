@@ -12,6 +12,20 @@ export function folderList(videos: Video[]): string[] {
   return [...new Set(videos.map((v) => folderOf(v.rel_path)))].sort()
 }
 
+/** Grouping key for the bin: source label + subfolder, so identically-named
+ *  subfolders in different sources stay distinct. Falls back to the plain
+ *  subfolder when a video has no source (legacy rows). */
+export function folderKey(v: Video): string {
+  const sub = folderOf(v.rel_path)
+  if (!v.source_label) return sub
+  return sub ? `${v.source_label}/${sub}` : v.source_label
+}
+
+/** Unique bin grouping keys present in a video list. */
+export function folderKeyList(videos: Video[]): string[] {
+  return [...new Set(videos.map(folderKey))].sort()
+}
+
 /** Free-text filter: matches filename, description and hashtags.
  *  A query starting with '#' matches hashtags only. */
 export function matchesQuery(v: Video, query: string): boolean {

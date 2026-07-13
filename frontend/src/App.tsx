@@ -4,6 +4,7 @@ import { api } from './lib/api'
 import { useProjectEvents } from './lib/sse'
 import type { JobInfo, ProjectInfo } from './lib/types'
 import HomePage from './pages/HomePage'
+import NewProjectPage from './pages/NewProjectPage'
 import SetupPage from './pages/SetupPage'
 import ReviewPage from './pages/ReviewPage'
 import MusicPage from './pages/MusicPage'
@@ -99,6 +100,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/new" element={<NewProjectPage />} />
       <Route path="/guide" element={<GuidePage standalone />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/p/:pid/*" element={<ProjectShell />} />

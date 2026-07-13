@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, fmtTime } from '../lib/api'
-import type { ProjectInfo, SongInfo } from '../lib/types'
+import type { ProjectInfo, SongInfo, Source } from '../lib/types'
 import FileBrowser from '../components/FileBrowser'
 
 interface Props {
@@ -24,6 +24,8 @@ function basename(p: string) {
 
 export default function SetupPage({ project, onChanged }: Props) {
   const [pickingSong, setPickingSong] = useState(false)
+  const [addingSource, setAddingSource] = useState(false)
+  const [relinking, setRelinking] = useState<Source | null>(null)
   const [error, setError] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -72,6 +74,59 @@ export default function SetupPage({ project, onChanged }: Props) {
       .catch((e) => setError(e.message))
   }
 
+  const addSource = (path: string) => {
+    setAddingSource(false)
+    setError('')
+    api.addSource(project.id, path).then(onChanged).catch((e) => setError(e.message))
+  }
+
+  const relink = (path: string) => {
+    const s = relinking
+    setRelinking(null)
+    if (!s) return
+    api.updateSource(project.id, s.id, { path }).then(onChanged).catch((e) => setError(e.message))
+  }
+
+  const removeSource = (s: Source) => {
+    if (!window.confirm(`Remove "${s.label}" and its ${s.video_count} clip(s) from this project? The original files are not deleted.`)) return
+    api.removeSource(project.id, s.id).then(onChanged).catch((e) => setError(e.message))
+  }
+
+  // Native OS dialogs first; fall back to the in-app browser panels when no
+  // native dialog is available (headless Linux without python3-tk).
+  const chooseAddFolder = async () => {
+    setError('')
+    try {
+      const r = await api.pickPath('dir')
+      if (!r.ok) return setAddingSource(true)
+      if (r.path) addSource(r.path)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  const chooseRelink = async (s: Source) => {
+    setError('')
+    try {
+      const r = await api.pickPath('dir', s.online ? s.path : '')
+      if (!r.ok) return setRelinking(s)
+      if (r.path) api.updateSource(project.id, s.id, { path: r.path }).then(onChanged).catch((e) => setError(e.message))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  const chooseSong = async () => {
+    setError('')
+    try {
+      const r = await api.pickPath('audio', project.sources[0]?.path ?? project.video_dir)
+      if (!r.ok) return setPickingSong(true)
+      if (r.path) api.setSong(project.id, r.path).then(onChanged).catch((e) => setError(e.message))
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   const byStatus = project.videos_by_status
   const count = (k: string) => byStatus[k] ?? 0
   const total = project.video_count
@@ -80,8 +135,13 @@ export default function SetupPage({ project, onChanged }: Props) {
 
   const steps: { label: string; detail: string; done: boolean; to?: string }[] = [
     {
-      label: 'Scan your folder',
-      detail: total > 0 ? `${total} videos found` : 'no videos found yet — check the folder and rescan',
+      label: 'Add your footage folders',
+      detail:
+        total > 0
+          ? `${total} videos across ${project.sources.length} folder${project.sources.length === 1 ? '' : 's'}`
+          : project.sources.length === 0
+            ? 'add one or more folders of footage above'
+            : 'no videos found yet — check the folders and rescan',
       done: total > 0,
     },
     {
@@ -140,12 +200,69 @@ export default function SetupPage({ project, onChanged }: Props) {
               <span className="name-edit-icon" aria-hidden>✎</span>
             </h1>
           )}
-          <div className="crumb" style={{ marginBottom: 0 }}>{project.video_dir}</div>
+          <div className="crumb" style={{ marginBottom: 0 }} title="Project storage folder">
+            📦 {project.video_dir}
+          </div>
         </div>
         <button onClick={() => api.scan(project.id).then(onChanged).catch((e) => setError(e.message))}>
-          ⟳ Rescan folder
+          ⟳ Rescan all
         </button>
       </header>
+
+      <div className="panel">
+        <div className="panel-title-row">
+          <h2>Source folders</h2>
+          <span className="hint">{project.sources.length} folder{project.sources.length === 1 ? '' : 's'}</span>
+        </div>
+        <p className="hint" style={{ marginTop: 0 }}>
+          The folders scanned for footage. Add or remove them anytime, or repoint one that moved —
+          each clip keeps its analysis, ratings and timeline placement.
+        </p>
+        {project.sources.length > 0 && (
+          <ul className="source-list">
+            {project.sources.map((s) => (
+              <li key={s.id} className="source-row">
+                <span className="source-icon" aria-hidden>{s.online ? '📁' : '⚠️'}</span>
+                <span className="source-meta">
+                  <span className="source-label">{s.label}</span>
+                  <span className="crumb" style={{ marginBottom: 0 }}>{s.path}</span>
+                  {!s.online && (
+                    <span className="hint" style={{ color: 'var(--danger)' }}>
+                      folder not found — use “Repoint” to relink it
+                    </span>
+                  )}
+                </span>
+                <span className="source-count hint">{s.video_count} clip{s.video_count === 1 ? '' : 's'}</span>
+                <button className="small" onClick={() => { setAddingSource(false); chooseRelink(s) }}>
+                  Repoint…
+                </button>
+                <button className="small danger" title="Remove folder" onClick={() => removeSource(s)}>
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {relinking ? (
+          <div className="panel-inset">
+            <div className="panel-title-row">
+              <h3 style={{ margin: 0 }}>New location for “{relinking.label}”</h3>
+              <button className="small" onClick={() => setRelinking(null)}>Cancel</button>
+            </div>
+            <FileBrowser mode="dir" initialPath={relinking.online ? relinking.path : undefined} onPick={relink} />
+          </div>
+        ) : addingSource ? (
+          <div className="panel-inset">
+            <div className="panel-title-row">
+              <h3 style={{ margin: 0 }}>Pick a footage folder</h3>
+              <button className="small" onClick={() => setAddingSource(false)}>Cancel</button>
+            </div>
+            <FileBrowser mode="dir" onPick={addSource} />
+          </div>
+        ) : (
+          <button className="primary" onClick={chooseAddFolder}>＋ Add folder</button>
+        )}
+      </div>
 
       <div className="panel">
         <div className="panel-title-row">
@@ -156,7 +273,11 @@ export default function SetupPage({ project, onChanged }: Props) {
         </div>
         {total === 0 ? (
           <p className="hint" style={{ margin: 0 }}>
-            No videos in this folder yet. Add your footage and hit <b>Rescan folder</b>.
+            {project.sources.length === 0 ? (
+              <>No footage yet. Add a <b>source folder</b> above to get started.</>
+            ) : (
+              <>No videos in these folders yet. Add your footage and hit <b>Rescan all</b>.</>
+            )}
           </p>
         ) : (
           <>
@@ -261,14 +382,14 @@ export default function SetupPage({ project, onChanged }: Props) {
         {pickingSong ? (
           <FileBrowser
             mode="audio"
-            initialPath={project.video_dir}
+            initialPath={project.sources[0]?.path ?? project.video_dir}
             onPick={(path) => {
               setPickingSong(false)
               api.setSong(project.id, path).then(onChanged).catch((e) => setError(e.message))
             }}
           />
         ) : (
-          <button onClick={() => setPickingSong(true)}>
+          <button onClick={chooseSong}>
             {project.song_path ? 'Change song' : 'Choose song…'}
           </button>
         )}

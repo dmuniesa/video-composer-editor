@@ -9,7 +9,7 @@ Turn a folder of vacation videos + a song into an **Adobe Premiere Pro** project
 
 A locally-run web app that:
 
-1. **Scans** a folder of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
+1. **Scans** one or more folders of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
 2. **Analyzes every clip with AI**: description, 1–10 score, and hashtags — via Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`, Gemini) or any **OpenAI-compatible endpoint** (z.ai GLM, OpenAI, OpenRouter, Ollama…), selectable on the in-app Settings page.
 3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
 4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …). Optionally (Settings) it also **transcribes the lyrics** — locally with Whisper, or with Gemini listening to the song through the Antigravity CLI — and detects vocal vs. melody-only (instrumental) passages — shown on the Music page and fed to the AI composer.
@@ -160,21 +160,24 @@ available inside the app under the **Guide** tab.
 
 | Page | What you do |
 |---|---|
-| **Setup** | Browse to your video folder → the app scans it and queues frame extraction + AI analysis. Pick the song here too. |
+| **Setup** | Pick a **storage folder** for the project, then **Add** one or more **source folders** of footage → each is scanned and queued for frame extraction + AI analysis. Add/remove sources or **Repoint** one that moved anytime. Pick the song here too. |
 | **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. |
 | **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. With lyrics enabled: timestamped lyrics (click a line to seek), a vocal/melody-only strip over the waveform, and a vocals % per section. |
 | **Montage** | Drag clips (or their ranges) from the bin onto the tracks. Drag to move, edge-drag to trim, snapping to beats/sections (**S** toggles). **Space** previews audio + a jump-cut video preview. **Del** removes the selected clip. |
 | **Export** | The **Export** menu downloads the sequence for your editor: Premiere Pro (`montage.xml`, **File → Import**), DaVinci Resolve (`montage-resolve.xml`, **File → Import → Timeline**) or Final Cut Pro (`montage.fcpxml`, **File → Import → XML**) — linked to the original files. Relink if your media moved. |
 
-All derived media and the project database live in `<your video folder>/.montage-cache/` — delete that folder to reset a project.
+All derived media and the project database live in the project's storage folder under `<storage>/.montage-cache/`, decoupled from your footage — delete that folder to reset a project, or copy it and **Import project** on the home screen to move the project elsewhere.
 
 ## Let Claude build the montage (MCP)
 
 The app ships an MCP server that exposes the project to Claude:
 
 ```bash
-claude mcp add montage -- /abs/path/backend/.venv/bin/python /abs/path/backend/mcp_server.py --project /path/to/video/folder
+claude mcp add montage -- /abs/path/backend/.venv/bin/python /abs/path/backend/mcp_server.py --project /path/to/project/storage/folder
 ```
+
+`--project` is the project's **storage folder** — the one containing
+`.montage-cache/` (not the footage folders).
 
 Tools: `get_project_summary`, `list_videos`, `get_music_sections`, `get_beats`,
 `get_lyrics`, `get_timeline`, `place_clip`, `move_clip`, `remove_clip`,

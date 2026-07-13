@@ -129,9 +129,10 @@ while the bug was live (Library → *Analyze all with Gemini*).
 
 ## Resetting a project
 
-All derived media and the per-project database live under
-`<video folder>/.montage-cache/` — delete that folder to reset a project
-without touching the original video files.
+All derived media and the per-project database live under the project's storage
+folder, `<storage>/.montage-cache/` — delete that folder to reset a project
+without touching the original video files (which live in the project's source
+folders, decoupled from storage).
 
 ## Note on conda
 

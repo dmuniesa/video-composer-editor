@@ -57,13 +57,16 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
 
         <h2 id="overview">Overview</h2>
         <p>
-          A project is simply a <b>video folder</b>: all of its state (AI descriptions, your stars
-          and rejects, in/out ranges, the song analysis, the timeline) lives in a small database
-          inside <code>&lt;folder&gt;/.montage-cache/</code>, next to the footage. That means you
-          can close the browser or the server anytime and pick up exactly where you left off, work
-          on two projects in two tabs, or move the folder to another drive — the project travels
-          with it. Deleting <code>.montage-cache/</code> resets the project; copying it backs the
-          montage up. Your original video files are never modified.
+          A project has a <b>storage folder</b> you choose and one or more <b>source folders</b> of
+          footage. All of its state (AI descriptions, your stars and rejects, in/out ranges, the
+          song analysis, the timeline) lives in a small database inside{' '}
+          <code>&lt;storage&gt;/.montage-cache/</code> — <b>separate from the footage</b>, so the
+          same project can pull clips from several folders on different drives. You can close the
+          browser or the server anytime and pick up exactly where you left off, work on two
+          projects in two tabs, add or remove source folders, or <b>repoint</b> one that moved
+          without losing any clip&apos;s data. Deleting <code>.montage-cache/</code> resets the
+          project; copying it backs the montage up (and it can be <b>imported</b> elsewhere). Your
+          original video files are never modified.
         </p>
         <p>
           The typical flow is the order of the tabs: <b>Setup → Review → Music → Montage</b>, then
@@ -73,16 +76,29 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
 
         <h2 id="setup">1 · Create a project (Setup)</h2>
         <p>
-          From the home screen, click <b>New project</b> and browse to the folder with your
-          videos. The app immediately scans it recursively (<code>.mp4</code>, <code>.mov</code>,{' '}
-          <code>.mts</code>, <code>.mkv</code>…), reads metadata with ffprobe, extracts frames, a
-          thumbnail and a filmstrip per clip, and transcodes browser-friendly proxies for formats
-          like HEVC/10-bit. If an AI provider is configured, every clip also gets a description, a
-          1–10 score and hashtags.
+          From the home screen, click <b>New project</b>. On the page that opens, click{' '}
+          <b>Choose folder…</b> — your operating system&apos;s native dialog appears — to pick a{' '}
+          <b>storage folder</b> for the project (where its database lives; it can be empty and
+          separate from your footage), optionally set a name, and hit <b>Create project</b>. Then,
+          on the Setup page, use the <b>Source folders</b> panel to <b>Add folder</b> for each
+          folder of footage (the same native dialog). Each source is scanned recursively (<code>.mp4</code>,{' '}
+          <code>.mov</code>, <code>.mts</code>, <code>.mkv</code>…), read with ffprobe; frames, a
+          thumbnail and a filmstrip are extracted per clip and browser-friendly proxies are
+          transcoded for formats like HEVC/10-bit. If an AI provider is configured, every clip also
+          gets a description, a 1–10 score and hashtags. Two clips with the same name in different
+          source folders coexist without clashing.
         </p>
         <ul>
           <li>
-            <b>Rescan folder</b> picks up files you added later.
+            <b>Add folder</b> attaches another source; <b>✕</b> removes one (its clips leave the
+            project — the files on disk are untouched).
+          </li>
+          <li>
+            <b>Repoint…</b> relinks a source folder that moved to a new location, keeping every
+            clip&apos;s analysis, ratings, ranges and timeline placement.
+          </li>
+          <li>
+            <b>Rescan all</b> picks up files you added to or removed from any source later.
           </li>
           <li>
             <b>Analyze all with AI</b> re-queues AI analysis (e.g. after configuring a provider).
@@ -91,6 +107,11 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             Pick your <b>song</b> in the bottom panel — music analysis starts right away.
           </li>
         </ul>
+        <p>
+          Already have a project from another machine or backup? On the home screen click{' '}
+          <b>Import project</b> and pick its storage folder (the one containing{' '}
+          <code>.montage-cache/</code>) to re-register it with everything intact.
+        </p>
 
         <h2 id="review">2 · Review &amp; rate your clips</h2>
         <p>
@@ -326,7 +347,12 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           </li>
           <li>
             <b>A video shows status &quot;error&quot;</b> — usually a corrupt file or unsupported
-            stream. Fix or remove the file and <b>Rescan</b>.
+            stream. Fix or remove the file and <b>Rescan all</b>.
+          </li>
+          <li>
+            <b>A source folder shows ⚠ &quot;not found&quot;</b> — the folder was moved or its drive
+            isn&apos;t mounted. Click <b>Repoint…</b> on that source and pick its new location; the
+            clips keep all their data.
           </li>
           <li>
             <b>Video won&apos;t play in the browser</b> — proxies are generated in the background;
@@ -338,12 +364,13 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           </li>
           <li>
             <b>Claude doesn&apos;t see the project</b> — the <code>--project</code> path passed to{' '}
-            <code>mcp_server.py</code> must be exactly your video folder (the one containing{' '}
-            <code>.montage-cache/</code>).
+            <code>mcp_server.py</code> must be exactly the project&apos;s storage folder (the one
+            containing <code>.montage-cache/</code>).
           </li>
           <li>
-            <b>Reset a project</b> — delete <code>&lt;folder&gt;/.montage-cache/</code> and scan
-            again (ratings, ranges and the timeline live there too, so export first if you care).
+            <b>Reset a project</b> — delete <code>&lt;storage&gt;/.montage-cache/</code> and add
+            your source folders again (ratings, ranges and the timeline live there too, so export
+            first if you care).
           </li>
         </ul>
       </article>

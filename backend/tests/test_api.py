@@ -184,6 +184,50 @@ def test_clear_analysis(client, project):
     assert all(v["description"] and v["ai_score"] is not None for v in redone)
 
 
+def test_delete_video_from_project(client, project):
+    """Removing a clip from the project drops its row, cache folder and any
+    timeline clip using it, while leaving the source file and siblings intact."""
+    from app import db as dbm
+
+    pid, videos_dir = project
+
+    client.post(f"/api/projects/{pid}/scan")
+    wait_until(
+        lambda: all(
+            v["status"] in ("extracted", "ready", "error")
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+    videos = client.get(f"/api/projects/{pid}/videos").json()
+    assert len(videos) == 2
+    target = videos[0]
+    other = videos[1]
+
+    # place the target on the timeline so we can assert the clip is cleaned up
+    track_id = client.get(f"/api/projects/{pid}/timeline").json()["tracks"][0]["id"]
+    client.post(
+        f"/api/projects/{pid}/clips",
+        json={"track_id": track_id, "video_id": target["id"], "timeline_start": 0.0, "source_in": 1.0, "source_out": 4.0},
+    )
+
+    source_file = videos_dir / target["rel_path"]
+    assert source_file.is_file()
+
+    res = client.delete(f"/api/projects/{pid}/videos/{target['id']}")
+    assert res.status_code == 200
+
+    remaining = client.get(f"/api/projects/{pid}/videos").json()
+    assert [v["id"] for v in remaining] == [other["id"]]
+    # timeline clip referencing the deleted video is gone
+    tracks = client.get(f"/api/projects/{pid}/timeline").json()["tracks"]
+    assert all(c["video_id"] != target["id"] for t in tracks for c in t["clips"])
+    # source file on disk is untouched
+    assert source_file.is_file()
+
+    # deleting again is a 404
+    assert client.delete(f"/api/projects/{pid}/videos/{target['id']}").status_code == 404
+
+
 def test_compose_endpoint(client, project):
     """Auto-compose through the fake agy: queues a job, applies the model's
     actions, and marks the clips with the provider name."""
@@ -247,6 +291,9 @@ def test_clip_speed_split_and_composition_fps(client, project):
     res = client.patch(f"/api/projects/{pid}", json={"name": "  My Montage  "})
     assert res.status_code == 200 and res.json()["name"] == "My Montage"
     assert client.get(f"/api/projects/{pid}").json()["name"] == "My Montage"
+    # the renamed project shows up with its new name in the home listing too
+    listed = {p["id"]: p["name"] for p in client.get("/api/projects").json()}
+    assert listed.get(pid) == "My Montage"
     assert client.patch(f"/api/projects/{pid}", json={"name": "   "}).status_code == 400
 
     client.post(f"/api/projects/{pid}/scan")
@@ -288,6 +335,107 @@ def test_clip_speed_split_and_composition_fps(client, project):
     items = root.findall("sequence/media/video/track/clipitem")
     effects = [i.findtext("filter/effect/effectid") for i in items]
     assert effects == [None, "timeremap"]  # first back at 1x, right half still 0.5x
+
+
+def test_sources_add_remove_relink(client, tmp_path, sample_video):
+    """Decoupled storage + multiple footage sources: add two folders (with a
+    colliding rel_path), relink one that moved, then remove one."""
+    storage = tmp_path / "project"
+    storage.mkdir()
+    dir_a = tmp_path / "cam_a"
+    dir_b = tmp_path / "cam_b"
+    dir_a.mkdir()
+    dir_b.mkdir()
+    # Same relative name in both sources — must not collide.
+    shutil.copy(sample_video, dir_a / "clip.mp4")
+    shutil.copy(sample_video, dir_b / "clip.mp4")
+
+    # storage folder is separate from any footage -> starts with 0 sources
+    res = client.post("/api/projects", json={"project_dir": str(storage)})
+    assert res.status_code == 200, res.text
+    pid = res.json()["id"]
+    assert res.json()["sources"] == []
+
+    # add both sources
+    client.post(f"/api/projects/{pid}/sources", json={"path": str(dir_a)})
+    info = client.post(f"/api/projects/{pid}/sources", json={"path": str(dir_b)}).json()
+    assert len(info["sources"]) == 2
+    # re-adding the same folder is rejected
+    assert client.post(f"/api/projects/{pid}/sources", json={"path": str(dir_a)}).status_code == 409
+
+    wait_until(
+        lambda: len(client.get(f"/api/projects/{pid}/videos").json()) == 2
+        and all(
+            v["status"] in ("extracted", "ready", "error")
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+    videos = client.get(f"/api/projects/{pid}/videos").json()
+    assert {v["rel_path"] for v in videos} == {"clip.mp4"}  # colliding names coexist
+    assert len({v["source_id"] for v in videos}) == 2
+    for v in videos:
+        assert client.get(f"/media/{pid}/video/{v['id']}").status_code in (200, 206)
+
+    # relink source A to a moved location — video data is preserved
+    a_id = next(s["id"] for s in info["sources"] if s["path"] == str(dir_a.resolve()))
+    moved = tmp_path / "cam_a_moved"
+    shutil.move(str(dir_a), str(moved))
+    a_video = next(v for v in videos if v["source_id"] == a_id)
+    res = client.patch(f"/api/projects/{pid}/sources/{a_id}", json={"path": str(moved)})
+    assert res.status_code == 200
+    # same video row (same id), still playable from the new path
+    still = client.get(f"/api/projects/{pid}/videos").json()
+    assert a_video["id"] in {v["id"] for v in still}
+    assert client.get(f"/media/{pid}/video/{a_video['id']}").status_code in (200, 206)
+
+    # remove source B — its videos disappear, source A intact
+    b_id = next(s["id"] for s in info["sources"] if s["path"] == str(dir_b.resolve()))
+    res = client.delete(f"/api/projects/{pid}/sources/{b_id}")
+    assert res.status_code == 200
+    assert len(res.json()["sources"]) == 1
+    remaining = client.get(f"/api/projects/{pid}/videos").json()
+    assert len(remaining) == 1 and remaining[0]["source_id"] == a_id
+
+
+def test_import_project(client, tmp_path, sample_video):
+    """A storage folder with an existing montage.db can be re-registered."""
+    storage = tmp_path / "proj"
+    storage.mkdir()
+    footage = tmp_path / "clips"
+    footage.mkdir()
+    shutil.copy(sample_video, footage / "a.mp4")
+
+    pid = client.post("/api/projects", json={"project_dir": str(storage)}).json()["id"]
+    client.post(f"/api/projects/{pid}/sources", json={"path": str(footage)})
+
+    # importing a folder with no project db fails
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    assert client.post("/api/projects/import", json={"project_dir": str(empty)}).status_code == 400
+
+    # importing the real storage folder returns the same project
+    res = client.post("/api/projects/import", json={"project_dir": str(storage)})
+    assert res.status_code == 200
+    assert res.json()["id"] == pid
+    assert len(res.json()["sources"]) == 1
+
+
+def test_fs_pick_native(client, monkeypatch):
+    """The native picker endpoint returns the chosen path, or 501 (so the UI
+    falls back to the in-app browser) when no native dialog is available."""
+    from app.services import native_picker
+
+    monkeypatch.setattr(native_picker, "available", lambda: True)
+    monkeypatch.setattr(
+        native_picker, "pick", lambda kind, initial="", title="": "/chosen/dir" if kind == "dir" else None
+    )
+    r = client.post("/api/fs/pick", json={"kind": "dir"})
+    assert r.status_code == 200 and r.json()["path"] == "/chosen/dir"
+    # cancelled dialog -> null path
+    assert client.post("/api/fs/pick", json={"kind": "audio"}).json()["path"] is None
+
+    monkeypatch.setattr(native_picker, "available", lambda: False)
+    assert client.post("/api/fs/pick", json={"kind": "dir"}).status_code == 501
 
 
 def test_fs_browser(client, tmp_path):

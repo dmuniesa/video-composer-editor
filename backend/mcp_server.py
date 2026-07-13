@@ -1,11 +1,14 @@
 """MCP server exposing the montage project to Claude, so Claude can read the
 video analyses + song structure and place clips on the timeline.
 
+--project is the project's storage folder — the one containing .montage-cache/
+(footage lives in one or more source folders, decoupled from storage).
+
 Run (stdio transport):
-    python backend/mcp_server.py --project /path/to/video/folder
+    python backend/mcp_server.py --project /path/to/project/storage/folder
 
 Register with Claude Code:
-    claude mcp add montage -- python /abs/path/backend/mcp_server.py --project /path/to/video/folder
+    claude mcp add montage -- python /abs/path/backend/mcp_server.py --project /path/to/project/storage/folder
 
 It opens the same SQLite database as the web app and, after each mutation,
 pokes the web app's SSE channel (best effort) so the browser updates live.
@@ -25,23 +28,33 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from app import db as dbm, settings  # noqa: E402
-from app.models import Song, Video  # noqa: E402
+from app.models import Song, Source, Video  # noqa: E402
 from app.services import lyrics as lyrics_svc  # noqa: E402
 from app.services import timeline_ops as ops  # noqa: E402
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--project", required=True, help="video directory of the project")
+parser.add_argument(
+    "--project", required=True,
+    help="project storage folder (the one containing .montage-cache/)",
+)
 parser.add_argument(
     "--api", default=os.environ.get("MONTAGE_API", "http://127.0.0.1:8765"),
     help="base URL of the running web app, used to live-refresh the browser",
 )
 args = parser.parse_args()
 
-VIDEO_DIR = Path(args.project).expanduser().resolve()
-if not VIDEO_DIR.is_dir():
-    print(f"error: {VIDEO_DIR} is not a directory", file=sys.stderr)
+PROJECT_DIR = Path(args.project).expanduser().resolve()
+if not PROJECT_DIR.is_dir():
+    print(f"error: {PROJECT_DIR} is not a directory", file=sys.stderr)
     sys.exit(1)
-PID = dbm.register_project(VIDEO_DIR)
+if not (dbm.cache_dir_for(PROJECT_DIR) / "montage.db").is_file():
+    print(
+        f"error: no project found in {PROJECT_DIR} (missing .montage-cache/montage.db).\n"
+        "Point --project at the project's storage folder, not the footage folder.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PID = dbm.register_project(PROJECT_DIR)
 
 mcp = FastMCP("video-montage")
 
@@ -62,13 +75,18 @@ def _notify() -> None:
 def get_project_summary() -> dict:
     """Overview of the montage project: song duration/BPM/sections, timeline
     tracks, and how many videos are available. Call this first."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         song = db.scalar(select(Song))
         videos = list(db.scalars(select(Video)))
+        sources = list(db.scalars(select(Source).order_by(Source.id)))
         state = ops.timeline_state(db)
         db.commit()
         return {
-            "video_dir": str(VIDEO_DIR),
+            "project_dir": str(PROJECT_DIR),
+            "sources": [
+                {"id": s.id, "label": s.label or Path(s.path).name, "path": s.path}
+                for s in sources
+            ],
             "song": {
                 "path": song.path,
                 "duration": song.duration,
@@ -100,7 +118,7 @@ def list_videos(
     include_unrated: also include videos with 0 stars (unrated).
     hashtag: filter to videos containing this hashtag."""
     out = []
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         for v in db.scalars(select(Video).order_by(Video.filename)):
             stars = v.rating.stars if v.rating else 0
             if v.rating and v.rating.rejected:
@@ -114,6 +132,7 @@ def list_videos(
                 {
                     "id": v.id,
                     "filename": v.filename,
+                    "source": (v.source.label or v.source.path) if v.source else "",
                     "duration": v.duration,
                     "stars": stars,
                     "ai_score": v.analysis.ai_score if v.analysis else None,
@@ -133,7 +152,7 @@ def get_music_sections() -> list[dict]:
     relative energy 0-1. When lyrics were transcribed, each section also has
     vocal_ratio (0-1, fraction with singing; ~0 = instrumental/melody-only).
     Cut points should usually align with these."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         song = db.scalar(select(Song))
         if song is None:
             return []
@@ -161,7 +180,7 @@ def get_lyrics() -> dict:
     melody-only passages. Use them to match footage to what the lyrics say
     and to place calmer/scenic shots over instrumental_ranges. Empty when
     lyrics analysis is disabled in Settings or not transcribed yet."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         song = db.scalar(select(Song))
         if song is None or song.lyrics is None or song.lyrics.status != "ready":
             return {"available": False, "lines": [], "instrumental_ranges": []}
@@ -180,7 +199,7 @@ def get_lyrics() -> dict:
 def get_beats(start: float = 0.0, end: float = 1e9) -> list[float]:
     """Beat timestamps (seconds) of the song between start and end. Snap clip
     boundaries to these for a montage that cuts on the beat."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         song = db.scalar(select(Song))
         if song is None:
             return []
@@ -191,7 +210,7 @@ def get_beats(start: float = 0.0, end: float = 1e9) -> list[float]:
 def get_timeline() -> dict:
     """Current timeline: tracks with their clips (timeline_start, source
     in/out, duration, video_id)."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         state = ops.timeline_state(db)
         db.commit()
         return state
@@ -212,7 +231,7 @@ def place_clip(
     slow motion); the clip occupies (source_out - source_in) / speed seconds
     of timeline. Fails if it would overlap an existing clip on
     the same track or exceed the video's duration."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         try:
             clip = ops.place_clip(
                 db, video_id, track, timeline_start, source_in, source_out,
@@ -236,7 +255,7 @@ def move_clip(
     speed: float | None = None,
 ) -> dict:
     """Move/retrim an existing clip. Only the provided fields change."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         try:
             ops.update_clip(db, clip_id, timeline_start, track, source_in, source_out, track_by_index=True, speed=speed)
         except ops.TimelineError as exc:
@@ -249,7 +268,7 @@ def move_clip(
 @mcp.tool()
 def remove_clip(clip_id: int) -> dict:
     """Remove one clip from the timeline."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         try:
             ops.remove_clip(db, clip_id)
         except ops.TimelineError as exc:
@@ -262,7 +281,7 @@ def remove_clip(clip_id: int) -> dict:
 @mcp.tool()
 def clear_track(track: int) -> dict:
     """Remove every clip from a track (id or 0-based index)."""
-    with dbm.open_session(VIDEO_DIR) as db:
+    with dbm.open_session(PROJECT_DIR) as db:
         try:
             count = ops.clear_track(db, track, track_by_index=True)
         except ops.TimelineError as exc:
