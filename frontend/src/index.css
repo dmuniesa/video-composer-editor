@@ -333,6 +333,8 @@ kbd {
 .review-layout { display: flex; height: 100%; }
 .review-main { flex: 1; overflow: auto; padding: 16px; }
 .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; color: var(--text-dim); }
+.filter-bar .thumb-size { display: flex; align-items: center; }
+.filter-bar .thumb-size input[type="range"] { width: 90px; accent-color: var(--accent); cursor: pointer; }
 .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
 
 .video-card {
@@ -374,6 +376,8 @@ kbd {
   position: absolute; left: 6px; top: 6px; font-size: 10px; text-transform: uppercase;
   background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; color: var(--text-dim);
 }
+.video-card .thumb-hit { display: block; }
+.video-card .name, .video-card .desc { cursor: pointer; }
 .video-card .body { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 .video-card .name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .video-card .desc { font-size: 12px; color: var(--text-dim); min-height: 28px; max-height: 42px; overflow: hidden; }

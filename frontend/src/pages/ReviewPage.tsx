@@ -19,6 +19,7 @@ export default function ReviewPage({ pid }: { pid: string }) {
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('*')
   const [sortBy, setSortBy] = useState<'name' | 'ai' | 'stars' | 'duration'>('name')
+  const [thumbSize, setThumbSize] = useState(() => Number(localStorage.getItem('review.thumbSize')) || 240)
   const [toast, setToast] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -48,6 +49,10 @@ export default function ReviewPage({ pid }: { pid: string }) {
     const t = setTimeout(() => setToast(''), 4000)
     return () => clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    localStorage.setItem('review.thumbSize', String(thumbSize))
+  }, [thumbSize])
 
   const folders = useMemo(() => folderList(videos), [videos])
 
@@ -98,6 +103,24 @@ export default function ReviewPage({ pid }: { pid: string }) {
     setSelected(next)
     setLastClicked(video.id)
   }
+
+  // While the detail is open, ←/→ step to the previous/next clip in view.
+  useEffect(() => {
+    if (openId == null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      const idx = shown.findIndex((v) => v.id === openId)
+      if (idx === -1) return
+      const nextIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1
+      if (nextIdx < 0 || nextIdx >= shown.length) return
+      e.preventDefault()
+      setOpenId(shown[nextIdx].id)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [openId, shown])
 
   // Keyboard: 0-5 rate selection, X toggle reject, A select all, Esc clear.
   useEffect(() => {
@@ -166,13 +189,23 @@ export default function ReviewPage({ pid }: { pid: string }) {
               #{tagFilter} ✕
             </span>
           )}
+          <label className="thumb-size" title="Thumbnail size">
+            <input
+              type="range"
+              min={160}
+              max={420}
+              step={20}
+              value={thumbSize}
+              onChange={(e) => setThumbSize(Number(e.target.value))}
+            />
+          </label>
           <InfoTip>
             <b>Selection & shortcuts</b>
             <ul>
-              <li><b>Click</b> selects · <b>Shift/Ctrl-click</b> multi-select.</li>
+              <li><b>Click</b> a clip opens the player · <b>Shift/Ctrl-click</b> multi-select.</li>
               <li><kbd>1</kbd>–<kbd>5</kbd> rate the selection · <kbd>0</kbd> clear.</li>
               <li><kbd>X</kbd> toggle reject · <kbd>Esc</kbd> clear selection.</li>
-              <li><b>Double-click</b> opens the player to mark in/out ranges.</li>
+              <li>In the player, <kbd>←</kbd>/<kbd>→</kbd> step to the previous/next clip.</li>
               <li>Hover a thumbnail to scrub · click a <b>#hashtag</b> to filter.</li>
             </ul>
           </InfoTip>
@@ -181,7 +214,10 @@ export default function ReviewPage({ pid }: { pid: string }) {
         {videos.length === 0 ? (
           <div className="empty-note">No videos yet — scan a folder on the Setup page.</div>
         ) : (
-          <div className="video-grid">
+          <div
+            className="video-grid"
+            style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${thumbSize}px, 1fr))` }}
+          >
             {shown.map((v) => (
               <VideoCard
                 key={v.id}
