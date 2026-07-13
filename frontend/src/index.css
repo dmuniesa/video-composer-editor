@@ -362,6 +362,10 @@ kbd {
   position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,0.75);
   padding: 1px 6px; border-radius: 4px; font-size: 11px;
 }
+.video-card .fps {
+  position: absolute; right: 6px; top: 6px; background: rgba(0,0,0,0.55);
+  padding: 1px 5px; border-radius: 4px; font-size: 10px; color: var(--text-dim);
+}
 .video-card .status-chip {
   position: absolute; left: 6px; top: 6px; font-size: 10px; text-transform: uppercase;
   background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; color: var(--text-dim);
@@ -501,8 +505,12 @@ kbd {
   background: none; border: none; border-radius: 6px; padding: 7px 10px;
 }
 .ctx-item:hover { background: var(--accent-soft); border: none; }
+.ctx-item:disabled { opacity: 0.45; }
+.ctx-item:disabled:hover { background: none; }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 .ctx-rate { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 4px; }
+.ctx-speed { display: flex; align-items: center; gap: 4px; padding: 6px 10px; flex-wrap: wrap; }
+.ctx-speed input { width: 58px; padding: 3px 6px; font-size: 12px; }
 
 /* ---- info tip ---- */
 .infotip { position: relative; display: inline-flex; }

@@ -47,28 +47,60 @@ def _rate_el(parent: ET.Element, timebase: int, ntsc: str) -> None:
     _el(rate, "ntsc", ntsc)
 
 
+def _speed_param(effect: ET.Element, pid: str, value: str, vmin: str | None = None, vmax: str | None = None) -> None:
+    param = _el(effect, "parameter")
+    _el(param, "parameterid", pid)
+    _el(param, "name", pid)
+    if vmin is not None:
+        _el(param, "valuemin", vmin)
+    if vmax is not None:
+        _el(param, "valuemax", vmax)
+    _el(param, "value", value)
+
+
+def _speed_filter(item: ET.Element, speed: float) -> None:
+    """Constant-speed Time Remap motion filter — the representation Premiere
+    itself writes/reads for speed-changed clips in FCP7 XML."""
+    filt = _el(item, "filter")
+    effect = _el(filt, "effect")
+    _el(effect, "name", "Time Remap")
+    _el(effect, "effectid", "timeremap")
+    _el(effect, "effectcategory", "motion")
+    _el(effect, "effecttype", "motion")
+    _el(effect, "mediatype", "video")
+    _speed_param(effect, "variablespeed", "0", "0", "1")
+    _speed_param(effect, "speed", str(round(speed * 100, 2)), "-100000", "100000")
+    _speed_param(effect, "reverse", "FALSE")
+    _speed_param(effect, "frameblending", "FALSE")
+
+
 def build_xmeml(
     sequence_name: str,
     videos: dict[int, dict],
     tracks: list[dict],
     song: dict | None,
+    sequence_fps: float = 0.0,
 ) -> str:
     """Build the project XML.
 
     videos: {video_id: {path, fps, width, height, duration}}
-    tracks: [{name, clips: [{video_id, timeline_start, source_in, source_out}]}]
+    tracks: [{name, clips: [{video_id, timeline_start, source_in, source_out, speed?}]}]
     song:   {path, duration} or None
+    sequence_fps: composition frame rate; falls back to the dominant source fps
     """
     fps_values = [round(v["fps"], 3) for v in videos.values() if v.get("fps")]
     dominant_fps = Counter(fps_values).most_common(1)[0][0] if fps_values else 25.0
-    timebase, ntsc = _rate_for(dominant_fps)
+    timebase, ntsc = _rate_for(sequence_fps or dominant_fps)
 
     def frames(seconds: float) -> int:
         return int(round(seconds * timebase))
 
+    def clip_len(c: dict) -> float:
+        return (c["source_out"] - c["source_in"]) / (c.get("speed") or 1.0)
+
     used_clips = [c for t in tracks for c in t["clips"]]
     total_end = max(
-        [frames(c["timeline_start"] + (c["source_out"] - c["source_in"])) for c in used_clips]
+        [frames(c["timeline_start"] + clip_len(c)) for c in used_clips]
         + ([frames(song["duration"])] if song else [0])
         + [0]
     )
@@ -102,10 +134,14 @@ def build_xmeml(
             clip_counter += 1
             v = videos[clip["video_id"]]
             v_timebase, v_ntsc = _rate_for(v.get("fps") or dominant_fps)
+            speed = clip.get("speed") or 1.0
             start_f = frames(clip["timeline_start"])
-            end_f = frames(clip["timeline_start"] + (clip["source_out"] - clip["source_in"]))
+            end_f = frames(clip["timeline_start"] + clip_len(clip))
             in_f = int(round(clip["source_in"] * v_timebase))
-            out_f = in_f + (end_f - start_f)
+            if abs(speed - 1.0) < 1e-6:
+                out_f = in_f + (end_f - start_f)
+            else:
+                out_f = int(round(clip["source_out"] * v_timebase))
 
             item = _el(track_el, "clipitem")
             item.set("id", f"clipitem-{clip_counter}")
@@ -135,6 +171,8 @@ def build_xmeml(
                 _el(fmedia, "audio")
             else:
                 file_el.set("id", file_ids[vid])
+            if abs(speed - 1.0) >= 1e-6:
+                _speed_filter(item, speed)
 
     audio_el = _el(media, "audio")
     if song:

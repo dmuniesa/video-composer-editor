@@ -2,6 +2,7 @@ export interface ProjectInfo {
   id: string
   name: string
   video_dir: string
+  composition_fps: number
   song_path: string | null
   song_status: string | null
   video_count: number
@@ -125,6 +126,7 @@ export interface TimelineClip {
   timeline_start: number
   source_in: number
   source_out: number
+  speed: number
   duration: number
   placed_by: string
 }

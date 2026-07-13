@@ -51,6 +51,7 @@ class ClipCreate(BaseModel):
     timeline_start: float
     source_in: float
     source_out: float
+    speed: float = 1.0
 
 
 @router.post("/projects/{pid}/clips")
@@ -66,6 +67,7 @@ def clip_create(pid: str, body: ClipCreate) -> dict:
                 source_in=body.source_in,
                 source_out=body.source_out,
                 placed_by="user",
+                speed=body.speed,
             )
         except ops.TimelineError as exc:
             raise HTTPException(400, str(exc))
@@ -80,6 +82,7 @@ class ClipUpdate(BaseModel):
     track_id: int | None = None
     source_in: float | None = None
     source_out: float | None = None
+    speed: float | None = None
 
 
 @router.patch("/projects/{pid}/clips/{cid}")
@@ -94,12 +97,31 @@ def clip_update(pid: str, cid: int, body: ClipUpdate) -> dict:
                 track_ref=body.track_id,
                 source_in=body.source_in,
                 source_out=body.source_out,
+                speed=body.speed,
             )
         except ops.TimelineError as exc:
             raise HTTPException(400, str(exc))
         db.commit()
     broadcaster.publish(pid, "timeline", {})
     return {"ok": True}
+
+
+class ClipSplit(BaseModel):
+    at: float
+
+
+@router.post("/projects/{pid}/clips/{cid}/split")
+def clip_split(pid: str, cid: int, body: ClipSplit) -> dict:
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        try:
+            right = ops.split_clip(db, cid, body.at)
+        except ops.TimelineError as exc:
+            raise HTTPException(400, str(exc))
+        db.commit()
+        result = {"id": right.id}
+    broadcaster.publish(pid, "timeline", {})
+    return result
 
 
 @router.delete("/projects/{pid}/clips/{cid}")

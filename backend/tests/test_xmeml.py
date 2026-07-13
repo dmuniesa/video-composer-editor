@@ -81,3 +81,41 @@ def test_no_song():
     xml = build_xmeml("no song", VIDEOS, TRACKS, None)
     root = ET.fromstring(xml)
     assert root.find("sequence/media/audio/track") is None
+
+
+def test_sequence_fps_override():
+    root = ET.fromstring(build_xmeml("t", VIDEOS, TRACKS, SONG, sequence_fps=50.0))
+    seq = root.find("sequence")
+    assert seq.findtext("rate/timebase") == "50"
+    first = seq.findall("media/video/track")[0].findall("clipitem")[0]
+    # clipitem keeps its source rate; timeline frames use the sequence rate
+    assert first.findtext("rate/timebase") == "25"
+    assert first.findtext("end") == "200"  # 4s at 50fps
+    # no speed filter on 1x clips
+    assert first.find("filter") is None
+
+
+def test_clip_speed_time_remap():
+    tracks = [
+        {
+            "name": "V1",
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 2.0, "source_out": 6.0, "speed": 0.5},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_xmeml("t", VIDEOS, tracks, None, sequence_fps=25.0))
+    item = root.find("sequence/media/video/track/clipitem")
+    # 4s of source at 0.5x occupies 8s of timeline
+    assert item.findtext("start") == "0"
+    assert item.findtext("end") == "200"
+    # in/out span the true source range at the source rate
+    assert item.findtext("in") == "50"
+    assert item.findtext("out") == "150"
+    effect = item.find("filter/effect")
+    assert effect is not None
+    assert effect.findtext("effectid") == "timeremap"
+    params = {p.findtext("parameterid"): p.findtext("value") for p in effect.findall("parameter")}
+    assert params["speed"] == "50.0"  # 0.5x -> 50%
+    assert params["variablespeed"] == "0"
+    assert params["reverse"] == "FALSE"

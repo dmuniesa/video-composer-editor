@@ -23,6 +23,7 @@ export default function VideoCard({ pid, video, selected, onSelect, onOpen, onRa
     >
       <ScrubThumb pid={pid} videoId={video.id} duration={video.duration}>
         <span className="duration">{fmtTime(video.duration)}</span>
+        {video.fps > 0 && <span className="fps">{Math.round(video.fps)} fps</span>}
         {video.status !== 'ready' && <span className="status-chip">{video.status}</span>}
         {video.rejected && <span className="status-chip" style={{ top: 26, color: 'var(--danger)' }}>rejected</span>}
       </ScrubThumb>

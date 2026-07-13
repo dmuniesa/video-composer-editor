@@ -24,6 +24,7 @@ class Project(Base):
     name: Mapped[str] = mapped_column(String, default="")
     video_dir: Mapped[str] = mapped_column(String)
     song_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    composition_fps: Mapped[float] = mapped_column(Float, default=25.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
@@ -200,6 +201,8 @@ class TimelineClip(Base):
     timeline_start: Mapped[float] = mapped_column(Float)
     source_in: Mapped[float] = mapped_column(Float)
     source_out: Mapped[float] = mapped_column(Float)
+    # playback rate: 0.5 = slow motion at half speed, 2.0 = double speed
+    speed: Mapped[float] = mapped_column(Float, default=1.0)
     placed_by: Mapped[str] = mapped_column(String, default="user")  # user | claude | agy | openai
 
     track: Mapped[Track] = relationship(back_populates="clips")
@@ -207,4 +210,5 @@ class TimelineClip(Base):
 
     @property
     def duration(self) -> float:
-        return self.source_out - self.source_in
+        """Length the clip occupies on the timeline (source range / speed)."""
+        return (self.source_out - self.source_in) / (self.speed or 1.0)

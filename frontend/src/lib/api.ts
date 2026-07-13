@@ -35,6 +35,8 @@ export const api = {
   createProject: (video_dir: string) =>
     req<ProjectInfo>('/api/projects', { method: 'POST', body: JSON.stringify({ video_dir }) }),
   getProject: (pid: string) => req<ProjectInfo>(`/api/projects/${pid}`),
+  updateProject: (pid: string, patch: { composition_fps?: number }) =>
+    req<ProjectInfo>(`/api/projects/${pid}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   scan: (pid: string) =>
     req<{ added: number; removed: number; total: number }>(`/api/projects/${pid}/scan`, {
       method: 'POST',
@@ -127,16 +129,21 @@ export const api = {
     req<{ ok: boolean }>(`/api/projects/${pid}/tracks/${tid}`, { method: 'DELETE' }),
   addClip: (
     pid: string,
-    clip: { track_id: number; video_id: number; timeline_start: number; source_in: number; source_out: number },
+    clip: { track_id: number; video_id: number; timeline_start: number; source_in: number; source_out: number; speed?: number },
   ) => req<{ id: number }>(`/api/projects/${pid}/clips`, { method: 'POST', body: JSON.stringify(clip) }),
   updateClip: (
     pid: string,
     cid: number,
-    patch: { timeline_start?: number; track_id?: number; source_in?: number; source_out?: number },
+    patch: { timeline_start?: number; track_id?: number; source_in?: number; source_out?: number; speed?: number },
   ) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/clips/${cid}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    }),
+  splitClip: (pid: string, cid: number, at: number) =>
+    req<{ id: number }>(`/api/projects/${pid}/clips/${cid}/split`, {
+      method: 'POST',
+      body: JSON.stringify({ at }),
     }),
   deleteClip: (pid: string, cid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/clips/${cid}`, { method: 'DELETE' }),

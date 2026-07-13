@@ -97,6 +97,7 @@ def project_get(pid: str) -> dict:
             "id": pid,
             "name": project.name if project else video_dir.name,
             "video_dir": str(video_dir),
+            "composition_fps": (project.composition_fps if project else None) or 25.0,
             "song_path": song.path if song else None,
             "song_status": song.status if song else None,
             "video_count": total,
@@ -106,6 +107,26 @@ def project_get(pid: str) -> dict:
             "composer_provider": composer.provider(),
             "composer_available": composer.available(),
         }
+
+
+class ProjectUpdate(BaseModel):
+    composition_fps: float | None = None
+
+
+@router.patch("/projects/{pid}")
+def project_update(pid: str, body: ProjectUpdate) -> dict:
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        project = db.scalar(select(Project))
+        if project is None:
+            project = Project(name=video_dir.name, video_dir=str(video_dir))
+            db.add(project)
+        if body.composition_fps is not None:
+            if not (10 <= body.composition_fps <= 120):
+                raise HTTPException(400, "composition_fps must be between 10 and 120")
+            project.composition_fps = body.composition_fps
+        db.commit()
+    return project_get(pid)
 
 
 @router.post("/projects/{pid}/scan")

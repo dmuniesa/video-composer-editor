@@ -8,10 +8,17 @@ from sqlalchemy.orm import Session
 from ..models import TimelineClip, Track, Video
 
 EPS = 1e-6
+SPEED_MIN = 0.05
+SPEED_MAX = 20.0
 
 
 class TimelineError(ValueError):
     pass
+
+
+def _validate_speed(speed: float) -> None:
+    if not (SPEED_MIN <= speed <= SPEED_MAX):
+        raise TimelineError(f"speed must be between {SPEED_MIN} and {SPEED_MAX}")
 
 
 def ensure_default_tracks(db: Session, count: int = 2) -> list[Track]:
@@ -80,6 +87,7 @@ def place_clip(
     source_out: float,
     placed_by: str = "user",
     track_by_index: bool = False,
+    speed: float = 1.0,
 ) -> TimelineClip:
     video = db.get(Video, video_id)
     if video is None:
@@ -93,7 +101,8 @@ def place_clip(
         raise TimelineError(
             f"source range {source_in:.2f}-{source_out:.2f}s outside video duration {video.duration:.2f}s"
         )
-    duration = source_out - source_in
+    _validate_speed(speed)
+    duration = (source_out - source_in) / speed
     _check_overlap(db, track.id, timeline_start, timeline_start + duration)
     clip = TimelineClip(
         track_id=track.id,
@@ -101,6 +110,7 @@ def place_clip(
         timeline_start=max(0.0, timeline_start),
         source_in=source_in,
         source_out=source_out,
+        speed=speed,
         placed_by=placed_by,
     )
     db.add(clip)
@@ -116,6 +126,7 @@ def update_clip(
     source_in: float | None = None,
     source_out: float | None = None,
     track_by_index: bool = False,
+    speed: float | None = None,
 ) -> TimelineClip:
     clip = db.get(TimelineClip, clip_id)
     if clip is None:
@@ -125,6 +136,7 @@ def update_clip(
     new_start = clip.timeline_start if timeline_start is None else timeline_start
     new_in = clip.source_in if source_in is None else source_in
     new_out = clip.source_out if source_out is None else source_out
+    new_speed = (clip.speed or 1.0) if speed is None else speed
     new_track_id = (
         clip.track_id
         if track_ref is None
@@ -137,14 +149,42 @@ def update_clip(
         raise TimelineError("source_out must be greater than source_in")
     if new_in < -EPS or (video and video.duration and new_out > video.duration + 0.05):
         raise TimelineError("source range outside video duration")
-    _check_overlap(db, new_track_id, new_start, new_start + (new_out - new_in), ignore_clip_id=clip.id)
+    _validate_speed(new_speed)
+    new_duration = (new_out - new_in) / new_speed
+    _check_overlap(db, new_track_id, new_start, new_start + new_duration, ignore_clip_id=clip.id)
 
     clip.timeline_start = max(0.0, new_start)
     clip.source_in = new_in
     clip.source_out = new_out
+    clip.speed = new_speed
     clip.track_id = new_track_id
     db.flush()
     return clip
+
+
+def split_clip(db: Session, clip_id: int, at: float) -> TimelineClip:
+    """Split a clip at timeline time `at`; the original keeps the left part
+    and a new clip (returned) takes the right part, inheriting speed."""
+    clip = db.get(TimelineClip, clip_id)
+    if clip is None:
+        raise TimelineError(f"clip {clip_id} not found")
+    if not (clip.timeline_start + EPS < at < clip.timeline_start + clip.duration - EPS):
+        raise TimelineError("split point must be inside the clip")
+    speed = clip.speed or 1.0
+    cut_src = clip.source_in + (at - clip.timeline_start) * speed
+    right = TimelineClip(
+        track_id=clip.track_id,
+        video_id=clip.video_id,
+        timeline_start=at,
+        source_in=cut_src,
+        source_out=clip.source_out,
+        speed=speed,
+        placed_by=clip.placed_by,
+    )
+    clip.source_out = cut_src
+    db.add(right)
+    db.flush()
+    return right
 
 
 def remove_clip(db: Session, clip_id: int) -> None:
@@ -180,6 +220,7 @@ def timeline_state(db: Session) -> dict:
                         "timeline_start": c.timeline_start,
                         "source_in": c.source_in,
                         "source_out": c.source_out,
+                        "speed": c.speed or 1.0,
                         "duration": c.duration,
                         "placed_by": c.placed_by,
                     }

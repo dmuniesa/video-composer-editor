@@ -65,6 +65,24 @@ def video_dir_for(pid: str) -> Path | None:
     return Path(path) if path else None
 
 
+def _ensure_columns(engine) -> None:
+    """create_all only adds new tables, never columns; add any columns missing
+    from existing tables so old project databases keep working."""
+    with engine.begin() as conn:
+        for table in Base.metadata.tables.values():
+            existing = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info('{table.name}')")}
+            if not existing:
+                continue
+            for col in table.columns:
+                if col.name in existing:
+                    continue
+                spec = f'"{col.name}" {col.type.compile(engine.dialect)}'
+                default = getattr(col.default, "arg", None)
+                if default is not None and not callable(default):
+                    spec += f" DEFAULT '{default}'" if isinstance(default, str) else f" DEFAULT {default}"
+                conn.exec_driver_sql(f'ALTER TABLE "{table.name}" ADD COLUMN {spec}')
+
+
 def session_factory(video_dir: str | Path) -> sessionmaker:
     resolved = str(Path(video_dir).resolve())
     with _lock:
@@ -76,6 +94,7 @@ def session_factory(video_dir: str | Path) -> sessionmaker:
                 connect_args={"check_same_thread": False, "timeout": 30},
             )
             Base.metadata.create_all(engine)
+            _ensure_columns(engine)
             _engines[resolved] = sessionmaker(bind=engine, expire_on_commit=False)
         return _engines[resolved]
 

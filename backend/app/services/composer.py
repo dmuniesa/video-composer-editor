@@ -216,6 +216,7 @@ def apply_actions(db: Session, actions: list[dict], placed_by: str) -> tuple[int
                     source_out=float(a["source_out"]),
                     placed_by=placed_by,
                     track_by_index=True,
+                    speed=float(a.get("speed", 1.0)),
                 )
             elif kind == "move":
                 ops.update_clip(
@@ -226,6 +227,7 @@ def apply_actions(db: Session, actions: list[dict], placed_by: str) -> tuple[int
                     source_in=None if a.get("source_in") is None else float(a["source_in"]),
                     source_out=None if a.get("source_out") is None else float(a["source_out"]),
                     track_by_index=True,
+                    speed=None if a.get("speed") is None else float(a["speed"]),
                 )
             elif kind == "remove":
                 ops.remove_clip(db, int(a["clip_id"]))

@@ -41,16 +41,22 @@ def build_fcpxml(
     videos: dict[int, dict],
     tracks: list[dict],
     song: dict | None,
+    sequence_fps: float = 0.0,
 ) -> str:
     """Build the project XML. Takes the same inputs as xmeml.build_xmeml:
 
     videos: {video_id: {path, fps, width, height, duration}}
-    tracks: [{name, clips: [{video_id, timeline_start, source_in, source_out}]}]
+    tracks: [{name, clips: [{video_id, timeline_start, source_in, source_out, speed?}]}]
     song:   {path, duration} or None
+    sequence_fps: composition frame rate; falls back to the dominant source fps
+
+    Clip speed only affects each clip's timeline footprint here; the FCPX
+    retime effect (<timeMap>) is not emitted, so retimed clips import at the
+    right length but play 1x — use the xmeml export for real speed changes.
     """
     fps_values = [round(v["fps"], 3) for v in videos.values() if v.get("fps")]
     dominant_fps = Counter(fps_values).most_common(1)[0][0] if fps_values else 25.0
-    num, den = _frame_duration(dominant_fps)
+    num, den = _frame_duration(sequence_fps or dominant_fps)
     fps = den / num
 
     def frames(seconds: float) -> int:
@@ -59,9 +65,12 @@ def build_fcpxml(
     def t(frame_count: int) -> str:
         return f"{frame_count * num}/{den}s"
 
+    def clip_len(c: dict) -> float:
+        return (c["source_out"] - c["source_in"]) / (c.get("speed") or 1.0)
+
     used_clips = [c for tr in tracks for c in tr["clips"]]
     total_end = max(
-        [frames(c["timeline_start"] + (c["source_out"] - c["source_in"])) for c in used_clips]
+        [frames(c["timeline_start"] + clip_len(c)) for c in used_clips]
         + ([frames(song["duration"])] if song else [0])
         + [1]
     )
@@ -134,7 +143,7 @@ def build_fcpxml(
         for clip in track["clips"]:
             v = videos[clip["video_id"]]
             start_f = frames(clip["timeline_start"])
-            dur_f = frames(clip["timeline_start"] + (clip["source_out"] - clip["source_in"])) - start_f
+            dur_f = frames(clip["timeline_start"] + clip_len(clip)) - start_f
             if dur_f <= 0:
                 continue
             ET.SubElement(

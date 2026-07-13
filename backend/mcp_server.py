@@ -204,16 +204,19 @@ def place_clip(
     timeline_start: float,
     source_in: float,
     source_out: float,
+    speed: float = 1.0,
 ) -> dict:
     """Place a clip on the timeline. track is a 0-based track index (falls
     back to a track id when no index matches). timeline_start is seconds into the song; source_in/source_out are
-    seconds inside the video. Fails if it would overlap an existing clip on
+    seconds inside the video. speed is the playback rate (0.5 = half-speed
+    slow motion); the clip occupies (source_out - source_in) / speed seconds
+    of timeline. Fails if it would overlap an existing clip on
     the same track or exceed the video's duration."""
     with dbm.open_session(VIDEO_DIR) as db:
         try:
             clip = ops.place_clip(
                 db, video_id, track, timeline_start, source_in, source_out,
-                placed_by="claude", track_by_index=True,
+                placed_by="claude", track_by_index=True, speed=speed,
             )
         except ops.TimelineError as exc:
             return {"error": str(exc)}
@@ -230,11 +233,12 @@ def move_clip(
     track: int | None = None,
     source_in: float | None = None,
     source_out: float | None = None,
+    speed: float | None = None,
 ) -> dict:
     """Move/retrim an existing clip. Only the provided fields change."""
     with dbm.open_session(VIDEO_DIR) as db:
         try:
-            ops.update_clip(db, clip_id, timeline_start, track, source_in, source_out, track_by_index=True)
+            ops.update_clip(db, clip_id, timeline_start, track, source_in, source_out, track_by_index=True, speed=speed)
         except ops.TimelineError as exc:
             return {"error": str(exc)}
         db.commit()

@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 
 from .. import db as dbm
-from ..models import Song, Track, Video
+from ..models import Project, Song, Track, Video
 from ..services import fcpxml, xmeml
 from .deps import resolve_project
 
@@ -23,9 +23,11 @@ def _gather(pid: str) -> dict:
         if not clips:
             raise HTTPException(409, "timeline is empty — place some clips first")
         song = db.scalar(select(Song))
+        project = db.scalar(select(Project))
         used_ids = {c.video_id for c in clips}
         return {
             "sequence_name": f"{video_dir.name} montage",
+            "sequence_fps": (project.composition_fps if project else None) or 25.0,
             "videos": {
                 v.id: {
                     "path": str(video_dir / v.rel_path),
@@ -45,6 +47,7 @@ def _gather(pid: str) -> dict:
                             "timeline_start": c.timeline_start,
                             "source_in": c.source_in,
                             "source_out": c.source_out,
+                            "speed": c.speed or 1.0,
                         }
                         for c in t.clips
                     ],

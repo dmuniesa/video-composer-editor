@@ -230,6 +230,54 @@ def test_compose_endpoint(client, project):
     assert clips[0]["source_in"] == 1.0 and clips[0]["source_out"] == 4.0
 
 
+def test_clip_speed_split_and_composition_fps(client, project):
+    pid, _videos_dir = project
+
+    # default composition fps + PATCH round-trip
+    assert client.get(f"/api/projects/{pid}").json()["composition_fps"] == 25.0
+    res = client.patch(f"/api/projects/{pid}", json={"composition_fps": 50})
+    assert res.status_code == 200 and res.json()["composition_fps"] == 50.0
+    assert client.patch(f"/api/projects/{pid}", json={"composition_fps": 500}).status_code == 400
+
+    client.post(f"/api/projects/{pid}/scan")
+    wait_until(
+        lambda: all(
+            v["status"] in ("extracted", "ready", "error")
+            for v in client.get(f"/api/projects/{pid}/videos").json()
+        )
+    )
+    vid = client.get(f"/api/projects/{pid}/videos").json()[0]["id"]
+    track_id = client.get(f"/api/projects/{pid}/timeline").json()["tracks"][0]["id"]
+
+    # place at half speed: 3s of source occupies 6s of timeline
+    res = client.post(
+        f"/api/projects/{pid}/clips",
+        json={"track_id": track_id, "video_id": vid, "timeline_start": 0.0, "source_in": 1.0, "source_out": 4.0, "speed": 0.5},
+    )
+    assert res.status_code == 200
+    cid = res.json()["id"]
+    clip = client.get(f"/api/projects/{pid}/timeline").json()["tracks"][0]["clips"][0]
+    assert clip["speed"] == 0.5 and clip["duration"] == 6.0
+
+    # split at t=2 -> left keeps 1.0-2.0 of source, right starts at t=2
+    res = client.post(f"/api/projects/{pid}/clips/{cid}/split", json={"at": 2.0})
+    assert res.status_code == 200
+    clips = client.get(f"/api/projects/{pid}/timeline").json()["tracks"][0]["clips"]
+    assert len(clips) == 2
+    assert clips[0]["source_out"] == 2.0
+    assert clips[1]["timeline_start"] == 2.0 and clips[1]["speed"] == 0.5
+    assert client.post(f"/api/projects/{pid}/clips/{cid}/split", json={"at": 99.0}).status_code == 400
+
+    # PATCH speed and check the export carries sequence fps + time remap
+    res = client.patch(f"/api/projects/{pid}/clips/{cid}", json={"speed": 1.0})
+    assert res.status_code == 200
+    root = ET.fromstring(client.get(f"/api/projects/{pid}/export.xml").text)
+    assert root.findtext("sequence/rate/timebase") == "50"
+    items = root.findall("sequence/media/video/track/clipitem")
+    effects = [i.findtext("filter/effect/effectid") for i in items]
+    assert effects == [None, "timeremap"]  # first back at 1x, right half still 0.5x
+
+
 def test_fs_browser(client, tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "a.mp4").touch()

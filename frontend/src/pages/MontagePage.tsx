@@ -39,6 +39,9 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [pxPerSec, setPxPerSec] = useState(20)
   const [snap, setSnap] = useState(true)
   const [selectedClip, setSelectedClip] = useState<number | null>(null)
+  const [clipCtx, setClipCtx] = useState<{ x: number; y: number; clipId: number } | null>(null)
+  const [speedInput, setSpeedInput] = useState('1')
+  const [compFps, setCompFps] = useState(25)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dropTrack, setDropTrack] = useState<number | null>(null)
   const [playhead, setPlayhead] = useState(0)
@@ -75,6 +78,7 @@ export default function MontagePage({ pid }: { pid: string }) {
     api.getProject(pid).then((p) => {
       setComposerProvider(p.composer_provider)
       setComposerAvailable(p.composer_available)
+      setCompFps(p.composition_fps || 25)
       // start expanded only when it can actually be used
       setComposeOpen(p.composer_available && p.composer_provider !== 'mcp')
     }).catch(() => {})
@@ -244,13 +248,15 @@ export default function MontagePage({ pid }: { pid: string }) {
       return
     }
     const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
-    const want = clip.source_in + (playhead - clip.timeline_start)
+    const speed = clip.speed || 1
+    const want = clip.source_in + (playhead - clip.timeline_start) * speed
     if (!pv.src.endsWith(src)) {
       pv.src = src
       pv.currentTime = want
-    } else if (Math.abs(pv.currentTime - want) > 0.5) {
+    } else if (Math.abs(pv.currentTime - want) > 0.5 * Math.max(1, speed)) {
       pv.currentTime = want
     }
+    if (pv.playbackRate !== speed) pv.playbackRate = speed
     const playing = audioRef.current && !audioRef.current.paused
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
@@ -263,8 +269,11 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (ctx) {
-        if (e.key === 'Escape') setCtx(null)
+      if (ctx || clipCtx) {
+        if (e.key === 'Escape') {
+          setCtx(null)
+          setClipCtx(null)
+        }
         return
       }
       if (detailId != null) return // the detail drawer has its own shortcuts
@@ -280,7 +289,7 @@ export default function MontagePage({ pid }: { pid: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedClip, pid, refreshTimeline, ctx, detailId])
+  }, [selectedClip, pid, refreshTimeline, ctx, clipCtx, detailId])
 
   // ---- bin context menu ----
   const openCtxMenu = (videoId: number) => (e: React.MouseEvent) => {
@@ -299,6 +308,18 @@ export default function MontagePage({ pid }: { pid: string }) {
     api.rate(pid, [id], patch).catch((e) => {
       setToast(e.message)
       refreshVideos()
+    })
+  }
+
+  const setClipSpeed = (clip: TimelineClip, speed: number) => {
+    if (!isFinite(speed) || speed < 0.05 || speed > 20) {
+      setToast('speed must be between 0.05 and 20')
+      return
+    }
+    setSpeedInput(String(speed))
+    api.updateClip(pid, clip.id, { speed }).then(refreshTimeline).catch((e) => {
+      setToast(e.message)
+      refreshTimeline()
     })
   }
 
@@ -345,9 +366,11 @@ export default function MontagePage({ pid }: { pid: string }) {
   // ---- clip drag / trim ----
   const startDrag = (clip: TimelineClip, trackId: number, mode: DragState['mode']) => (e: React.PointerEvent) => {
     e.stopPropagation()
+    if (e.button !== 0) return // right-click opens the context menu, not a drag
     e.preventDefault()
     setSelectedClip(clip.id)
     const video = videoById.get(clip.video_id)
+    const speed = clip.speed || 1
     const startX = e.clientX
     const startY = e.clientY
     const state: DragState = {
@@ -374,27 +397,28 @@ export default function MontagePage({ pid }: { pid: string }) {
         const newIdx = Math.min(tracks.length - 1, Math.max(0, idx + rows))
         previewTrackId = tracks[newIdx].id
       } else if (mode === 'trim-l') {
-        const maxIn = state.orig.source_out - 0.2
+        // timeline deltas convert to source seconds at the clip's speed
+        const maxIn = state.orig.source_out - 0.2 * speed
         let newStart = snapTime(state.orig.timeline_start + dt)
-        let delta = newStart - state.orig.timeline_start
-        let newIn = state.orig.source_in + delta
+        const delta = newStart - state.orig.timeline_start
+        let newIn = state.orig.source_in + delta * speed
         if (newIn < 0) {
-          newStart -= newIn
+          newStart -= newIn / speed
           newIn = 0
         }
         if (newIn > maxIn) {
-          newStart -= newIn - maxIn
+          newStart -= (newIn - maxIn) / speed
           newIn = maxIn
         }
         p.timeline_start = newStart
         p.source_in = newIn
       } else {
         const end = snapTime(state.orig.timeline_start + state.orig.duration + dt)
-        let newOut = state.orig.source_in + Math.max(0.2, end - state.orig.timeline_start)
+        let newOut = state.orig.source_in + Math.max(0.2, end - state.orig.timeline_start) * speed
         if (video?.duration) newOut = Math.min(newOut, video.duration)
         p.source_out = newOut
       }
-      p.duration = p.source_out - p.source_in
+      p.duration = (p.source_out - p.source_in) / speed
       state.preview = p
       state.previewTrackId = previewTrackId
       setDrag({ ...state })
@@ -602,6 +626,21 @@ export default function MontagePage({ pid }: { pid: string }) {
               − track
             </button>
           )}
+          <label title="composition frame rate — written to the exported sequence">
+            seq fps{' '}
+            <select
+              value={compFps}
+              onChange={(e) => {
+                const fps = Number(e.target.value)
+                setCompFps(fps)
+                api.updateProject(pid, { composition_fps: fps }).catch((err) => setToast(err.message))
+              }}
+            >
+              {[23.976, 24, 25, 29.97, 30, 50, 59.94, 60].map((f) => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+          </label>
           <span className="spacer" style={{ flex: 1 }} />
           <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
           <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
@@ -776,12 +815,24 @@ export default function MontagePage({ pid }: { pid: string }) {
                       className={`tl-clip ${selectedClip === clip.id ? 'selected' : ''} ${clip.placed_by !== 'user' ? 'by-ai' : ''}`}
                       style={{ left: shown.timeline_start * pxPerSec, width: Math.max(shown.duration * pxPerSec, 8) }}
                       onPointerDown={startDrag(clip, track.id, 'move')}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setSelectedClip(clip.id)
+                        setSpeedInput(String(clip.speed || 1))
+                        setClipCtx({
+                          x: Math.min(e.clientX, window.innerWidth - 320),
+                          y: Math.min(e.clientY, window.innerHeight - 340),
+                          clipId: clip.id,
+                        })
+                      }}
                     >
                       {video && (
                         <img className="film" src={media.thumb(pid, clip.video_id)} alt="" draggable={false} />
                       )}
                       <div className="label">
                         {video?.filename ?? clip.video_id} · {fmtTime(shown.duration)}
+                        {(clip.speed || 1) !== 1 ? ` · ${clip.speed}×` : ''}
                       </div>
                       <div className="trim l" onPointerDown={startDrag(clip, track.id, 'trim-l')} />
                       <div className="trim r" onPointerDown={startDrag(clip, track.id, 'trim-r')} />
@@ -817,6 +868,7 @@ export default function MontagePage({ pid }: { pid: string }) {
               <span>start {fmtTime(selected.timeline_start)}</span>
               <span>src {fmtTime(selected.source_in)} → {fmtTime(selected.source_out)}</span>
               <span>len {fmtTime(selected.duration)}</span>
+              <span>speed {selected.speed || 1}×</span>
               <span>by {selected.placed_by}</span>
               <button
                 className="small danger"
@@ -894,6 +946,122 @@ export default function MontagePage({ pid }: { pid: string }) {
                   ✕ reject
                 </button>
               </div>
+            </div>
+          </>
+        )
+      })()}
+      {clipCtx && (() => {
+        const cclip = tracks.flatMap((t) => t.clips).find((c) => c.id === clipCtx.clipId)
+        if (!cclip) return null // clip vanished (SSE refresh)
+        const v = videoById.get(cclip.video_id)
+        const speed = cclip.speed || 1
+        const canSplit =
+          cclip.timeline_start + 0.05 < playhead && playhead < cclip.timeline_start + cclip.duration - 0.05
+        const nearestBeat = snapPoints.length
+          ? snapPoints.reduce((best, p) =>
+              Math.abs(p - cclip.timeline_start) < Math.abs(best - cclip.timeline_start) ? p : best,
+            )
+          : null
+        return (
+          <>
+            <div
+              className="ctx-overlay"
+              onMouseDown={() => setClipCtx(null)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setClipCtx(null)
+              }}
+            />
+            <div className="ctx-menu" style={{ left: clipCtx.x, top: clipCtx.y }}>
+              <div className="ctx-header">
+                <span className="ctx-title">{v?.filename ?? `clip #${cclip.id}`}</span>
+                <span className="hint">
+                  {fmtTime(cclip.duration)}
+                  {v ? ` · ${v.width}×${v.height} · ${Math.round(v.fps)} fps` : ''}
+                  {speed !== 1 ? ` · ${speed}×` : ''}
+                </span>
+              </div>
+              <div className="ctx-speed">
+                <span className="hint">speed</span>
+                {[0.25, 0.5, 0.75, 1, 1.5, 2].map((s) => (
+                  <button
+                    key={s}
+                    className={`small ${speed === s ? 'primary' : ''}`}
+                    onClick={() => setClipSpeed(cclip, s)}
+                  >
+                    {s}×
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={0.05}
+                  max={20}
+                  step={0.05}
+                  value={speedInput}
+                  onChange={(e) => setSpeedInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setClipSpeed(cclip, Number(speedInput))
+                  }}
+                  onBlur={() => {
+                    const n = Number(speedInput)
+                    if (n && n !== speed) setClipSpeed(cclip, n)
+                  }}
+                />
+              </div>
+              <div className="ctx-sep" />
+              <button
+                className="ctx-item"
+                disabled={!canSplit}
+                title={canSplit ? '' : 'move the playhead inside this clip'}
+                onClick={() => {
+                  api.splitClip(pid, cclip.id, playhead).then(refreshTimeline).catch((e) => setToast(e.message))
+                  setClipCtx(null)
+                }}
+              >
+                <span>✂ Split at playhead</span>
+                <span className="hint">{fmtTime(playhead)}</span>
+              </button>
+              <button
+                className="ctx-item"
+                disabled={nearestBeat == null}
+                onClick={() => {
+                  if (nearestBeat == null) return
+                  api
+                    .updateClip(pid, cclip.id, { timeline_start: nearestBeat })
+                    .then(refreshTimeline)
+                    .catch((e) => setToast(e.message))
+                  setClipCtx(null)
+                }}
+              >
+                <span>🧲 Snap to nearest beat</span>
+                {nearestBeat != null && <span className="hint">{fmtTime(nearestBeat)}</span>}
+              </button>
+              <div className="ctx-sep" />
+              <button
+                className="ctx-item"
+                onClick={() => {
+                  setDetailId(cclip.video_id)
+                  setClipCtx(null)
+                }}
+              >
+                <span>🎞 Details — player, ranges & tags</span>
+              </button>
+              <button className="ctx-item" onClick={() => navigate(`/p/${pid}/review?video=${cclip.video_id}`)}>
+                <span>⭐ Show in Review</span>
+                <span className="hint">→</span>
+              </button>
+              <div className="ctx-sep" />
+              <button
+                className="ctx-item"
+                onClick={() => {
+                  api.deleteClip(pid, cclip.id).then(refreshTimeline).catch((e) => setToast(e.message))
+                  setSelectedClip(null)
+                  setClipCtx(null)
+                }}
+              >
+                <span style={{ color: 'var(--danger)' }}>🗑 Delete clip</span>
+                <span className="hint">Del</span>
+              </button>
             </div>
           </>
         )
