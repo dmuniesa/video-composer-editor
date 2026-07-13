@@ -111,8 +111,10 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             <kbd>X</kbd> to reject. Rejected clips dim out and never reach the montage bin.
           </li>
           <li>
-            Filter with the top bar (minimum stars, hide rejected, sort by name / AI score / stars
-            / duration) and click any <b>#hashtag</b> to filter by it.
+            Filter with the top bar: free-text <b>search</b> (matches filename, description and
+            tags; start with <code>#</code> to search hashtags only), <b>subfolder</b>, minimum
+            stars, hide rejected, sort by name / AI score / stars / duration — and click any{' '}
+            <b>#hashtag</b> to filter by it.
           </li>
         </ul>
         <div className="callout">
@@ -175,6 +177,15 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
         <ul>
           <li>
             <b>Drag</b> a video — or one of its ranges — from the bin onto a track.
+          </li>
+          <li>
+            <b>Right-click</b> a clip in the bin for quick actions: place it (or one of its
+            ranges) at the playhead, open its detail (player, ranges, tags), jump to it in
+            Review, rate it or reject it. <b>Double-click</b> opens the detail directly.
+          </li>
+          <li>
+            <b>Filter the bin</b> with the box at the top: free text, <code>#hashtag</code>, or a
+            subfolder of your project — handy on big shoots.
           </li>
           <li>
             Drag a clip horizontally to move it, vertically to change tracks, and drag its{' '}

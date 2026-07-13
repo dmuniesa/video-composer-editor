@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api, media, fmtTime } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
 import ScrubThumb from '../components/ScrubThumb'
+import StarRating from '../components/StarRating'
+import VideoDetail from '../components/VideoDetail'
 import Waveform from '../components/Waveform'
+import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
 import { sectionColor } from './MusicPage'
 
 const RULER_H = 26
@@ -22,7 +26,12 @@ interface DragState {
 }
 
 export default function MontagePage({ pid }: { pid: string }) {
+  const navigate = useNavigate()
   const [videos, setVideos] = useState<Video[]>([])
+  const [ctx, setCtx] = useState<{ x: number; y: number; videoId: number } | null>(null)
+  const [detailId, setDetailId] = useState<number | null>(null)
+  const [binQuery, setBinQuery] = useState('')
+  const [binFolder, setBinFolder] = useState('*')
   const [song, setSong] = useState<SongInfo | null>(null)
   const [peaks, setPeaks] = useState<[number, number][]>([])
   const [tracks, setTracks] = useState<Track[]>([])
@@ -53,8 +62,12 @@ export default function MontagePage({ pid }: { pid: string }) {
     api.timeline(pid).then((t) => setTracks(t.tracks)).catch((e) => setToast(e.message))
   }, [pid])
 
-  useEffect(() => {
+  const refreshVideos = useCallback(() => {
     api.videos(pid).then(setVideos).catch(() => {})
+  }, [pid])
+
+  useEffect(() => {
+    refreshVideos()
     api.song(pid).then(setSong).catch(() => {})
     api.songPeaks(pid).then((p) => setPeaks(p.peaks)).catch(() => {})
     api.getProject(pid).then((p) => {
@@ -62,11 +75,11 @@ export default function MontagePage({ pid }: { pid: string }) {
       setComposerAvailable(p.composer_available)
     }).catch(() => {})
     refreshTimeline()
-  }, [pid, refreshTimeline])
+  }, [pid, refreshTimeline, refreshVideos])
 
   useProjectEvents(pid, (e) => {
     if (e.event === 'timeline') refreshTimeline()
-    if (e.event === 'videos' || e.event === 'video') api.videos(pid).then(setVideos).catch(() => {})
+    if (e.event === 'videos' || e.event === 'video') refreshVideos()
     if (e.event === 'compose') {
       setComposing(false)
       const d = e.data as {
@@ -107,12 +120,15 @@ export default function MontagePage({ pid }: { pid: string }) {
   const width = duration * pxPerSec
 
   const videoById = useMemo(() => new Map(videos.map((v) => [v.id, v])), [videos])
+  const kept = useMemo(() => videos.filter((v) => !v.rejected), [videos])
+  const folders = useMemo(() => folderList(kept), [kept])
   const binVideos = useMemo(
     () =>
-      videos
-        .filter((v) => !v.rejected)
+      kept
+        .filter((v) => matchesQuery(v, binQuery))
+        .filter((v) => binFolder === '*' || folderOf(v.rel_path) === binFolder)
         .sort((a, b) => b.stars - a.stars || (b.ai_score ?? 0) - (a.ai_score ?? 0)),
-    [videos],
+    [kept, binQuery, binFolder],
   )
 
   const snapPoints = useMemo(() => {
@@ -243,6 +259,11 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (ctx) {
+        if (e.key === 'Escape') setCtx(null)
+        return
+      }
+      if (detailId != null) return // the detail drawer has its own shortcuts
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === ' ') {
@@ -255,7 +276,46 @@ export default function MontagePage({ pid }: { pid: string }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedClip, pid, refreshTimeline])
+  }, [selectedClip, pid, refreshTimeline, ctx, detailId])
+
+  // ---- bin context menu ----
+  const openCtxMenu = (videoId: number) => (e: React.MouseEvent) => {
+    e.preventDefault()
+    const v = videoById.get(videoId)
+    const estH = 250 + (v?.ranges.length ?? 0) * 30
+    setCtx({
+      x: Math.min(e.clientX, window.innerWidth - 300),
+      y: Math.min(e.clientY, window.innerHeight - estH),
+      videoId,
+    })
+  }
+
+  const rateVideo = (id: number, patch: { stars?: number; rejected?: boolean }) => {
+    setVideos((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)))
+    api.rate(pid, [id], patch).catch((e) => {
+      setToast(e.message)
+      refreshVideos()
+    })
+  }
+
+  const placeAtPlayhead = (v: Video, tIn: number, tOut: number) => {
+    setCtx(null)
+    const track = tracks[0]
+    if (!track) {
+      setToast('no track to place on — add one first')
+      return
+    }
+    api
+      .addClip(pid, {
+        track_id: track.id,
+        video_id: v.id,
+        timeline_start: snapTime(playhead),
+        source_in: tIn,
+        source_out: tOut,
+      })
+      .then(refreshTimeline)
+      .catch((e) => setToast(e.message))
+  }
 
   // ---- drop from bin ----
   const onDrop = (track: Track) => (e: React.DragEvent) => {
@@ -404,14 +464,45 @@ export default function MontagePage({ pid }: { pid: string }) {
           {composeResult && <div className="hint">{composeResult}</div>}
         </div>
         <div className="hint">
-          Drag a video (full clip) or one of its ranges onto a track. Purple clips were placed by
-          AI (Claude/agy/OpenAI).
+          Drag a video (full clip) or one of its ranges onto a track. Right-click for options.
+          Purple clips were placed by AI (Claude/agy/OpenAI).
+        </div>
+        <div className="bin-filter">
+          <input
+            placeholder="filter — text or #tag"
+            value={binQuery}
+            onChange={(e) => setBinQuery(e.target.value)}
+          />
+          {folders.length > 1 && (
+            <select value={binFolder} onChange={(e) => setBinFolder(e.target.value)} title="subfolder">
+              <option value="*">all folders</option>
+              {folders.map((f) => (
+                <option key={f} value={f}>{f === '' ? '(root)' : f}</option>
+              ))}
+            </select>
+          )}
+          {(binQuery || binFolder !== '*') && (
+            <span className="hint">
+              {binVideos.length}/{kept.length}
+              <button
+                className="small"
+                style={{ marginLeft: 6 }}
+                onClick={() => {
+                  setBinQuery('')
+                  setBinFolder('*')
+                }}
+              >
+                ✕
+              </button>
+            </span>
+          )}
         </div>
         {binVideos.map((v) => (
-          <div key={v.id}>
+          <div key={v.id} onContextMenu={openCtxMenu(v.id)}>
             <div
               className="bin-item"
               draggable
+              onDoubleClick={() => setDetailId(v.id)}
               onDragStart={(e) =>
                 e.dataTransfer.setData(
                   'application/x-montage',
@@ -421,11 +512,17 @@ export default function MontagePage({ pid }: { pid: string }) {
             >
               <ScrubThumb pid={pid} videoId={v.id} duration={v.duration} />
               <div className="meta">
-                <div className="name">{v.filename}</div>
+                <div className="name" title={v.rel_path}>{v.filename}</div>
                 <div className="sub">
                   {'★'.repeat(v.stars)}{v.ai_score != null ? ` · AI ${v.ai_score}` : ''} · {fmtTime(v.duration)}
                 </div>
-                <div className="sub">{v.hashtags.slice(0, 3).map((t) => `#${t}`).join(' ')}</div>
+                <div className="sub">
+                  {v.hashtags.slice(0, 3).map((t) => (
+                    <span key={t} className="bin-tag" onClick={() => setBinQuery(`#${t}`)}>
+                      #{t}{' '}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             {v.ranges.map((r) => (
@@ -445,6 +542,11 @@ export default function MontagePage({ pid }: { pid: string }) {
             ))}
           </div>
         ))}
+        {binVideos.length === 0 && kept.length > 0 && (
+          <div className="hint" style={{ textAlign: 'center', padding: 12 }}>
+            no clips match the filter
+          </div>
+        )}
       </div>
 
       <div className="montage-main">
@@ -697,6 +799,78 @@ export default function MontagePage({ pid }: { pid: string }) {
           )}
         </div>
       </div>
+      {ctx && (() => {
+        const v = videoById.get(ctx.videoId)
+        if (!v) return null
+        return (
+          <>
+            <div
+              className="ctx-overlay"
+              onMouseDown={() => setCtx(null)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setCtx(null)
+              }}
+            />
+            <div className="ctx-menu" style={{ left: ctx.x, top: ctx.y }}>
+              <div className="ctx-header">
+                <span className="ctx-title">{v.filename}</span>
+                <span className="hint">
+                  {fmtTime(v.duration)} · {v.width}×{v.height} · {Math.round(v.fps)} fps
+                  {v.ai_score != null ? ` · AI ${v.ai_score}` : ''}
+                </span>
+              </div>
+              <button className="ctx-item" onClick={() => placeAtPlayhead(v, 0, v.duration)}>
+                <span>➕ Place at playhead</span>
+                <span className="hint">{fmtTime(playhead)}</span>
+              </button>
+              {v.ranges.map((r) => (
+                <button key={r.id} className="ctx-item" onClick={() => placeAtPlayhead(v, r.t_in, r.t_out)}>
+                  <span>◳ Place “{r.label || 'range'}”</span>
+                  <span className="hint">{fmtTime(r.t_in)}–{fmtTime(r.t_out)}</span>
+                </button>
+              ))}
+              <div className="ctx-sep" />
+              <button
+                className="ctx-item"
+                onClick={() => {
+                  setDetailId(v.id)
+                  setCtx(null)
+                }}
+              >
+                <span>🎞 Details — player, ranges & tags</span>
+              </button>
+              <button className="ctx-item" onClick={() => navigate(`/p/${pid}/review?video=${v.id}`)}>
+                <span>⭐ Show in Review</span>
+                <span className="hint">→</span>
+              </button>
+              <div className="ctx-sep" />
+              <div className="ctx-rate">
+                <StarRating stars={v.stars} onChange={(stars) => rateVideo(v.id, { stars })} />
+                <button
+                  className="small danger"
+                  onClick={() => {
+                    rateVideo(v.id, { rejected: true })
+                    setCtx(null)
+                  }}
+                >
+                  ✕ reject
+                </button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
+      {detailId != null && videoById.get(detailId) && (
+        <VideoDetail
+          pid={pid}
+          video={videoById.get(detailId)!}
+          onClose={() => setDetailId(null)}
+          onChanged={refreshVideos}
+          onRate={(stars) => rateVideo(detailId, { stars })}
+          onReject={(rejected) => rateVideo(detailId, { rejected })}
+        />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   )

@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { Video } from '../lib/types'
 import VideoCard from '../components/VideoCard'
 import VideoDetail from '../components/VideoDetail'
+import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
 
 export default function ReviewPage({ pid }: { pid: string }) {
   const [videos, setVideos] = useState<Video[]>([])
@@ -13,8 +15,11 @@ export default function ReviewPage({ pid }: { pid: string }) {
   const [minStars, setMinStars] = useState(0)
   const [hideRejected, setHideRejected] = useState(false)
   const [tagFilter, setTagFilter] = useState('')
+  const [query, setQuery] = useState('')
+  const [folder, setFolder] = useState('*')
   const [sortBy, setSortBy] = useState<'name' | 'ai' | 'stars' | 'duration'>('name')
   const [toast, setToast] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const refresh = useCallback(() => {
     api.videos(pid).then(setVideos).catch((e) => setToast(e.message))
@@ -24,17 +29,34 @@ export default function ReviewPage({ pid }: { pid: string }) {
     if (e.event === 'video' || e.event === 'videos') refresh()
   })
 
+  // Deep link (?video=ID) from the montage bin: open that clip's detail.
+  useEffect(() => {
+    const q = searchParams.get('video')
+    if (!q || videos.length === 0) return
+    const id = Number(q)
+    if (videos.some((v) => v.id === id)) {
+      setOpenId(id)
+      setSelected(new Set([id]))
+      setLastClicked(id)
+    }
+    setSearchParams({}, { replace: true })
+  }, [videos, searchParams, setSearchParams])
+
   useEffect(() => {
     if (!toast) return
     const t = setTimeout(() => setToast(''), 4000)
     return () => clearTimeout(t)
   }, [toast])
 
+  const folders = useMemo(() => folderList(videos), [videos])
+
   const shown = useMemo(() => {
     let list = videos
     if (minStars > 0) list = list.filter((v) => v.stars >= minStars)
     if (hideRejected) list = list.filter((v) => !v.rejected)
     if (tagFilter) list = list.filter((v) => v.hashtags.includes(tagFilter))
+    if (query) list = list.filter((v) => matchesQuery(v, query))
+    if (folder !== '*') list = list.filter((v) => folderOf(v.rel_path) === folder)
     const by = {
       name: (a: Video, b: Video) => a.filename.localeCompare(b.filename),
       ai: (a: Video, b: Video) => (b.ai_score ?? -1) - (a.ai_score ?? -1),
@@ -42,7 +64,7 @@ export default function ReviewPage({ pid }: { pid: string }) {
       duration: (a: Video, b: Video) => b.duration - a.duration,
     }[sortBy]
     return [...list].sort(by)
-  }, [videos, minStars, hideRejected, tagFilter, sortBy])
+  }, [videos, minStars, hideRejected, tagFilter, query, folder, sortBy])
 
   const rate = useCallback(
     (ids: number[], patch: { stars?: number; rejected?: boolean }) => {
@@ -101,6 +123,23 @@ export default function ReviewPage({ pid }: { pid: string }) {
       <div className="review-main">
         <div className="filter-bar">
           <span>{shown.length}/{videos.length} videos</span>
+          <input
+            className="filter-search"
+            placeholder="search — text or #tag"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {folders.length > 1 && (
+            <label>
+              folder{' '}
+              <select value={folder} onChange={(e) => setFolder(e.target.value)}>
+                <option value="*">all</option>
+                {folders.map((f) => (
+                  <option key={f} value={f}>{f === '' ? '(root)' : f}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             min ★{' '}
             <select value={minStars} onChange={(e) => setMinStars(Number(e.target.value))}>

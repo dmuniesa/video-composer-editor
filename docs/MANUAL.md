@@ -89,8 +89,10 @@ star rating.
   reject. Rejected clips dim out and never reach the montage bin or Claude.
 - You can also click the stars on the card directly (clicking the current
   rating clears it).
-- Filter with the top bar: minimum stars, hide rejected, sort by name / AI
-  score / stars / duration. Click any **#hashtag** to filter by it.
+- Filter with the top bar: free-text **search** (matches filename, description
+  and tags; start with `#` to search hashtags only), **subfolder** of the
+  project, minimum stars, hide rejected, sort by name / AI score / stars /
+  duration. Click any **#hashtag** to filter by it.
 
 Suggested workflow: sort by **AI score**, reject the junk with `X`, then give
 4–5 stars to the must-haves.
@@ -174,6 +176,11 @@ ruler, song row (sections + waveform + beat ticks) and your video tracks.
 ![Montage page](img/montage.png)
 
 - **Drag** a video — or one of its ranges — from the bin onto a track.
+- **Right-click** a clip in the bin for quick actions: place it (or one of its
+  ranges) at the playhead, open its detail (player, ranges, tags), jump to it
+  in Review, rate or reject it. **Double-click** opens the detail directly.
+- **Filter the bin** with the box at the top: free text, `#hashtag`, or a
+  subfolder of your project.
 - Drag a clip horizontally to move it, vertically to change tracks. Drag its
   **edges** to trim (limited by the source video's length).
 - **Snap to beats (S)** magnetizes moves/trims to beats and section boundaries.
