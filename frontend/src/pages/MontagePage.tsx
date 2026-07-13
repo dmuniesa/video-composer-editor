@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, media, fmtTime } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
+import InfoTip from '../components/InfoTip'
 import ScrubThumb from '../components/ScrubThumb'
 import StarRating from '../components/StarRating'
 import VideoDetail from '../components/VideoDetail'
@@ -53,6 +54,7 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [instructions, setInstructions] = useState('')
   const [composing, setComposing] = useState(false)
   const [composeResult, setComposeResult] = useState('')
+  const [composeOpen, setComposeOpen] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -73,6 +75,8 @@ export default function MontagePage({ pid }: { pid: string }) {
     api.getProject(pid).then((p) => {
       setComposerProvider(p.composer_provider)
       setComposerAvailable(p.composer_available)
+      // start expanded only when it can actually be used
+      setComposeOpen(p.composer_available && p.composer_provider !== 'mcp')
     }).catch(() => {})
     refreshTimeline()
   }, [pid, refreshTimeline, refreshVideos])
@@ -436,36 +440,69 @@ export default function MontagePage({ pid }: { pid: string }) {
     <div className="montage-layout">
       <div className="bin">
         <div className="compose-panel">
-          <textarea
-            value={instructions}
-            onChange={(e) => setInstructions(e.target.value)}
-            placeholder="Instructions for the AI, e.g. “use the best clips on the choruses, calm shots on the verses”"
-            rows={3}
-          />
-          <button
-            className="primary"
-            onClick={compose}
-            disabled={composing || !composerAvailable}
-            title={composerProvider === 'mcp' ? 'Composer provider is Claude via MCP — see Settings' : ''}
-          >
-            {composing ? 'Composing…' : `Auto-compose (${composerProvider})`}
-          </button>
-          {composerProvider === 'mcp' && (
-            <div className="hint">
-              Composer provider is set to Claude via MCP — compose by talking to Claude as before,
-              or switch provider in Settings.
-            </div>
-          )}
-          {composerProvider !== 'mcp' && !composerAvailable && (
-            <div className="hint">
-              Composer provider “{composerProvider}” is not available — check Settings.
-            </div>
+          <div className="compose-head" onClick={() => setComposeOpen((v) => !v)}>
+            <span className="compose-title">
+              ✨ Auto-compose
+              <span className={`chip ${composerAvailable && composerProvider !== 'mcp' ? 'ok' : ''}`}>
+                {composerProvider}
+              </span>
+            </span>
+            <InfoTip>
+              <b>AI auto-compose</b>
+              <p>
+                Writes your instructions once and the whole project (clips, song sections, beats,
+                current timeline) is sent to the composer provider, which places clips on the
+                timeline — they appear purple, live.
+              </p>
+              <p>
+                With <b>Claude via MCP</b> (the default) this button stays disabled: compose by
+                talking to Claude with the MCP server registered (see the Guide). Pick agy or an
+                OpenAI endpoint in <b>Settings → Composer provider</b> to compose from here.
+              </p>
+            </InfoTip>
+            <span className="hint">{composeOpen ? '▾' : '▸'}</span>
+          </div>
+          {composeOpen && (
+            <>
+              <textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="e.g. “best clips on the choruses, calm shots on the verses”"
+                rows={2}
+              />
+              <button
+                className="primary"
+                onClick={compose}
+                disabled={composing || !composerAvailable || composerProvider === 'mcp'}
+                title={
+                  composerProvider === 'mcp'
+                    ? 'Composer provider is Claude via MCP — see the ? help'
+                    : !composerAvailable
+                      ? `provider “${composerProvider}” unavailable — check Settings`
+                      : ''
+                }
+              >
+                {composing ? 'Composing…' : 'Compose'}
+              </button>
+            </>
           )}
           {composeResult && <div className="hint">{composeResult}</div>}
         </div>
-        <div className="hint">
-          Drag a video (full clip) or one of its ranges onto a track. Right-click for options.
-          Purple clips were placed by AI (Claude/agy/OpenAI).
+        <div className="bin-head">
+          <span className="bin-title">
+            Clips <span className="hint">{binVideos.length}</span>
+          </span>
+          <InfoTip>
+            <b>Bin tips</b>
+            <ul>
+              <li><b>Drag</b> a clip — or one of its ranges — onto a track.</li>
+              <li><b>Right-click</b> for actions: place at playhead, details, Review, rate, reject.</li>
+              <li><b>Double-click</b> opens the detail (player, ranges, tags).</li>
+              <li>Hover a thumbnail to <b>scrub</b> through the clip.</li>
+              <li>Filter with free text, <code>#hashtag</code> or a subfolder.</li>
+              <li>Purple clips on the timeline were placed by AI.</li>
+            </ul>
+          </InfoTip>
         </div>
         <div className="bin-filter">
           <input

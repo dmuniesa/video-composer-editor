@@ -504,6 +504,39 @@ kbd {
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 .ctx-rate { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 4px; }
 
+/* ---- info tip ---- */
+.infotip { position: relative; display: inline-flex; }
+.infotip-btn {
+  width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  font-size: 11px; line-height: 1; color: var(--text-dim);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.infotip-btn:hover { color: var(--accent); }
+.infotip-pop {
+  position: fixed; z-index: 70;
+  width: 280px; max-height: 60vh; overflow: auto;
+  padding: 10px 12px; font-size: 12px; line-height: 1.5;
+  color: var(--text); font-weight: 400; text-align: left; cursor: auto;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.infotip-pop p { margin: 6px 0 0; color: var(--text-dim); }
+.infotip-pop ul { margin: 6px 0 0; padding-left: 16px; color: var(--text-dim); }
+.infotip-pop li { margin-bottom: 3px; }
+.infotip-pop code, .infotip-pop kbd {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 4px; font-size: 11px;
+}
+
+/* ---- compose panel / bin header ---- */
+.compose-head {
+  display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+}
+.compose-title { flex: 1; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.bin-head { display: flex; align-items: center; gap: 6px; }
+.bin-title { flex: 1; font-size: 13px; font-weight: 600; }
+.bin-title .hint { font-weight: 400; }
+
 /* ---- bin filter ---- */
 .bin-filter { display: flex; gap: 6px; align-items: center; }
 .bin-filter input { flex: 1; min-width: 0; font-size: 12px; padding: 4px 8px; }

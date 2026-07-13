@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { Video } from '../lib/types'
+import InfoTip from '../components/InfoTip'
 import VideoCard from '../components/VideoCard'
 import VideoDetail from '../components/VideoDetail'
 import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
@@ -165,7 +166,16 @@ export default function ReviewPage({ pid }: { pid: string }) {
               #{tagFilter} ✕
             </span>
           )}
-          <span className="hint">click = select · shift/ctrl = multi · 1-5 rate · X reject · dbl-click open</span>
+          <InfoTip>
+            <b>Selection & shortcuts</b>
+            <ul>
+              <li><b>Click</b> selects · <b>Shift/Ctrl-click</b> multi-select.</li>
+              <li><kbd>1</kbd>–<kbd>5</kbd> rate the selection · <kbd>0</kbd> clear.</li>
+              <li><kbd>X</kbd> toggle reject · <kbd>Esc</kbd> clear selection.</li>
+              <li><b>Double-click</b> opens the player to mark in/out ranges.</li>
+              <li>Hover a thumbnail to scrub · click a <b>#hashtag</b> to filter.</li>
+            </ul>
+          </InfoTip>
         </div>
 
         {videos.length === 0 ? (
