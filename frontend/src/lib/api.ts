@@ -35,8 +35,10 @@ export const api = {
   createProject: (video_dir: string) =>
     req<ProjectInfo>('/api/projects', { method: 'POST', body: JSON.stringify({ video_dir }) }),
   getProject: (pid: string) => req<ProjectInfo>(`/api/projects/${pid}`),
-  updateProject: (pid: string, patch: { composition_fps?: number }) =>
-    req<ProjectInfo>(`/api/projects/${pid}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  updateProject: (
+    pid: string,
+    patch: { composition_fps?: number; composition_width?: number; composition_height?: number },
+  ) => req<ProjectInfo>(`/api/projects/${pid}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   scan: (pid: string) =>
     req<{ added: number; removed: number; total: number }>(`/api/projects/${pid}/scan`, {
       method: 'POST',
@@ -162,4 +164,16 @@ export function fmtTime(s: number): string {
   const m = Math.floor(s / 60)
   const sec = s - m * 60
   return `${m}:${sec.toFixed(1).padStart(4, '0')}`
+}
+
+export function fmtBytes(n: number): string {
+  if (!n) return '—'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0
+  let v = n
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`
 }

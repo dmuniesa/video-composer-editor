@@ -25,6 +25,8 @@ class Project(Base):
     video_dir: Mapped[str] = mapped_column(String)
     song_path: Mapped[str | None] = mapped_column(String, nullable=True)
     composition_fps: Mapped[float] = mapped_column(Float, default=25.0)
+    composition_width: Mapped[int] = mapped_column(Integer, default=1920)
+    composition_height: Mapped[int] = mapped_column(Integer, default=1080)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 

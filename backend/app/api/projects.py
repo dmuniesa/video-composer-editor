@@ -98,6 +98,8 @@ def project_get(pid: str) -> dict:
             "name": project.name if project else video_dir.name,
             "video_dir": str(video_dir),
             "composition_fps": (project.composition_fps if project else None) or 25.0,
+            "composition_width": (project.composition_width if project else None) or 1920,
+            "composition_height": (project.composition_height if project else None) or 1080,
             "song_path": song.path if song else None,
             "song_status": song.status if song else None,
             "video_count": total,
@@ -111,6 +113,8 @@ def project_get(pid: str) -> dict:
 
 class ProjectUpdate(BaseModel):
     composition_fps: float | None = None
+    composition_width: int | None = None
+    composition_height: int | None = None
 
 
 @router.patch("/projects/{pid}")
@@ -125,6 +129,14 @@ def project_update(pid: str, body: ProjectUpdate) -> dict:
             if not (10 <= body.composition_fps <= 120):
                 raise HTTPException(400, "composition_fps must be between 10 and 120")
             project.composition_fps = body.composition_fps
+        if body.composition_width is not None:
+            if not (16 <= body.composition_width <= 8192):
+                raise HTTPException(400, "composition_width must be between 16 and 8192")
+            project.composition_width = body.composition_width
+        if body.composition_height is not None:
+            if not (16 <= body.composition_height <= 8192):
+                raise HTTPException(400, "composition_height must be between 16 and 8192")
+            project.composition_height = body.composition_height
         db.commit()
     return project_get(pid)
 

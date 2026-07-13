@@ -1,15 +1,24 @@
+import { useState } from 'react'
+
 interface Props {
   stars: number
   onChange?: (stars: number) => void
 }
 
 export default function StarRating({ stars, onChange }: Props) {
+  const [hover, setHover] = useState(0)
+  // While hovering, preview the rating the click would set.
+  const active = hover || stars
   return (
-    <span className={`stars ${onChange ? '' : 'readonly'}`}>
+    <span
+      className={`stars ${onChange ? '' : 'readonly'}`}
+      onMouseLeave={() => setHover(0)}
+    >
       {[1, 2, 3, 4, 5].map((n) => (
         <span
           key={n}
-          className={`star ${n <= stars ? 'on' : ''}`}
+          className={`star ${n <= active ? 'on' : ''} ${hover ? 'preview' : ''}`}
+          onMouseEnter={onChange ? () => setHover(n) : undefined}
           onClick={(e) => {
             e.stopPropagation()
             // Clicking the current rating clears it, Lightroom-style.

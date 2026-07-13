@@ -42,6 +42,8 @@ def build_fcpxml(
     tracks: list[dict],
     song: dict | None,
     sequence_fps: float = 0.0,
+    sequence_width: int = 0,
+    sequence_height: int = 0,
 ) -> str:
     """Build the project XML. Takes the same inputs as xmeml.build_xmeml:
 
@@ -75,8 +77,11 @@ def build_fcpxml(
         + [1]
     )
 
-    sizes = [(v["width"], v["height"]) for v in videos.values() if v.get("width")]
-    width, height = (Counter(sizes).most_common(1)[0][0] if sizes else (1920, 1080))
+    if sequence_width and sequence_height:
+        width, height = sequence_width, sequence_height
+    else:
+        sizes = [(v["width"], v["height"]) for v in videos.values() if v.get("width")]
+        width, height = (Counter(sizes).most_common(1)[0][0] if sizes else (1920, 1080))
 
     root = ET.Element("fcpxml", version="1.9")
     resources = ET.SubElement(root, "resources")

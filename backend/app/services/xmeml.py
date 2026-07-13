@@ -80,6 +80,8 @@ def build_xmeml(
     tracks: list[dict],
     song: dict | None,
     sequence_fps: float = 0.0,
+    sequence_width: int = 0,
+    sequence_height: int = 0,
 ) -> str:
     """Build the project XML.
 
@@ -87,6 +89,7 @@ def build_xmeml(
     tracks: [{name, clips: [{video_id, timeline_start, source_in, source_out, speed?}]}]
     song:   {path, duration} or None
     sequence_fps: composition frame rate; falls back to the dominant source fps
+    sequence_width/height: composition frame size; falls back to the dominant source size
     """
     fps_values = [round(v["fps"], 3) for v in videos.values() if v.get("fps")]
     dominant_fps = Counter(fps_values).most_common(1)[0][0] if fps_values else 25.0
@@ -118,8 +121,11 @@ def build_xmeml(
     fmt = _el(video_el, "format")
     sc = _el(fmt, "samplecharacteristics")
     _rate_el(sc, timebase, ntsc)
-    sizes = [(v["width"], v["height"]) for v in videos.values() if v.get("width")]
-    width, height = (Counter(sizes).most_common(1)[0][0] if sizes else (1920, 1080))
+    if sequence_width and sequence_height:
+        width, height = sequence_width, sequence_height
+    else:
+        sizes = [(v["width"], v["height"]) for v in videos.values() if v.get("width")]
+        width, height = (Counter(sizes).most_common(1)[0][0] if sizes else (1920, 1080))
     _el(sc, "width", str(width))
     _el(sc, "height", str(height))
     _el(sc, "anamorphic", "FALSE")

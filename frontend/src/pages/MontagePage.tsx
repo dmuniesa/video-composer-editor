@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { api, media, fmtTime } from '../lib/api'
+import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
@@ -14,6 +14,22 @@ import { sectionColor } from './MusicPage'
 const RULER_H = 26
 const TRACK_H = 64
 const SNAP_PX = 8
+
+const SEQ_RATIOS = [
+  { label: '16:9', w: 16, h: 9 },
+  { label: '9:16', w: 9, h: 16 },
+  { label: '4:3', w: 4, h: 3 },
+  { label: '1:1', w: 1, h: 1 },
+  { label: '21:9', w: 21, h: 9 },
+  { label: '4:5', w: 4, h: 5 },
+]
+const SEQ_TIERS = [
+  { label: '4K', v: 2160 },
+  { label: '1440p', v: 1440 },
+  { label: '1080p', v: 1080 },
+  { label: '720p', v: 720 },
+  { label: '480p', v: 480 },
+]
 
 interface DragState {
   clipId: number
@@ -42,6 +58,13 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [clipCtx, setClipCtx] = useState<{ x: number; y: number; clipId: number } | null>(null)
   const [speedInput, setSpeedInput] = useState('1')
   const [compFps, setCompFps] = useState(25)
+  const [compW, setCompW] = useState(1920)
+  const [compH, setCompH] = useState(1080)
+  const [seqOpen, setSeqOpen] = useState(false)
+  const [binView, setBinView] = useState<'list' | 'details' | 'grid'>(
+    () => (localStorage.getItem('montageBinView') as 'list' | 'details' | 'grid') || 'list',
+  )
+  const [binWidth, setBinWidth] = useState(() => Number(localStorage.getItem('montageBinWidth')) || 300)
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dropTrack, setDropTrack] = useState<number | null>(null)
   const [playhead, setPlayhead] = useState(0)
@@ -79,6 +102,8 @@ export default function MontagePage({ pid }: { pid: string }) {
       setComposerProvider(p.composer_provider)
       setComposerAvailable(p.composer_available)
       setCompFps(p.composition_fps || 25)
+      setCompW(p.composition_width || 1920)
+      setCompH(p.composition_height || 1080)
       // start expanded only when it can actually be used
       setComposeOpen(p.composer_available && p.composer_provider !== 'mcp')
     }).catch(() => {})
@@ -119,6 +144,50 @@ export default function MontagePage({ pid }: { pid: string }) {
     const t = setTimeout(() => setToast(''), 4000)
     return () => clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    localStorage.setItem('montageBinView', binView)
+  }, [binView])
+  useEffect(() => {
+    localStorage.setItem('montageBinWidth', String(binWidth))
+  }, [binWidth])
+
+  // ---- composition frame size: resolution tier × aspect ratio ----
+  const applySeqSize = (tier: number, ratioW: number, ratioH: number) => {
+    // the tier is the short edge; the ratio decides which side is long
+    let w: number
+    let h: number
+    if (ratioW >= ratioH) {
+      h = tier
+      w = Math.round((tier * ratioW) / ratioH / 2) * 2
+    } else {
+      w = tier
+      h = Math.round((tier * ratioH) / ratioW / 2) * 2
+    }
+    setCompW(w)
+    setCompH(h)
+    api.updateProject(pid, { composition_width: w, composition_height: h }).catch((e) => setToast(e.message))
+  }
+  const curTier = Math.min(compW, compH)
+  const curRatio = compW / compH
+  const nearestRatio = SEQ_RATIOS.reduce((best, r) =>
+    Math.abs(r.w / r.h - curRatio) < Math.abs(best.w / best.h - curRatio) ? r : best,
+  )
+
+  const startBinResize = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = binWidth
+    const move = (ev: PointerEvent) => {
+      setBinWidth(Math.max(220, Math.min(720, startW + ev.clientX - startX)))
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
 
   const duration = Math.max(
     song?.duration ?? 0,
@@ -462,7 +531,7 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   return (
     <div className="montage-layout">
-      <div className="bin">
+      <div className={`bin bin-view-${binView}`} style={{ width: binWidth }}>
         <div className="compose-panel">
           <div className="compose-head" onClick={() => setComposeOpen((v) => !v)}>
             <span className="compose-title">
@@ -516,6 +585,11 @@ export default function MontagePage({ pid }: { pid: string }) {
           <span className="bin-title">
             Clips <span className="hint">{binVideos.length}</span>
           </span>
+          <div className="bin-view-toggle">
+            <button className={binView === 'list' ? 'active' : ''} title="compact list" onClick={() => setBinView('list')}>☰</button>
+            <button className={binView === 'details' ? 'active' : ''} title="list with details" onClick={() => setBinView('details')}>≣</button>
+            <button className={binView === 'grid' ? 'active' : ''} title="large thumbnails" onClick={() => setBinView('grid')}>▦</button>
+          </div>
           <InfoTip>
             <b>Bin tips</b>
             <ul>
@@ -558,57 +632,72 @@ export default function MontagePage({ pid }: { pid: string }) {
             </span>
           )}
         </div>
-        {binVideos.map((v) => (
-          <div key={v.id} onContextMenu={openCtxMenu(v.id)}>
-            <div
-              className="bin-item"
-              draggable
-              onDoubleClick={() => setDetailId(v.id)}
-              onDragStart={(e) =>
-                e.dataTransfer.setData(
-                  'application/x-montage',
-                  JSON.stringify({ video_id: v.id, t_in: 0, t_out: v.duration }),
-                )
-              }
-            >
-              <ScrubThumb pid={pid} videoId={v.id} duration={v.duration} />
-              <div className="meta">
-                <div className="name" title={v.rel_path}>{v.filename}</div>
-                <div className="sub">
-                  {'★'.repeat(v.stars)}{v.ai_score != null ? ` · AI ${v.ai_score}` : ''} · {fmtTime(v.duration)}
-                </div>
-                <div className="sub">
-                  {v.hashtags.slice(0, 3).map((t) => (
-                    <span key={t} className="bin-tag" onClick={() => setBinQuery(`#${t}`)}>
-                      #{t}{' '}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            {v.ranges.map((r) => (
+        <div className={`bin-list bin-view-${binView}`}>
+          {binVideos.map((v) => (
+            <div key={v.id} className="bin-entry" onContextMenu={openCtxMenu(v.id)}>
               <div
-                key={r.id}
-                className="bin-range"
+                className="bin-item"
                 draggable
+                onDoubleClick={() => setDetailId(v.id)}
                 onDragStart={(e) =>
                   e.dataTransfer.setData(
                     'application/x-montage',
-                    JSON.stringify({ video_id: v.id, t_in: r.t_in, t_out: r.t_out }),
+                    JSON.stringify({ video_id: v.id, t_in: 0, t_out: v.duration }),
                   )
                 }
               >
-                ◳ {r.label || 'range'} {fmtTime(r.t_in)}–{fmtTime(r.t_out)}
+                <ScrubThumb pid={pid} videoId={v.id} duration={v.duration}>
+                  {binView === 'grid' && <span className="bin-grid-dur">{fmtTime(v.duration)}</span>}
+                </ScrubThumb>
+                <div className="meta">
+                  <div className="name" title={v.rel_path}>{v.filename}</div>
+                  <div className="sub">
+                    {'★'.repeat(v.stars)}{v.ai_score != null ? ` · AI ${v.ai_score}` : ''} · {fmtTime(v.duration)}
+                  </div>
+                  {binView === 'details' && (
+                    <div className="sub">
+                      {v.width > 0 ? `${v.width}×${v.height}` : '—'}
+                      {v.fps > 0 ? ` · ${Math.round(v.fps)} fps` : ''}
+                      {v.codec ? ` · ${v.codec}` : ''}
+                      {v.size > 0 ? ` · ${fmtBytes(v.size)}` : ''}
+                    </div>
+                  )}
+                  <div className="sub">
+                    {v.hashtags.slice(0, 3).map((t) => (
+                      <span key={t} className="bin-tag" onClick={() => setBinQuery(`#${t}`)}>
+                        #{t}{' '}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        ))}
+              {binView !== 'grid' &&
+                v.ranges.map((r) => (
+                  <div
+                    key={r.id}
+                    className="bin-range"
+                    draggable
+                    onDragStart={(e) =>
+                      e.dataTransfer.setData(
+                        'application/x-montage',
+                        JSON.stringify({ video_id: v.id, t_in: r.t_in, t_out: r.t_out }),
+                      )
+                    }
+                  >
+                    ◳ {r.label || 'range'} {fmtTime(r.t_in)}–{fmtTime(r.t_out)}
+                  </div>
+                ))}
+            </div>
+          ))}
+        </div>
         {binVideos.length === 0 && kept.length > 0 && (
           <div className="hint" style={{ textAlign: 'center', padding: 12 }}>
             no clips match the filter
           </div>
         )}
       </div>
+
+      <div className="bin-resizer" onPointerDown={startBinResize} title="drag to resize the clip list" />
 
       <div className="montage-main">
         <div className="montage-toolbar">
@@ -626,21 +715,60 @@ export default function MontagePage({ pid }: { pid: string }) {
               − track
             </button>
           )}
-          <label title="composition frame rate — written to the exported sequence">
-            seq fps{' '}
-            <select
-              value={compFps}
-              onChange={(e) => {
-                const fps = Number(e.target.value)
-                setCompFps(fps)
-                api.updateProject(pid, { composition_fps: fps }).catch((err) => setToast(err.message))
-              }}
-            >
-              {[23.976, 24, 25, 29.97, 30, 50, 59.94, 60].map((f) => (
-                <option key={f} value={f}>{f}</option>
-              ))}
-            </select>
-          </label>
+          <div className="seq-menu">
+            <button className="small" onClick={() => setSeqOpen((v) => !v)} title="composition settings — written to the exported sequence">
+              ⚙ {compW}×{compH} · {compFps} fps ▾
+            </button>
+            {seqOpen && (
+              <>
+                <div className="seq-overlay" onMouseDown={() => setSeqOpen(false)} />
+                <div className="seq-dropdown">
+                  <div className="seq-title">Sequence</div>
+                  <label className="seq-row">
+                    <span>Frame rate</span>
+                    <select
+                      value={compFps}
+                      onChange={(e) => {
+                        const fps = Number(e.target.value)
+                        setCompFps(fps)
+                        api.updateProject(pid, { composition_fps: fps }).catch((err) => setToast(err.message))
+                      }}
+                    >
+                      {[23.976, 24, 25, 29.97, 30, 50, 59.94, 60].map((f) => (
+                        <option key={f} value={f}>{f} fps</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="seq-row">
+                    <span>Resolution</span>
+                    <select
+                      value={curTier}
+                      onChange={(e) => applySeqSize(Number(e.target.value), nearestRatio.w, nearestRatio.h)}
+                    >
+                      {SEQ_TIERS.map((t) => (
+                        <option key={t.v} value={t.v}>{t.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="seq-row">
+                    <span>Aspect ratio</span>
+                    <select
+                      value={nearestRatio.label}
+                      onChange={(e) => {
+                        const r = SEQ_RATIOS.find((x) => x.label === e.target.value)!
+                        applySeqSize(curTier, r.w, r.h)
+                      }}
+                    >
+                      {SEQ_RATIOS.map((r) => (
+                        <option key={r.label} value={r.label}>{r.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="seq-row hint"><span>Output size</span><span>{compW} × {compH}</span></div>
+                </div>
+              </>
+            )}
+          </div>
           <span className="spacer" style={{ flex: 1 }} />
           <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
           <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>

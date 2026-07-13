@@ -233,11 +233,15 @@ def test_compose_endpoint(client, project):
 def test_clip_speed_split_and_composition_fps(client, project):
     pid, _videos_dir = project
 
-    # default composition fps + PATCH round-trip
-    assert client.get(f"/api/projects/{pid}").json()["composition_fps"] == 25.0
-    res = client.patch(f"/api/projects/{pid}", json={"composition_fps": 50})
+    # default composition settings + PATCH round-trip
+    info = client.get(f"/api/projects/{pid}").json()
+    assert info["composition_fps"] == 25.0
+    assert (info["composition_width"], info["composition_height"]) == (1920, 1080)
+    res = client.patch(f"/api/projects/{pid}", json={"composition_fps": 50, "composition_width": 1080, "composition_height": 1920})
     assert res.status_code == 200 and res.json()["composition_fps"] == 50.0
+    assert (res.json()["composition_width"], res.json()["composition_height"]) == (1080, 1920)
     assert client.patch(f"/api/projects/{pid}", json={"composition_fps": 500}).status_code == 400
+    assert client.patch(f"/api/projects/{pid}", json={"composition_width": 4}).status_code == 400
 
     client.post(f"/api/projects/{pid}/scan")
     wait_until(
@@ -273,6 +277,8 @@ def test_clip_speed_split_and_composition_fps(client, project):
     assert res.status_code == 200
     root = ET.fromstring(client.get(f"/api/projects/{pid}/export.xml").text)
     assert root.findtext("sequence/rate/timebase") == "50"
+    sc = root.find("sequence/media/video/format/samplecharacteristics")
+    assert (sc.findtext("width"), sc.findtext("height")) == ("1080", "1920")
     items = root.findall("sequence/media/video/track/clipitem")
     effects = [i.findtext("filter/effect/effectid") for i in items]
     assert effects == [None, "timeremap"]  # first back at 1x, right half still 0.5x

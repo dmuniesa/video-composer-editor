@@ -3,6 +3,8 @@ export interface ProjectInfo {
   name: string
   video_dir: string
   composition_fps: number
+  composition_width: number
+  composition_height: number
   song_path: string | null
   song_status: string | null
   video_count: number

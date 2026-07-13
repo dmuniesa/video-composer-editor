@@ -28,6 +28,8 @@ def _gather(pid: str) -> dict:
         return {
             "sequence_name": f"{video_dir.name} montage",
             "sequence_fps": (project.composition_fps if project else None) or 25.0,
+            "sequence_width": (project.composition_width if project else None) or 0,
+            "sequence_height": (project.composition_height if project else None) or 0,
             "videos": {
                 v.id: {
                     "path": str(video_dir / v.rel_path),

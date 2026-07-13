@@ -366,6 +366,10 @@ kbd {
   position: absolute; right: 6px; top: 6px; background: rgba(0,0,0,0.55);
   padding: 1px 5px; border-radius: 4px; font-size: 10px; color: var(--text-dim);
 }
+.video-card .dims {
+  position: absolute; right: 6px; top: 24px; background: rgba(0,0,0,0.55);
+  padding: 1px 5px; border-radius: 4px; font-size: 10px; color: var(--text-dim);
+}
 .video-card .status-chip {
   position: absolute; left: 6px; top: 6px; font-size: 10px; text-transform: uppercase;
   background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; color: var(--text-dim);
@@ -381,8 +385,10 @@ kbd {
 .ai-score b { color: var(--ok); }
 
 .stars { display: inline-flex; gap: 1px; }
-.stars .star { cursor: pointer; font-size: 16px; color: var(--border); user-select: none; }
+.stars .star { cursor: pointer; font-size: 16px; color: var(--border); user-select: none; transition: color 0.08s, transform 0.08s; }
 .stars .star.on { color: var(--star); }
+/* preview shows the rating a click would set, dimmer than a committed one */
+.stars .star.on.preview { color: var(--star); opacity: 0.65; transform: scale(1.12); }
 .stars.readonly .star { cursor: default; }
 
 /* ---- Detail drawer ---- */
@@ -421,8 +427,17 @@ kbd {
 /* ---- Montage page ---- */
 .montage-layout { display: flex; height: 100%; }
 .bin {
-  width: 300px; border-right: 1px solid var(--border); overflow: auto; padding: 10px;
+  flex: 0 0 auto; width: 300px; overflow: auto; padding: 10px;
   display: flex; flex-direction: column; gap: 8px; background: var(--bg-panel);
+}
+.bin-resizer {
+  flex: 0 0 6px; cursor: col-resize; background: var(--border);
+  transition: background 0.1s;
+}
+.bin-resizer:hover { background: var(--accent); }
+.bin-list { display: flex; flex-direction: column; gap: 8px; }
+.bin-list.bin-view-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;
 }
 .bin-item {
   display: flex; gap: 8px; background: var(--bg-elevated); border: 1px solid var(--border);
@@ -438,6 +453,22 @@ kbd {
 .bin-item .meta .name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bin-item .meta .sub { font-size: 11px; color: var(--text-dim); }
 .bin-range { margin-left: 12px; font-size: 11px; color: var(--accent); cursor: grab; padding: 2px 6px; }
+
+/* grid view: a big thumbnail card, name underneath */
+.bin-view-grid .bin-item { flex-direction: column; align-items: stretch; gap: 6px; padding: 4px; }
+.bin-view-grid .bin-item .thumb { width: 100%; }
+.bin-view-grid .bin-item .meta .name { white-space: normal; }
+.bin-grid-dur {
+  position: absolute; right: 3px; bottom: 3px; font-size: 9px; padding: 0 4px;
+  border-radius: 3px; background: rgba(0,0,0,0.7);
+}
+
+.bin-view-toggle { display: inline-flex; gap: 2px; }
+.bin-view-toggle button {
+  padding: 2px 6px; font-size: 13px; line-height: 1.2; background: none;
+  border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim);
+}
+.bin-view-toggle button.active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
 .compose-panel {
   display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px;
   margin-bottom: 8px; border-bottom: 1px solid var(--border);
@@ -485,6 +516,20 @@ kbd {
   color: var(--text); text-decoration: none; font-size: 13px;
 }
 .export-dropdown a:hover { background: var(--accent-soft); }
+
+/* ---- sequence settings dropdown ---- */
+.seq-menu { position: relative; }
+.seq-overlay { position: fixed; inset: 0; z-index: 29; }
+.seq-dropdown {
+  position: absolute; left: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 240px; padding: 8px;
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.seq-title { font-size: 12px; font-weight: 600; color: var(--text-dim); padding: 0 2px 2px; }
+.seq-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; }
+.seq-row select { font-size: 12px; padding: 3px 6px; min-width: 96px; }
 
 /* ---- bin context menu ---- */
 .ctx-overlay { position: fixed; inset: 0; z-index: 60; }
