@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
-import type { Video } from '../lib/types'
+import type { ProjectInfo, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
 import VideoCard from '../components/VideoCard'
 import VideoDetail from '../components/VideoDetail'
 import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
 
-export default function ReviewPage({ pid }: { pid: string }) {
+export default function ReviewPage({ pid, project }: { pid: string; project: ProjectInfo | null }) {
   const [videos, setVideos] = useState<Video[]>([])
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [lastClicked, setLastClicked] = useState<number | null>(null)
@@ -101,6 +101,23 @@ export default function ReviewPage({ pid }: { pid: string }) {
     [pid, refresh],
   )
 
+  const analyze = useCallback(
+    (ids: number[]) => {
+      if (ids.length === 0) return
+      api
+        .analyze(pid, ids)
+        .then(({ queued }) =>
+          setToast(
+            queued > 0
+              ? `Analyzing ${queued} clip${queued === 1 ? '' : 's'} with AI…`
+              : 'Those clips are already analyzed — nothing to do.',
+          ),
+        )
+        .catch((e) => setToast(e.message))
+    },
+    [pid],
+  )
+
   const clickCard = (video: Video, e: React.MouseEvent) => {
     const next = new Set(selected)
     if (e.shiftKey && lastClicked != null) {
@@ -167,6 +184,15 @@ export default function ReviewPage({ pid }: { pid: string }) {
       <div className="review-main">
         <div className="filter-bar">
           <span>{shown.length}/{videos.length} videos</span>
+          {project?.ai_available && selected.size > 0 && (
+            <button
+              className="primary small"
+              title={`Analyze the ${selected.size} selected clip${selected.size === 1 ? '' : 's'} with AI`}
+              onClick={() => analyze([...selected])}
+            >
+              ✨ Analyze {selected.size} with AI
+            </button>
+          )}
           <input
             className="filter-search"
             placeholder="search — text or #tag"
@@ -223,6 +249,7 @@ export default function ReviewPage({ pid }: { pid: string }) {
             <b>Selection & shortcuts</b>
             <ul>
               <li><b>Click</b> a clip opens the player · <b>Shift/Ctrl-click</b> multi-select.</li>
+              <li>Select clips, then <b>✨ Analyze with AI</b> to describe & score just those.</li>
               <li><kbd>1</kbd>–<kbd>5</kbd> rate the selection · <kbd>0</kbd> clear.</li>
               <li><kbd>X</kbd> toggle reject · <kbd>Del</kbd> remove from project · <kbd>Esc</kbd> clear selection.</li>
               <li>In the player, <kbd>←</kbd>/<kbd>→</kbd> step to the previous/next clip.</li>
@@ -259,6 +286,7 @@ export default function ReviewPage({ pid }: { pid: string }) {
         <VideoDetail
           pid={pid}
           video={open}
+          aiAvailable={project?.ai_available}
           onClose={() => setOpenId(null)}
           onChanged={refresh}
           onRate={(stars) => rate([open.id], { stars })}

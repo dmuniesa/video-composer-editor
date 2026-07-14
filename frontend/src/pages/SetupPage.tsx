@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, fmtTime } from '../lib/api'
-import type { ProjectInfo, SongInfo, Source } from '../lib/types'
+import type { ProjectInfo, SongInfo, Source, Video } from '../lib/types'
 import FileBrowser from '../components/FileBrowser'
 
 interface Props {
@@ -30,8 +30,10 @@ export default function SetupPage({ project, onChanged }: Props) {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [song, setSong] = useState<SongInfo | null>(null)
-  const [reviewed, setReviewed] = useState<{ rated: number; total: number } | null>(null)
+  const [videos, setVideos] = useState<Video[]>([])
   const [placedClips, setPlacedClips] = useState<number | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [picked, setPicked] = useState<Set<number>>(new Set())
 
   const pid = project?.id
   const songStatus = project?.song_status
@@ -46,7 +48,7 @@ export default function SetupPage({ project, onChanged }: Props) {
     if (!pid) return
     api
       .videos(pid)
-      .then((vs) => setReviewed({ rated: vs.filter((v) => v.stars > 0 || v.rejected).length, total: vs.length }))
+      .then((vs) => setVideos([...vs].sort((a, b) => a.filename.localeCompare(b.filename))))
       .catch(() => {})
     api
       .timeline(pid)
@@ -132,6 +134,26 @@ export default function SetupPage({ project, onChanged }: Props) {
   const total = project.video_count
   const ready = count('ready')
   const working = count('extracting') + count('analyzing') + count('pending') + count('extracted')
+  const reviewedCount = videos.filter((v) => v.stars > 0 || v.rejected).length
+
+  const togglePicked = (id: number) =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  const analyze = (ids?: number[]) => {
+    setError('')
+    api
+      .analyze(project.id, ids)
+      .then(() => {
+        setPicked(new Set())
+        return onChanged()
+      })
+      .catch((e) => setError(e.message))
+  }
 
   const steps: { label: string; detail: string; done: boolean; to?: string }[] = [
     {
@@ -162,8 +184,8 @@ export default function SetupPage({ project, onChanged }: Props) {
     },
     {
       label: 'Review & rate your clips',
-      detail: reviewed && reviewed.rated > 0 ? `${reviewed.rated} of ${reviewed.total} clips rated or rejected` : 'cull the junk, star the keepers',
-      done: !!reviewed && reviewed.rated > 0,
+      detail: reviewedCount > 0 ? `${reviewedCount} of ${videos.length} clips rated or rejected` : 'cull the junk, star the keepers',
+      done: reviewedCount > 0,
       to: `/p/${project.id}/review`,
     },
     {
@@ -323,14 +345,15 @@ export default function SetupPage({ project, onChanged }: Props) {
         </div>
         <p className="hint" style={{ marginTop: 0 }}>
           The AI writes a description, a 1–10 score and hashtags for every clip — the raw material
-          for sorting on the Review page and for AI auto-placement.
+          for sorting on the Review page and for AI auto-placement. It runs only when you ask:
+          analyze every not-yet-analyzed clip, or expand the list to pick just the ones you want.
         </p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             className="primary"
             disabled={!project.ai_available}
             title={project.ai_available ? `provider: ${project.ai_provider}` : 'No AI provider configured'}
-            onClick={() => api.analyze(project.id).then(onChanged).catch((e) => setError(e.message))}
+            onClick={() => analyze()}
           >
             Analyze all with AI{project.ai_provider ? ` (${project.ai_provider})` : ''}
           </button>
@@ -338,6 +361,61 @@ export default function SetupPage({ project, onChanged }: Props) {
             <Link to={`/p/${project.id}/settings`}>Configure a provider in Settings →</Link>
           )}
         </div>
+
+        {project.ai_available && total > 0 && (
+          <div className="pick-block">
+            <button
+              className="pick-toggle"
+              aria-expanded={pickerOpen}
+              onClick={() => setPickerOpen((o) => !o)}
+            >
+              <span className="pick-caret" aria-hidden>{pickerOpen ? '▾' : '▸'}</span>
+              Choose specific clips to analyze
+              <span className="hint">
+                — {picked.size > 0 ? `${picked.size} selected` : `${total} clip${total === 1 ? '' : 's'}`}
+              </span>
+            </button>
+            {pickerOpen && (
+              <div className="pick-panel">
+                <div className="pick-actions">
+                  <button className="small" onClick={() => setPicked(new Set(videos.map((v) => v.id)))}>All</button>
+                  <button className="small" onClick={() => setPicked(new Set())}>None</button>
+                  <button
+                    className="small"
+                    title="Select every clip that has no AI description yet"
+                    onClick={() => setPicked(new Set(videos.filter((v) => v.status !== 'ready').map((v) => v.id)))}
+                  >
+                    Un-analyzed
+                  </button>
+                  <span className="pick-spacer" />
+                  <button className="primary small" disabled={picked.size === 0} onClick={() => analyze([...picked])}>
+                    Analyze {picked.size || ''} selected
+                  </button>
+                </div>
+                <ul className="pick-list">
+                  {videos.map((v) => (
+                    <li key={v.id}>
+                      <label>
+                        <input type="checkbox" checked={picked.has(v.id)} onChange={() => togglePicked(v.id)} />
+                        <span className="pick-name" title={v.rel_path}>{v.filename}</span>
+                        {v.status === 'ready' ? (
+                          <span className="chip ok">{v.ai_score != null ? `AI ${v.ai_score}/10` : 'analyzed'}</span>
+                        ) : v.status === 'analyzing' ? (
+                          <span className="chip">analyzing…</span>
+                        ) : v.status === 'error' ? (
+                          <span className="chip danger">error</span>
+                        ) : (
+                          <span className="chip">not analyzed</span>
+                        )}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         {!project.ai_available && (
           <p className="hint" style={{ marginBottom: 0 }}>
             Install the Antigravity CLI (<code>agy</code>) and sign in, or configure an

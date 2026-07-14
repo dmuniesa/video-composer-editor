@@ -6,6 +6,7 @@ import StarRating from './StarRating'
 interface Props {
   pid: string
   video: Video
+  aiAvailable?: boolean
   onClose: () => void
   onChanged: () => void
   onRate: (stars: number) => void
@@ -15,7 +16,7 @@ interface Props {
 
 /** Detail drawer: player + trim bar with in/out handles over a filmstrip.
  *  Keyboard: I = set in, O = set out, Enter = save range, L = loop range. */
-export default function VideoDetail({ pid, video, onClose, onChanged, onRate, onReject, onDelete }: Props) {
+export default function VideoDetail({ pid, video, aiAvailable, onClose, onChanged, onRate, onReject, onDelete }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
   const [playhead, setPlayhead] = useState(0)
@@ -203,7 +204,19 @@ export default function VideoDetail({ pid, video, onClose, onChanged, onRate, on
         </div>
 
         <div className="panel">
-          <h2>AI analysis {video.ai_score != null && <span className="ai-score">score <b>{video.ai_score}</b>/10</span>}</h2>
+          <div className="panel-title-row">
+            <h2>AI analysis {video.ai_score != null && <span className="ai-score">score <b>{video.ai_score}</b>/10</span>}</h2>
+            {aiAvailable && (
+              <button
+                className="primary small"
+                disabled={video.status === 'analyzing'}
+                title={video.description ? 'Re-run the AI analysis for this clip' : 'Describe & score this clip with AI'}
+                onClick={() => api.analyze(pid, [video.id], !!video.description).then(onChanged).catch(() => {})}
+              >
+                {video.status === 'analyzing' ? 'Analyzing…' : video.description ? '✨ Re-analyze' : '✨ Analyze with AI'}
+              </button>
+            )}
+          </div>
           <p style={{ margin: '4px 0' }}>{video.description || <span className="hint">No description yet.</span>}</p>
           {editTags ? (
             <div style={{ display: 'flex', gap: 8 }}>

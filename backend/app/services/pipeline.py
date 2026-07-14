@@ -123,7 +123,10 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
             finally:
                 broadcaster.publish(pid, "video", {"id": video_id})
 
-        queue_analysis_job(pid, video_dir, video_id)
+        # AI analysis is not triggered automatically: the clip stops at
+        # "extracted" and the user chooses when to run it (Setup → "Analyze all
+        # with AI") and which clips (Review → "Analyze selected"). This lets them
+        # cull junk footage before spending AI calls on it.
 
     jobs.submit(pid, "media", f"media #{video_id}", work, pool="media", video_id=video_id)
 

@@ -59,7 +59,7 @@ function ProjectShell() {
       <main className="app-main">
         <Routes>
           <Route path="setup" element={<SetupPage project={project} onChanged={refreshProject} />} />
-          <Route path="review" element={<ReviewPage pid={pid} />} />
+          <Route path="review" element={<ReviewPage pid={pid} project={project} />} />
           <Route path="music" element={<MusicPage pid={pid} />} />
           <Route path="montage" element={<MontagePage pid={pid} />} />
           <Route path="guide" element={<GuidePage />} />

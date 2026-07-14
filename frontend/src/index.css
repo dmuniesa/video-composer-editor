@@ -294,6 +294,35 @@ kbd {
 .source-count { flex-shrink: 0; white-space: nowrap; }
 .panel-inset { margin-top: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
 
+.pick-block { margin-top: 10px; }
+.pick-toggle {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  padding: 8px 10px; text-align: left; font-size: 13px; font-weight: 600;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 9px; color: var(--text);
+}
+.pick-toggle:hover { border-color: var(--text-dim); }
+.pick-toggle .hint { font-weight: 400; }
+.pick-caret { display: inline-block; width: 12px; flex-shrink: 0; color: var(--text-dim); }
+.pick-panel {
+  margin-top: 6px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--bg); overflow: hidden;
+}
+.pick-actions {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+.pick-spacer { flex: 1; }
+.pick-list { list-style: none; margin: 0; padding: 4px; max-height: 260px; overflow-y: auto; }
+.pick-list li { margin: 0; }
+.pick-list label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.pick-list label:hover { background: var(--bg-elevated); }
+.pick-list input { flex-shrink: 0; }
+.pick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-list .chip { flex-shrink: 0; }
+
 .steps-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .steps-list li { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .steps-list li:last-child { border-bottom: none; }
