@@ -178,10 +178,10 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             faces (named people are never touched).
           </li>
           <li>
-            <b>🙈 Hide</b> a person you&apos;re not interested in (strangers in the background):
-            they move to a collapsed <b>Hidden</b> section and leave the Review chips and the AI
-            context, but their faces are kept — new detections keep matching them instead of
-            creating new unnamed groups. Unhide them anytime.
+            <b>Hide</b> an unnamed group you&apos;re not interested in (strangers in the
+            background): it moves to a collapsed <b>Hidden</b> section, but its faces are kept —
+            new detections keep matching it instead of creating new unnamed groups. Unhide it
+            anytime.
           </li>
           <li>
             Named people show as <b>@name</b> chips on the Review cards (click to filter, or search{' '}

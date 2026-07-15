@@ -141,10 +141,10 @@ missing).
   false positive as not-a-person. **Merge into…** joins whole groups;
   **Re-cluster** re-groups the unassigned faces (named people are never
   touched).
-- **🙈 Hide** a person you're not interested in (strangers in the background):
-  they move to a collapsed **Hidden** section and leave the Review chips and
-  the AI context, but their faces are kept — new detections keep matching them
-  instead of creating new unnamed groups. Unhide them anytime.
+- **Hide** an unnamed group you're not interested in (strangers in the
+  background): it moves to a collapsed **Hidden** section, but its faces are
+  kept — new detections keep matching it instead of creating new unnamed
+  groups. Unhide it anytime.
 - Named people show as **@name chips** on the Review cards, and both the
   in-app AI composer and Claude (MCP `list_people`, `list_videos(person=…)`)
   see who appears in each clip — so "only clips with Ana" works as a montage

@@ -93,19 +93,21 @@ function PersonCard({
           <button className="small" onClick={() => setOpen(!open)}>
             {open ? 'Hide faces' : 'Faces'}
           </button>
-          <button
-            className="small"
-            title={
-              person.hidden
-                ? 'Show this person in the list again'
-                : "Not interested in this person — hide them from the list and the Review chips. Their faces are kept and new detections still match them."
-            }
-            onClick={() =>
-              api.updatePerson(pid, person.id, { hidden: !person.hidden }).catch((e) => onToast(e.message))
-            }
-          >
-            {person.hidden ? '👀 Unhide' : '🙈'}
-          </button>
+          {(!person.name || person.hidden) && (
+            <button
+              className="small"
+              title={
+                person.hidden
+                  ? 'Show this person in the list again'
+                  : "Not interested in this person — hide them from the list. Their faces are kept and new detections still match them silently."
+              }
+              onClick={() =>
+                api.updatePerson(pid, person.id, { hidden: !person.hidden }).catch((e) => onToast(e.message))
+              }
+            >
+              {person.hidden ? 'Unhide' : 'Hide'}
+            </button>
+          )}
           {others.length > 0 && (
             <select
               className="small"
@@ -314,7 +316,7 @@ export default function PeoplePage({ pid }: { pid: string }) {
             <li><b>Detect people</b> samples frames from each clip and finds faces (runs locally, no cloud).</li>
             <li>Similar faces are grouped automatically. <b>Type a name</b> on a group to identify that person.</li>
             <li>Typing a name that <b>already exists merges</b> the two groups — quickest way to fix a split person.</li>
-            <li><b>🙈 Hide</b> a person you're not interested in (strangers in the background): they leave the list and the chips, but their faces are kept so new detections keep matching them instead of creating new groups.</li>
+            <li><b>Hide</b> an unnamed group you're not interested in (strangers in the background): it leaves the list, but its faces are kept so new detections keep matching it instead of creating new groups.</li>
             <li>Named people are matched automatically in newly detected clips — and every confirmed face makes future matches easier.</li>
             <li>Open <b>Faces</b>: click a face to view it large, 👁 opens the video at that exact moment (new tab), 📌 makes it the cover, ↷ detaches it, 🚫 ignores a false positive.</li>
             <li>Named people appear as chips on the Review page — filter with <b>@name</b>.</li>
