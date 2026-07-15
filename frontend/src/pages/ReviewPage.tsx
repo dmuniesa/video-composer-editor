@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
-import type { ProjectInfo, Video } from '../lib/types'
+import type { ExcludedFile, ProjectInfo, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
 import VideoCard from '../components/VideoCard'
 import VideoDetail from '../components/VideoDetail'
+import ExcludedPanel from '../components/ExcludedPanel'
 import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
 
 export default function ReviewPage({ pid, project }: { pid: string; project: ProjectInfo | null }) {
@@ -25,10 +26,13 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
   const [sortBy, setSortBy] = useState<'name' | 'ai' | 'stars' | 'duration'>('name')
   const [thumbSize, setThumbSize] = useState(() => Number(localStorage.getItem('review.thumbSize')) || 240)
   const [toast, setToast] = useState('')
+  const [excluded, setExcluded] = useState<ExcludedFile[]>([])
+  const [showExcluded, setShowExcluded] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const refresh = useCallback(() => {
     api.videos(pid).then(setVideos).catch((e) => setToast(e.message))
+    api.excluded(pid).then(setExcluded).catch(() => {})
   }, [pid])
   useEffect(refresh, [refresh])
   useProjectEvents(pid, (e) => {
@@ -101,10 +105,27 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
         ids.forEach((id) => next.delete(id))
         return next
       })
-      Promise.all(ids.map((id) => api.deleteVideo(pid, id))).catch((e) => {
-        setToast(e.message)
-        refresh()
-      })
+      Promise.all(ids.map((id) => api.deleteVideo(pid, id)))
+        .then(refresh)
+        .catch((e) => {
+          setToast(e.message)
+          refresh()
+        })
+    },
+    [pid, refresh],
+  )
+
+  const restore = useCallback(
+    (eid: number) => {
+      // Drop the tombstone, then rescan so the file is picked up as new footage.
+      api
+        .restoreExcluded(pid, eid)
+        .then(() => api.scan(pid))
+        .then(() => {
+          refresh()
+          setToast('Clip restored — re-scanned from its folder.')
+        })
+        .catch((e) => setToast(e.message))
     },
     [pid, refresh],
   )
@@ -179,7 +200,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
         rate(ids, { rejected: anyKept })
       } else if (e.key === 'Delete') {
         const label = ids.length === 1 ? '1 clip' : `${ids.length} clips`
-        if (confirm(`Remove ${label} from the project?\n\nThe source files on disk are kept, but a later rescan will re-add them.`)) remove(ids)
+        if (confirm(`Remove ${label} from the project?\n\nThe source files on disk are kept. Rescans won't re-add them — restore later from "Deleted".`)) remove(ids)
       } else if (e.key === 'Escape') setSelected(new Set())
     }
     window.addEventListener('keydown', onKey)
@@ -193,6 +214,15 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
       <div className="review-main">
         <div className="filter-bar">
           <span>{shown.length}/{videos.length} videos</span>
+          {excluded.length > 0 && (
+            <button
+              className="small"
+              title="Files you deleted — restore any of them"
+              onClick={() => setShowExcluded(true)}
+            >
+              🗑 Deleted ({excluded.length})
+            </button>
+          )}
           {project?.ai_available && selected.size > 0 && (
             <button
               className="primary small"
@@ -319,6 +349,13 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
             setOpenId(null)
             remove([id])
           }}
+        />
+      )}
+      {showExcluded && (
+        <ExcludedPanel
+          excluded={excluded}
+          onRestore={restore}
+          onClose={() => setShowExcluded(false)}
         />
       )}
       {toast && <div className="toast">{toast}</div>}
