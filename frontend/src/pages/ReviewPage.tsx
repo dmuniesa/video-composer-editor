@@ -13,9 +13,13 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [lastClicked, setLastClicked] = useState<number | null>(null)
   const [openId, setOpenId] = useState<number | null>(null)
+  // Seek target when the detail was opened via a deep link (?video=ID&t=SECONDS,
+  // e.g. clicking a face on the People page); null = start from the beginning.
+  const [openTime, setOpenTime] = useState<number | null>(null)
   const [minStars, setMinStars] = useState(0)
   const [hideRejected, setHideRejected] = useState(false)
   const [tagFilter, setTagFilter] = useState('')
+  const [personFilter, setPersonFilter] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('*')
   const [sortBy, setSortBy] = useState<'name' | 'ai' | 'stars' | 'duration'>('name')
@@ -28,15 +32,18 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
   }, [pid])
   useEffect(refresh, [refresh])
   useProjectEvents(pid, (e) => {
-    if (e.event === 'video' || e.event === 'videos') refresh()
+    if (e.event === 'video' || e.event === 'videos' || e.event === 'people') refresh()
   })
 
-  // Deep link (?video=ID) from the montage bin: open that clip's detail.
+  // Deep link (?video=ID[&t=SECONDS]) from the montage bin or the People
+  // page: open that clip's detail, seeking to t when given.
   useEffect(() => {
     const q = searchParams.get('video')
     if (!q || videos.length === 0) return
     const id = Number(q)
     if (videos.some((v) => v.id === id)) {
+      const t = Number(searchParams.get('t'))
+      setOpenTime(Number.isFinite(t) && searchParams.get('t') != null ? t : null)
       setOpenId(id)
       setSelected(new Set([id]))
       setLastClicked(id)
@@ -61,6 +68,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
     if (minStars > 0) list = list.filter((v) => v.stars >= minStars)
     if (hideRejected) list = list.filter((v) => !v.rejected)
     if (tagFilter) list = list.filter((v) => v.hashtags.includes(tagFilter))
+    if (personFilter) list = list.filter((v) => (v.people ?? []).some((p) => p.name === personFilter))
     if (query) list = list.filter((v) => matchesQuery(v, query))
     if (folder !== '*') list = list.filter((v) => folderOf(v.rel_path) === folder)
     const by = {
@@ -70,7 +78,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
       duration: (a: Video, b: Video) => b.duration - a.duration,
     }[sortBy]
     return [...list].sort(by)
-  }, [videos, minStars, hideRejected, tagFilter, query, folder, sortBy])
+  }, [videos, minStars, hideRejected, tagFilter, personFilter, query, folder, sortBy])
 
   const rate = useCallback(
     (ids: number[], patch: { stars?: number; rejected?: boolean }) => {
@@ -150,6 +158,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
       const nextIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1
       if (nextIdx < 0 || nextIdx >= shown.length) return
       e.preventDefault()
+      setOpenTime(null)
       setOpenId(shown[nextIdx].id)
     }
     window.addEventListener('keydown', onKey)
@@ -195,7 +204,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
           )}
           <input
             className="filter-search"
-            placeholder="search — text or #tag"
+            placeholder="search — text, #tag or @person"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -235,6 +244,11 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
               #{tagFilter} ✕
             </span>
           )}
+          {personFilter && (
+            <span className="person-chip active" onClick={() => setPersonFilter('')} style={{ cursor: 'pointer' }}>
+              @{personFilter} ✕
+            </span>
+          )}
           <label className="thumb-size" title="Thumbnail size">
             <input
               type="range"
@@ -272,10 +286,15 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
                 video={v}
                 selected={selected.has(v.id)}
                 onSelect={(e) => clickCard(v, e)}
-                onOpen={() => setOpenId(v.id)}
+                onOpen={() => {
+                  setOpenTime(null)
+                  setOpenId(v.id)
+                }}
                 onRate={(stars) => rate(selected.has(v.id) && selected.size > 1 ? [...selected] : [v.id], { stars })}
                 onTagClick={(t) => setTagFilter(t === tagFilter ? '' : t)}
                 activeTag={tagFilter}
+                onPersonClick={(name) => setPersonFilter(name === personFilter ? '' : name)}
+                activePerson={personFilter}
               />
             ))}
           </div>
@@ -287,7 +306,11 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
           pid={pid}
           video={open}
           aiAvailable={project?.ai_available}
-          onClose={() => setOpenId(null)}
+          initialTime={openTime ?? undefined}
+          onClose={() => {
+            setOpenTime(null)
+            setOpenId(null)
+          }}
           onChanged={refresh}
           onRate={(stars) => rate([open.id], { stars })}
           onReject={(rejected) => rate([open.id], { rejected })}

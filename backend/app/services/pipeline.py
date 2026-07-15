@@ -10,8 +10,17 @@ from sqlalchemy import select
 
 from .. import db as dbm, settings
 from ..events import broadcaster
-from ..models import Song, SongLyrics, SongSection, Source, Video, VideoAnalysis, VideoRating
-from . import ai, audio_analysis, frames, jobs, lyrics, scanner
+from ..models import (
+    ExcludedFile,
+    Song,
+    SongLyrics,
+    SongSection,
+    Source,
+    Video,
+    VideoAnalysis,
+    VideoRating,
+)
+from . import ai, audio_analysis, faces, frames, jobs, lyrics, scanner
 
 
 def video_cache(video_dir: Path, cache_key: str) -> Path:
@@ -36,6 +45,11 @@ def scan_project(pid: str, video_dir: Path) -> dict:
         known: dict[tuple[int, str], Video] = {
             (v.source_id, v.rel_path): v for v in db.scalars(select(Video))
         }
+        # Tombstones for files the user deleted in Review; keep skipping them on
+        # rescan so a deletion sticks.
+        excluded: dict[tuple[int | None, str], ExcludedFile] = {
+            (e.source_id, e.rel_path): e for e in db.scalars(select(ExcludedFile))
+        }
         for source in sources:
             root = Path(source.path)
             if not root.is_dir():
@@ -43,11 +57,14 @@ def scan_project(pid: str, video_dir: Path) -> dict:
                 total += sum(1 for k in known if k[0] == source.id)
                 continue
             found = scanner.find_videos(root)
-            total += len(found)
             found_rels: set[str] = set()
             for path in found:
                 rel = str(path.relative_to(root))
                 found_rels.add(rel)
+                if (source.id, rel) in excluded:
+                    # User deleted this file; honor the tombstone, don't re-add.
+                    continue
+                total += 1
                 if (source.id, rel) in known:
                     continue
                 video = Video(
@@ -67,6 +84,12 @@ def scan_project(pid: str, video_dir: Path) -> dict:
                 if sid == source.id and rel not in found_rels:
                     db.delete(video)
                     removed += 1
+            # Drop tombstones of this source whose file is gone from disk: there
+            # is nothing left to exclude, and if the file ever returns it should
+            # be treated as new footage again.
+            for (sid, rel), exc in excluded.items():
+                if sid == source.id and rel not in found_rels:
+                    db.delete(exc)
         added = len(new_ids)
         db.commit()
 
@@ -176,6 +199,70 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
                 broadcaster.publish(pid, "video", {"id": video_id})
 
     jobs.submit(pid, "analyze", f"analyze #{video_id}", work, pool="ai", video_id=video_id)
+    return True
+
+
+def queue_faces_job(pid: str, video_dir: Path, video_id: int, force: bool = False) -> bool:
+    """Queue face detection for one video. Returns False when skipped."""
+    if not faces.available():
+        return False
+    if jobs.has_active(pid, "faces", video_id):
+        return False
+    with dbm.open_session(video_dir) as db:
+        video = db.get(Video, video_id)
+        if video is None or video.status not in ("extracted", "ready"):
+            return False
+        if video.faces_status == "done" and not force:
+            return False
+
+    def work(job: jobs.Job) -> None:
+        with dbm.open_session(video_dir) as db:
+            video = db.get(Video, video_id)
+            if video is None:
+                return
+            cache = video_cache(video_dir, video.cache_key)
+            video.faces_status = "detecting"
+            db.commit()
+            broadcaster.publish(pid, "video", {"id": video_id})
+            try:
+                # First run downloads the model pack (~30-280 MB).
+                jobs.update(job, 0.05, "loading face model (first run downloads it)")
+                count = faces.detect_video(
+                    db, video, cache, progress=lambda pct, msg: jobs.update(job, pct, msg)
+                )
+                jobs.update(job, 0.95, "clustering")
+                faces.cluster_unassigned(db)
+                video.faces_status = "done"
+                db.commit()
+                jobs.update(job, 1.0, f"{count} face(s)")
+            except Exception:
+                db.rollback()
+                video.faces_status = "error"
+                db.commit()
+                raise
+            finally:
+                broadcaster.publish(pid, "video", {"id": video_id})
+                broadcaster.publish(pid, "people", {})
+
+    jobs.submit(pid, "faces", f"faces #{video_id}", work, pool="faces", video_id=video_id)
+    return True
+
+
+def queue_recluster_job(pid: str, video_dir: Path) -> bool:
+    """Re-cluster unnamed faces in the background (same pool as detection so
+    it never runs concurrently with a detect job touching the same rows)."""
+    if jobs.has_active(pid, "recluster"):
+        return False
+
+    def work(job: jobs.Job) -> None:
+        with dbm.open_session(video_dir) as db:
+            jobs.update(job, 0.3, "re-clustering faces")
+            result = faces.recluster(db)
+            db.commit()
+            jobs.update(job, 1.0, f"{result['created']} group(s)")
+        broadcaster.publish(pid, "people", {})
+
+    jobs.submit(pid, "recluster", "re-cluster people", work, pool="faces")
     return True
 
 

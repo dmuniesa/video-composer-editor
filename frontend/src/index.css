@@ -698,6 +698,72 @@ kbd {
 
 .empty-note { padding: 40px; text-align: center; color: var(--text-dim); }
 .error-text { color: var(--danger); font-size: 13px; }
+
+/* People page */
+.people-page { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+.people-section { margin: 18px 0 8px; font-size: 14px; color: var(--text-dim); }
+.person-card {
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.person-card.unnamed { border-style: dashed; }
+.person-card.hidden-person { opacity: 0.55; }
+.people-hidden-toggle { cursor: pointer; user-select: none; }
+.people-hidden-toggle:hover { color: var(--accent); }
+.person-head { display: flex; gap: 12px; align-items: center; }
+.person-cover {
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+  background: var(--bg-elevated);
+}
+.person-cover.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); font-size: 22px;
+}
+.person-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.person-name {
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  color: var(--text); font-size: 14px; font-weight: 600; padding: 2px 6px; max-width: 260px;
+}
+.person-name:hover, .person-name:focus { border-color: var(--border); background: var(--bg-elevated); }
+.person-meta { font-size: 12px; color: var(--text-dim); }
+.person-meta-faces { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.person-meta-faces:hover { color: var(--accent); }
+.person-videos { display: flex; flex-wrap: wrap; gap: 4px; }
+.person-videos .tag { text-decoration: none; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-videos .tag:hover { color: var(--accent); }
+.person-actions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.person-actions select { font-size: 12px; padding: 2px 4px; }
+.face-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.face-tile { position: relative; width: 72px; height: 72px; border-radius: 6px; overflow: hidden; background: var(--bg-elevated); }
+.face-tile.cover { outline: 2px solid var(--accent); }
+.face-tile img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+.face-tile .face-actions {
+  position: absolute; inset: auto 0 0 0; display: flex; justify-content: space-between;
+  opacity: 0; transition: opacity 0.12s; background: rgba(0, 0, 0, 0.55);
+}
+.face-tile:hover .face-actions { opacity: 1; }
+.face-tile .face-actions button {
+  background: transparent; border: none; color: #fff; font-size: 12px; padding: 3px 6px; cursor: pointer;
+}
+
+/* people chips on video cards */
+.person-chip { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+.person-chip.active { outline: 1px solid var(--accent); }
+
+/* face viewer lightbox (full sampled frame + bbox) */
+.face-viewer {
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px; max-width: min(92vw, 1000px); max-height: 92vh; margin: auto;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.face-frame-wrap { position: relative; overflow: hidden; border-radius: 6px; }
+.face-frame-wrap img { display: block; max-width: 100%; max-height: 76vh; }
+.face-bbox {
+  position: absolute; border: 2px solid var(--accent); border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); pointer-events: none;
+}
+.face-viewer-bar { display: flex; align-items: center; gap: 10px; }
+.face-viewer-bar .spacer { flex: 1; }
 .toast {
   position: fixed; bottom: 44px; left: 50%; transform: translateX(-50%);
   background: var(--danger); color: #fff; border-radius: 8px; padding: 8px 16px; z-index: 100;

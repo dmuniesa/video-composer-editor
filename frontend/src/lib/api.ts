@@ -1,8 +1,12 @@
 import type {
   AppSettings,
+  ExcludedFile,
+  FaceInfo,
   FsListing,
   JobInfo,
   LogRecord,
+  PeopleResponse,
+  Person,
   ProjectInfo,
   SongInfo,
   Source,
@@ -124,6 +128,9 @@ export const api = {
     }),
   deleteVideo: (pid: string, vid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/videos/${vid}`, { method: 'DELETE' }),
+  excluded: (pid: string) => req<ExcludedFile[]>(`/api/projects/${pid}/excluded`),
+  restoreExcluded: (pid: string, eid: number) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/excluded/${eid}`, { method: 'DELETE' }),
   editAnalysis: (pid: string, vid: number, patch: { description?: string; hashtags?: string[] }) =>
     req<Video>(`/api/projects/${pid}/videos/${vid}/analysis`, {
       method: 'PATCH',
@@ -141,6 +148,36 @@ export const api = {
     }),
   deleteRange: (pid: string, vid: number, rid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/videos/${vid}/ranges/${rid}`, { method: 'DELETE' }),
+
+  people: (pid: string) => req<PeopleResponse>(`/api/projects/${pid}/people`),
+  detectFaces: (pid: string, video_ids?: number[], force = false) =>
+    req<{ queued: number }>(`/api/projects/${pid}/faces/detect`, {
+      method: 'POST',
+      body: JSON.stringify({ video_ids: video_ids ?? null, force }),
+    }),
+  reclusterPeople: (pid: string) =>
+    req<{ queued: boolean }>(`/api/projects/${pid}/people/recluster`, { method: 'POST' }),
+  updatePerson: (pid: string, personId: number, patch: { name?: string; cover_face_id?: number; hidden?: boolean }) =>
+    req<Person>(`/api/projects/${pid}/people/${personId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  mergePerson: (pid: string, personId: number, intoId: number) =>
+    req<Person>(`/api/projects/${pid}/people/${personId}/merge`, {
+      method: 'POST',
+      body: JSON.stringify({ into_id: intoId }),
+    }),
+  deletePerson: (pid: string, personId: number) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/people/${personId}`, { method: 'DELETE' }),
+  personFaces: (pid: string, personId: number) =>
+    req<FaceInfo[]>(`/api/projects/${pid}/people/${personId}/faces`),
+  videoFaces: (pid: string, vid: number) =>
+    req<FaceInfo[]>(`/api/projects/${pid}/videos/${vid}/faces`),
+  updateFace: (pid: string, faceId: number, patch: { person_id?: number | null; ignored?: boolean }) =>
+    req<FaceInfo>(`/api/projects/${pid}/faces/${faceId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
 
   song: (pid: string) => req<SongInfo>(`/api/projects/${pid}/song`),
   songPeaks: (pid: string) => req<{ peaks: [number, number][] }>(`/api/projects/${pid}/song/peaks`),
@@ -200,6 +237,8 @@ export const media = {
   preview: (pid: string, vid: number) => `/media/${pid}/preview/${vid}`,
   thumb: (pid: string, vid: number) => `/media/${pid}/thumb/${vid}`,
   filmstrip: (pid: string, vid: number) => `/media/${pid}/filmstrip/${vid}`,
+  face: (pid: string, fid: number) => `/media/${pid}/face/${fid}`,
+  faceFrame: (pid: string, fid: number) => `/media/${pid}/face/${fid}/frame`,
   song: (pid: string) => `/media/${pid}/song`,
 }
 

@@ -26,6 +26,8 @@ export default function SettingsPage({ pid }: { pid?: string }) {
     set({ frames: { ...settings.frames, ...patch } })
   const setLyrics = (patch: Partial<AppSettings['lyrics']>) =>
     set({ lyrics: { ...settings.lyrics, ...patch } })
+  const setFaces = (patch: Partial<AppSettings['faces']>) =>
+    set({ faces: { ...settings.faces, ...patch } })
 
   const save = async () => {
     setBusy(true)
@@ -321,6 +323,37 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           Whisper runs fully on this machine (requires <code>pip install faster-whisper</code>;
           the first run downloads the model). The Antigravity CLI engine uploads the song's
           audio to Google and returns approximate (~1s) timestamps, but needs no local model.
+        </p>
+      </div>
+
+      <div className="panel">
+        <h2>People detection (faces)</h2>
+        <p className="hint">
+          Finds the people appearing in each clip (People page). Runs fully on this machine;
+          requires <code>pip install insightface onnxruntime opencv-python-headless</code> in the
+          backend environment. The first detection downloads the face model.
+        </p>
+        <div className="settings-grid">
+          <label>Model pack</label>
+          <select
+            value={settings.faces.model_pack}
+            onChange={(e) => setFaces({ model_pack: e.target.value })}
+          >
+            <option value="buffalo_l">buffalo_l — most accurate (~280 MB)</option>
+            <option value="buffalo_s">buffalo_s — faster on weak CPUs (~30 MB)</option>
+          </select>
+
+          <label>Sample one frame every N seconds</label>
+          <input type="number" min={0.5} max={30} step={0.5} value={settings.faces.frame_interval_s}
+            onChange={(e) => setFaces({ frame_interval_s: num(e.target.value, 2) })} />
+
+          <label>Max frames per video</label>
+          <input type="number" min={5} max={200} value={settings.faces.max_frames}
+            onChange={(e) => setFaces({ max_frames: num(e.target.value, 40) })} />
+        </div>
+        <p className="hint" style={{ marginTop: 10 }}>
+          Denser sampling (lower interval, more frames) catches people who appear briefly, at the
+          cost of slower detection. Changes apply to detections run from now on.
         </p>
       </div>
 

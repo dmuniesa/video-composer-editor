@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .. import db as dbm
 from .. import settings
-from ..models import Song, Video
+from ..models import Face, Person, Song, Video
 from . import gemini, jobs, lyrics as lyrics_svc, openai_client
 from . import timeline_ops as ops
 from .ai import AIError, _extract_json
@@ -64,7 +64,11 @@ Rules:
 - If the song includes lyrics/vocal data (timestamped lines, per-section
   vocal_ratio, instrumental_ranges): match footage to what the lyrics say or
   evoke, use calmer/scenic shots over melody-only instrumental passages, and
-  save the most striking footage for the chorus.\
+  save the most striking footage for the chorus.
+- Videos may list "people": the named people appearing in them. Honor
+  instructions that reference people (e.g. "more shots of Ana", "only clips
+  with Marc"), and when no instruction says otherwise, vary who is on screen
+  across the montage.\
 """
 
 
@@ -148,6 +152,14 @@ def build_context(db: Session) -> dict:
                 f"{len(beats)} beats omitted for brevity; cut on the downbeats "
                 "above or interpolate from the BPM"
             )
+    # Named people per video (from face detection), one batch query.
+    people_by_video: dict[int, set[str]] = {}
+    for vid, name in db.execute(
+        select(Face.video_id, Person.name)
+        .join(Person, Face.person_id == Person.id)
+        .where(Face.ignored.is_(False), Person.name != "", Person.hidden.is_(False))
+    ):
+        people_by_video.setdefault(vid, set()).add(name)
     videos = []
     for v in db.scalars(select(Video).order_by(Video.filename)):
         if v.rating and v.rating.rejected:
@@ -161,6 +173,11 @@ def build_context(db: Session) -> dict:
                 "ai_score": v.analysis.ai_score if v.analysis else None,
                 "description": v.analysis.description if v.analysis else "",
                 "hashtags": v.analysis.hashtags if v.analysis else [],
+                **(
+                    {"people": sorted(people_by_video[v.id])}
+                    if v.id in people_by_video
+                    else {}
+                ),
                 "ranges": [
                     {"t_in": _round(r.t_in), "t_out": _round(r.t_out), "label": r.label}
                     for r in v.ranges

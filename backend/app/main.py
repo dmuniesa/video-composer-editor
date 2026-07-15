@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import export, media, music, projects, settings_api, timeline, videos
+from .api import export, media, music, people, projects, settings_api, timeline, videos
 from .events import broadcaster
 from .logbuffer import BufferHandler, apply_level
 from .services import jobs
@@ -84,6 +84,7 @@ app.include_router(music.router, prefix="/api")
 app.include_router(timeline.router, prefix="/api")
 app.include_router(export.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
+app.include_router(people.router, prefix="/api")
 app.include_router(media.router)
 
 # Serve the built frontend when it exists (production mode: single process).

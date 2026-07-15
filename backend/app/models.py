@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -73,6 +73,8 @@ class Video(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     has_proxy: Mapped[bool] = mapped_column(Boolean, default=False)
     frame_count: Mapped[int] = mapped_column(Integer, default=0)
+    # none -> detecting -> done | error (independent of the media/AI pipeline)
+    faces_status: Mapped[str] = mapped_column(String, default="none")
 
     source: Mapped[Source | None] = relationship(back_populates="videos")
     analysis: Mapped[VideoAnalysis | None] = relationship(
@@ -84,6 +86,27 @@ class Video(Base):
     ranges: Mapped[list[VideoRange]] = relationship(
         back_populates="video", cascade="all, delete-orphan", order_by="VideoRange.t_in"
     )
+    faces: Mapped[list[Face]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+
+
+class ExcludedFile(Base):
+    """Tombstone for a video the user deleted in Review. Records the
+    (source_id, rel_path) of the file so a later rescan of that source skips it
+    instead of re-adding the row (the source file on disk is never touched).
+    Dropped automatically when the underlying file disappears from disk (nothing
+    left to exclude), or explicitly when the user restores it. New table, so
+    create_all adds it to existing project databases without a migration."""
+
+    __tablename__ = "excluded_file"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source_id: Mapped[int | None] = mapped_column(ForeignKey("source.id"), nullable=True)
+    # rel_path is relative to the source root, same convention as Video.rel_path.
+    rel_path: Mapped[str] = mapped_column(String)
+    filename: Mapped[str] = mapped_column(String, default="")
+    excluded_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
 class VideoAnalysis(Base):
@@ -129,6 +152,58 @@ class VideoRange(Base):
     label: Mapped[str] = mapped_column(String, default="")
 
     video: Mapped[Video] = relationship(back_populates="ranges")
+
+
+class Person(Base):
+    """A person appearing in the project's footage. Created automatically by
+    clustering detected faces; the user gives it a name (name == "" means an
+    unnamed cluster awaiting review). Once named, new faces matching the
+    centroid are auto-assigned across videos."""
+
+    __tablename__ = "person"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, default="")
+    # Soft reference (no FK) to the face used as the card cover; cleared by the
+    # API when that face is detached/ignored.
+    cover_face_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # L2-normalized mean of the member embeddings, float32 little-endian.
+    centroid: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    # User marked this person as not interesting: kept (so their faces stay
+    # assigned and keep absorbing new detections) but tucked away in the UI
+    # and excluded from Review chips, the composer and MCP.
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    faces: Mapped[list[Face]] = relationship(back_populates="person")
+
+
+class Face(Base):
+    """One detected face in one sampled frame of a video. The bbox is
+    normalized to the frame (0-1) so it survives resolution changes; the
+    embedding is an L2-normalized float32 vector (cosine similarity == dot)."""
+
+    __tablename__ = "face"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("video.id"))
+    frame_index: Mapped[int] = mapped_column(Integer)
+    t: Mapped[float] = mapped_column(Float, default=0.0)
+    x: Mapped[float] = mapped_column(Float, default=0.0)
+    y: Mapped[float] = mapped_column(Float, default=0.0)
+    w: Mapped[float] = mapped_column(Float, default=0.0)
+    h: Mapped[float] = mapped_column(Float, default=0.0)
+    det_score: Mapped[float] = mapped_column(Float, default=0.0)
+    embedding: Mapped[bytes] = mapped_column(LargeBinary)
+    person_id: Mapped[int | None] = mapped_column(ForeignKey("person.id"), nullable=True)
+    # Cosine similarity to the person centroid at auto-assign time; None for
+    # manual assignments and cluster seeds.
+    similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # True = user marked it as not-a-person/false positive; excluded everywhere.
+    ignored: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    video: Mapped[Video] = relationship(back_populates="faces")
+    person: Mapped[Person | None] = relationship(back_populates="faces")
 
 
 class Song(Base):

@@ -127,6 +127,20 @@ calls (red/blue) and two real videos analyzed in parallel — no cross-talk.
 After updating, re-run analysis on any project whose clips were described
 while the bug was live (Library → *Analyze all with Gemini*).
 
+## People detection (faces)
+
+The optional face libraries are **already installed in this repo's
+`backend/.venv`** (insightface 1.0.1 + opencv-python-headless + the
+onnxruntime that faster-whisper had pulled in). The `buffalo_l` model pack
+(~280 MB) is downloaded to `~/.insightface/models/` on the first detection —
+after that everything runs offline. The pip build of `insightface` compiles a
+small Cython extension; the MSVC 2019 Build Tools present on this machine
+covered it.
+
+`tests/test_faces.py` does **not** need those libraries (clustering/matching
+logic uses synthetic embeddings and the API tests fake detection), so the
+suite still runs on a venv without the `[faces]` extra.
+
 ## Resetting a project
 
 All derived media and the per-project database live under the project's storage

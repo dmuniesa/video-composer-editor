@@ -114,6 +114,21 @@ npm run build
 
 The first `pip install` takes a few minutes (librosa pulls in numba/llvmlite).
 
+**Optional — people detection (faces).** The **People** page finds the people
+appearing in your clips (locally, no cloud), lets you name them, and matches
+each named person across the project's videos. It needs extra libraries:
+
+```bash
+.venv/bin/pip install -e ".[faces]"    # Windows: .venv\Scripts\pip install -e ".[faces]"
+```
+
+The app runs fine without them (the People page shows the install hint).
+`insightface` builds a small native extension, so Windows may need the
+[Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+installed once. The first detection auto-downloads the face model
+(`buffalo_l`, ~280 MB, to `~/.insightface/models/`); pick the smaller/faster
+`buffalo_s` pack in Settings if your CPU struggles.
+
 ### Alternative: conda
 
 If you use [conda/miniconda](https://docs.conda.io), one environment covers
@@ -161,7 +176,8 @@ available inside the app under the **Guide** tab.
 | Page | What you do |
 |---|---|
 | **Setup** | Pick a **storage folder** for the project, then **Add** one or more **source folders** of footage → each is scanned and queued for frame extraction + AI analysis. Add/remove sources or **Repoint** one that moved anytime. Pick the song here too. |
-| **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. |
+| **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. Named people show as **@name** chips — click one (or search `@name`) to filter. |
+| **People** | Press **Detect people** to find faces in every clip (runs locally). Similar faces are grouped; type a name on a group to identify that person — they're then matched automatically in newly detected clips. Merge groups, detach single faces or ignore false positives. The AI composer and the MCP server see who appears in each clip. |
 | **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. With lyrics enabled: timestamped lyrics (click a line to seek), a vocal/melody-only strip over the waveform, and a vocals % per section. |
 | **Montage** | Drag clips (or their ranges) from the bin onto the tracks. Drag to move, edge-drag to trim, snapping to beats/sections (**S** toggles). **Space** previews audio + a jump-cut video preview. **Del** removes the selected clip. |
 | **Export** | The **Export** menu downloads the sequence for your editor: Premiere Pro (`montage.xml`, **File → Import**), DaVinci Resolve (`montage-resolve.xml`, **File → Import → Timeline**) or Final Cut Pro (`montage.fcpxml`, **File → Import → XML**) — linked to the original files. Relink if your media moved. |

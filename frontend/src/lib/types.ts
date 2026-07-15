@@ -6,6 +6,14 @@ export interface Source {
   video_count: number
 }
 
+export interface ExcludedFile {
+  id: number
+  source_id: number | null
+  rel_path: string
+  filename: string
+  excluded_at: string | null
+}
+
 export interface ProjectInfo {
   id: string
   name: string
@@ -53,6 +61,11 @@ export interface AppSettings {
     language: string
     min_instrumental_gap: number
   }
+  faces: {
+    model_pack: string
+    frame_interval_s: number
+    max_frames: number
+  }
   debug_logging: boolean
   ai_status?: { available: boolean; provider: string | null }
 }
@@ -81,12 +94,53 @@ export interface Video {
   error: string | null
   has_proxy: boolean
   frame_count: number
+  faces_status: string
+  people: PersonRef[]
   description: string
   ai_score: number | null
   hashtags: string[]
   stars: number
   rejected: boolean
   ranges: VideoRange[]
+}
+
+/** Named person appearing in a video (Review chips / filters). */
+export interface PersonRef {
+  id: number
+  name: string
+}
+
+export interface Person {
+  id: number
+  name: string
+  cover_face_id: number | null
+  /** Not interesting: kept (still absorbs new faces) but out of lists/chips. */
+  hidden: boolean
+  face_count: number
+  videos: { id: number; filename: string }[]
+}
+
+export interface PeopleResponse {
+  available: boolean
+  reason: string | null
+  persons: Person[]
+}
+
+export interface FaceInfo {
+  id: number
+  video_id: number
+  filename: string
+  frame_index: number
+  t: number
+  /** bbox normalized 0-1 relative to the sampled frame */
+  x: number
+  y: number
+  w: number
+  h: number
+  det_score: number
+  similarity: number | null
+  person_id: number | null
+  ignored: boolean
 }
 
 export interface SongSection {

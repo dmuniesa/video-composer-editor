@@ -19,11 +19,14 @@ _id_counter = itertools.count(1)
 _jobs: dict[int, "Job"] = {}
 _jobs_lock = threading.Lock()
 
-# Separate pools: ffmpeg is CPU/IO heavy, agy calls are network-bound.
+# Separate pools: ffmpeg is CPU/IO heavy, agy calls are network-bound, and
+# face detection (ONNX on CPU) gets a single worker so it neither competes
+# with ffmpeg nor loads the model concurrently.
 _pools = {
     "media": ThreadPoolExecutor(max_workers=2, thread_name_prefix="media"),
     "ai": ThreadPoolExecutor(max_workers=2, thread_name_prefix="ai"),
     "audio": ThreadPoolExecutor(max_workers=1, thread_name_prefix="audio"),
+    "faces": ThreadPoolExecutor(max_workers=1, thread_name_prefix="faces"),
 }
 
 

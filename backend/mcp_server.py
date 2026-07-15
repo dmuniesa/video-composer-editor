@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from app import db as dbm, settings  # noqa: E402
-from app.models import Song, Source, Video  # noqa: E402
+from app.models import Face, Person, Song, Source, Video  # noqa: E402
 from app.services import lyrics as lyrics_svc  # noqa: E402
 from app.services import timeline_ops as ops  # noqa: E402
 
@@ -57,6 +57,18 @@ if not (dbm.cache_dir_for(PROJECT_DIR) / "montage.db").is_file():
 PID = dbm.register_project(PROJECT_DIR)
 
 mcp = FastMCP("video-montage")
+
+
+def _people_by_video(db) -> dict[int, list[str]]:
+    """video_id -> sorted names of the named people detected in it."""
+    by_video: dict[int, set[str]] = {}
+    for vid, name in db.execute(
+        select(Face.video_id, Person.name)
+        .join(Person, Face.person_id == Person.id)
+        .where(Face.ignored.is_(False), Person.name != "", Person.hidden.is_(False))
+    ):
+        by_video.setdefault(vid, set()).add(name)
+    return {vid: sorted(names) for vid, names in by_video.items()}
 
 
 def _notify() -> None:
@@ -103,22 +115,33 @@ def get_project_summary() -> dict:
                 for t in state["tracks"]
             ],
             "video_count": len(videos),
+            "people": sorted(
+                {
+                    name
+                    for names in _people_by_video(db).values()
+                    for name in names
+                }
+            ),
         }
 
 
 @mcp.tool()
 def list_videos(
-    min_stars: int = 0, include_unrated: bool = True, hashtag: str = ""
+    min_stars: int = 0, include_unrated: bool = True, hashtag: str = "", person: str = ""
 ) -> list[dict]:
     """List candidate videos (never includes rejected ones) with their AI
     description, hashtags, user star rating (0-5), AI score (1-10), duration
-    in seconds, and the user's hand-picked interesting ranges.
+    in seconds, the named people detected in them, and the user's hand-picked
+    interesting ranges.
 
     min_stars: only videos rated at least this many stars.
     include_unrated: also include videos with 0 stars (unrated).
-    hashtag: filter to videos containing this hashtag."""
+    hashtag: filter to videos containing this hashtag.
+    person: filter to videos where this person appears (case-insensitive name,
+    see list_people)."""
     out = []
     with dbm.open_session(PROJECT_DIR) as db:
+        people = _people_by_video(db)
         for v in db.scalars(select(Video).order_by(Video.filename)):
             stars = v.rating.stars if v.rating else 0
             if v.rating and v.rating.rejected:
@@ -127,6 +150,9 @@ def list_videos(
                 continue
             tags = v.analysis.hashtags if v.analysis else []
             if hashtag and hashtag.lower().lstrip("#") not in tags:
+                continue
+            names = people.get(v.id, [])
+            if person and person.strip().lower() not in (n.lower() for n in names):
                 continue
             out.append(
                 {
@@ -138,12 +164,33 @@ def list_videos(
                     "ai_score": v.analysis.ai_score if v.analysis else None,
                     "description": v.analysis.description if v.analysis else "",
                     "hashtags": tags,
+                    "people": names,
                     "ranges": [
                         {"t_in": r.t_in, "t_out": r.t_out, "label": r.label} for r in v.ranges
                     ],
                 }
             )
     return out
+
+
+@mcp.tool()
+def list_people() -> list[dict]:
+    """Named people detected in the project's footage (face recognition), with
+    how many face sightings they have and which videos they appear in. Use the
+    names with list_videos(person=...) to pick footage of someone specific."""
+    with dbm.open_session(PROJECT_DIR) as db:
+        out = []
+        for p in db.scalars(select(Person).where(Person.name != "", Person.hidden.is_(False))):
+            members = [f for f in p.faces if not f.ignored]
+            out.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "face_count": len(members),
+                    "video_ids": sorted({f.video_id for f in members}),
+                }
+            )
+        return sorted(out, key=lambda p: p["name"].lower())
 
 
 @mcp.tool()

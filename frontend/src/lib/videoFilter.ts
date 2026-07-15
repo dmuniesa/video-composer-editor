@@ -26,8 +26,8 @@ export function folderKeyList(videos: Video[]): string[] {
   return [...new Set(videos.map(folderKey))].sort()
 }
 
-/** Free-text filter: matches filename, description and hashtags.
- *  A query starting with '#' matches hashtags only. */
+/** Free-text filter: matches filename, description, hashtags and people.
+ *  A query starting with '#' matches hashtags only; '@' matches people only. */
 export function matchesQuery(v: Video, query: string): boolean {
   const q = query.trim().toLowerCase()
   if (!q) return true
@@ -35,9 +35,14 @@ export function matchesQuery(v: Video, query: string): boolean {
     const tag = q.slice(1)
     return tag === '' || v.hashtags.some((t) => t.toLowerCase().includes(tag))
   }
+  if (q.startsWith('@')) {
+    const name = q.slice(1)
+    return name === '' || (v.people ?? []).some((p) => p.name.toLowerCase().includes(name))
+  }
   return (
     v.filename.toLowerCase().includes(q) ||
     (v.description ?? '').toLowerCase().includes(q) ||
-    v.hashtags.some((t) => t.toLowerCase().includes(q))
+    v.hashtags.some((t) => t.toLowerCase().includes(q)) ||
+    (v.people ?? []).some((p) => p.name.toLowerCase().includes(q))
   )
 }

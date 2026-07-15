@@ -17,6 +17,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+# People detection (faces): SCRFD detector + ArcFace embeddings on CPU.
+faces = ["insightface>=0.7.3", "onnxruntime>=1.17", "opencv-python-headless>=4.9"]
 
 [build-system]
 requires = ["setuptools>=68"]

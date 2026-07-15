@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from .. import db as dbm
-from ..models import Song, Video
+from ..models import Face, Song, Video
 from .deps import resolve_project
 
 router = APIRouter()
@@ -122,6 +122,38 @@ def media_frame(pid: str, vid: int, n: int) -> FileResponse:
     path = dbm.cache_dir_for(video_dir) / video.cache_key / f"frame_{n:02d}.jpg"
     if not path.is_file():
         raise HTTPException(404, "frame not found")
+    return FileResponse(path)
+
+
+@router.get("/media/{pid}/face/{fid}")
+def media_face(pid: str, fid: int) -> FileResponse:
+    """Cropped face thumbnail saved at detection time by services/faces.py."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        face = db.get(Face, fid)
+        if face is None:
+            raise HTTPException(404, "face not found")
+        cache_key = face.video.cache_key
+    path = dbm.cache_dir_for(video_dir) / cache_key / "faces" / f"crop_{fid}.jpg"
+    if not path.is_file():
+        raise HTTPException(404, "face crop missing")
+    return FileResponse(path)
+
+
+@router.get("/media/{pid}/face/{fid}/frame")
+def media_face_frame(pid: str, fid: int) -> FileResponse:
+    """Full sampled frame the face was detected in (the face viewer overlays
+    the bbox on it client-side)."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        face = db.get(Face, fid)
+        if face is None:
+            raise HTTPException(404, "face not found")
+        cache_key = face.video.cache_key
+        frame_index = face.frame_index
+    path = dbm.cache_dir_for(video_dir) / cache_key / "faces" / f"src_{frame_index:03d}.jpg"
+    if not path.is_file():
+        raise HTTPException(404, "source frame missing (re-run detection)")
     return FileResponse(path)
 
 

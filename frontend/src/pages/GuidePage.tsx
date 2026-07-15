@@ -5,11 +5,12 @@ const TOC = [
   ['overview', 'Overview'],
   ['setup', '1 · Create a project'],
   ['review', '2 · Review & rate'],
-  ['ranges', '3 · Mark the best parts'],
-  ['music', '4 · Analyze the song'],
-  ['montage', '5 · Build the montage'],
-  ['ai-compose', '6 · AI auto-placement'],
-  ['export', '7 · Export your montage'],
+  ['people', '3 · People in your clips'],
+  ['ranges', '4 · Mark the best parts'],
+  ['music', '5 · Analyze the song'],
+  ['montage', '6 · Build the montage'],
+  ['ai-compose', '7 · AI auto-placement'],
+  ['export', '8 · Export your montage'],
   ['settings', 'Settings & AI providers'],
   ['shortcuts', 'Keyboard shortcuts'],
   ['troubleshooting', 'Troubleshooting'],
@@ -132,10 +133,11 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             <kbd>X</kbd> to reject. Rejected clips dim out and never reach the montage bin.
           </li>
           <li>
-            Filter with the top bar: free-text <b>search</b> (matches filename, description and
-            tags; start with <code>#</code> to search hashtags only), <b>subfolder</b>, minimum
-            stars, hide rejected, sort by name / AI score / stars / duration — and click any{' '}
-            <b>#hashtag</b> to filter by it.
+            Filter with the top bar: free-text <b>search</b> (matches filename, description, tags
+            and people; start with <code>#</code> to search hashtags only, <code>@</code> for
+            people only), <b>subfolder</b>, minimum stars, hide rejected, sort by name / AI score
+            / stars / duration — and click any <b>#hashtag</b> or <b>@person</b> chip to filter by
+            it.
           </li>
         </ul>
         <div className="callout">
@@ -143,7 +145,53 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           4–5 stars to the must-haves.
         </div>
 
-        <h2 id="ranges">3 · Mark the best parts</h2>
+        <h2 id="people">3 · People in your clips (People)</h2>
+        <p>
+          The <b>People</b> tab detects the people appearing in your footage — entirely on your
+          machine, nothing is uploaded. It needs the optional face libraries (
+          <code>pip install -e &quot;.[faces]&quot;</code> in <code>backend/</code>; the page shows
+          the exact hint when they&apos;re missing), and the first detection downloads the face
+          model (~280 MB) once.
+        </p>
+        <ul>
+          <li>
+            Press <b>Detect people</b>: every clip is sampled (one frame every ~2 s) and each face
+            gets an identity fingerprint. Similar faces are <b>grouped automatically</b>; groups
+            appear unnamed at the bottom.
+          </li>
+          <li>
+            <b>Type a name</b> on a group (&quot;Ana&quot;, &quot;abuelo&quot;…) to identify that
+            person. Typing a name that <b>already exists merges</b> the two groups — the quickest
+            way to fix the same person split in two.
+          </li>
+          <li>
+            Named people are matched <b>automatically</b> when you detect faces in new clips, and
+            the matching <b>learns</b>: every face confirmed for a person covers another
+            pose/lighting, making future matches easier.
+          </li>
+          <li>
+            Open <b>Faces</b> on a card (the face count is clickable too): <b>click a face</b> to
+            view it large — the full frame with the face highlighted — and <b>👁</b> opens the
+            video at that exact moment in a new tab. <b>📌</b> makes a face the card&apos;s cover
+            picture, <b>↷</b> detaches a mis-grouped face and <b>🚫</b> ignores a false positive.{' '}
+            <b>Merge into…</b> joins whole groups; <b>♻ Re-cluster</b> re-groups the unassigned
+            faces (named people are never touched).
+          </li>
+          <li>
+            <b>🙈 Hide</b> a person you&apos;re not interested in (strangers in the background):
+            they move to a collapsed <b>Hidden</b> section and leave the Review chips and the AI
+            context, but their faces are kept — new detections keep matching them instead of
+            creating new unnamed groups. Unhide them anytime.
+          </li>
+          <li>
+            Named people show as <b>@name</b> chips on the Review cards (click to filter, or search{' '}
+            <code>@name</code>), and both the in-app AI composer and Claude over MCP see who
+            appears in each clip — so &quot;only clips with Ana&quot; works as a montage
+            instruction.
+          </li>
+        </ul>
+
+        <h2 id="ranges">4 · Mark the best parts</h2>
         <p>
           <b>Double-click</b> a card to open the detail view: a player with a trim bar rendered
           over the clip&apos;s filmstrip.
@@ -166,7 +214,7 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           when auto-placing clips.
         </p>
 
-        <h2 id="music">4 · Analyze the song (Music)</h2>
+        <h2 id="music">5 · Analyze the song (Music)</h2>
         <p>
           The <b>Music</b> tab shows what was extracted locally from your track: <b>BPM</b>, every
           beat (yellow ticks are estimated downbeats), the waveform, and the <b>structure
@@ -189,7 +237,7 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           the AI composer uses to decide where each kind of clip belongs.
         </p>
 
-        <h2 id="montage">5 · Build the montage</h2>
+        <h2 id="montage">6 · Build the montage</h2>
         <p>
           The <b>Montage</b> tab has the <b>bin</b> on the left (all non-rejected videos, best
           rated first, with their saved ranges) and the <b>timeline</b> on the right: ruler, song
@@ -229,7 +277,7 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           </li>
         </ul>
 
-        <h2 id="ai-compose">6 · AI auto-placement</h2>
+        <h2 id="ai-compose">7 · AI auto-placement</h2>
         <p>Two ways to have an AI build the timeline for you:</p>
         <ul>
           <li>
@@ -251,7 +299,7 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           delete them like any other clip.
         </p>
 
-        <h2 id="export">7 · Export your montage</h2>
+        <h2 id="export">8 · Export your montage</h2>
         <p>
           Click <b>Export</b> (top right of the Montage tab) and pick your editor. All three
           exports reference your <b>original</b> files on disk, with every cut at the right frame

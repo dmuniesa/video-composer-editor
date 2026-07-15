@@ -9,13 +9,32 @@ from sqlalchemy import select
 
 from .. import db as dbm
 from ..events import broadcaster
-from ..models import TimelineClip, Video, VideoAnalysis, VideoRange, VideoRating
+from ..models import (
+    ExcludedFile,
+    Face,
+    Person,
+    TimelineClip,
+    Video,
+    VideoAnalysis,
+    VideoRange,
+    VideoRating,
+)
 from .deps import resolve_project
 
 router = APIRouter()
 
 
-def video_dict(v: Video) -> dict:
+def _people_of(v: Video) -> list[dict]:
+    """Named, non-hidden persons appearing in this video (via its non-ignored
+    faces)."""
+    seen: dict[int, str] = {}
+    for f in v.faces:
+        if not f.ignored and f.person is not None and f.person.name and not f.person.hidden:
+            seen[f.person.id] = f.person.name
+    return [{"id": pid, "name": name} for pid, name in sorted(seen.items(), key=lambda i: i[1].lower())]
+
+
+def video_dict(v: Video, people: list[dict] | None = None) -> dict:
     return {
         "id": v.id,
         "rel_path": v.rel_path,
@@ -33,6 +52,8 @@ def video_dict(v: Video) -> dict:
         "error": v.error,
         "has_proxy": v.has_proxy,
         "frame_count": v.frame_count,
+        "faces_status": v.faces_status,
+        "people": _people_of(v) if people is None else people,
         "description": v.analysis.description if v.analysis else "",
         "ai_score": v.analysis.ai_score if v.analysis else None,
         "hashtags": v.analysis.hashtags if v.analysis else [],
@@ -49,7 +70,28 @@ def video_dict(v: Video) -> dict:
 def videos_list(pid: str) -> list[dict]:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
-        return [video_dict(v) for v in db.scalars(select(Video).order_by(Video.filename))]
+        # One batch query for people-per-video instead of lazy-loading each
+        # video's faces (N+1) in video_dict.
+        by_video: dict[int, dict[int, str]] = {}
+        rows = db.execute(
+            select(Face.video_id, Person.id, Person.name)
+            .join(Person, Face.person_id == Person.id)
+            .where(Face.ignored.is_(False), Person.name != "", Person.hidden.is_(False))
+        )
+        for vid, person_id, name in rows:
+            by_video.setdefault(vid, {})[person_id] = name
+        return [
+            video_dict(
+                v,
+                people=[
+                    {"id": pid_, "name": name}
+                    for pid_, name in sorted(
+                        by_video.get(v.id, {}).items(), key=lambda i: i[1].lower()
+                    )
+                ],
+            )
+            for v in db.scalars(select(Video).order_by(Video.filename))
+        ]
 
 
 class RatingRequest(BaseModel):
@@ -84,8 +126,9 @@ def videos_rate(pid: str, body: RatingRequest) -> dict:
 def video_delete(pid: str, vid: int) -> dict:
     """Remove a video from the project: drops its DB row (analysis, rating,
     ranges cascade), any timeline clips using it, and its cache folder. The
-    source file on disk is left untouched — but note a later rescan of its
-    source will re-add the file."""
+    source file on disk is left untouched, and an ExcludedFile tombstone is
+    recorded so a later rescan of its source skips the file instead of re-adding
+    it (restore it from Excluded to undo)."""
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
         video = db.get(Video, vid)
@@ -96,10 +139,59 @@ def video_delete(pid: str, vid: int) -> dict:
             db.delete(clip)
         cache = dbm.cache_dir_for(video_dir) / video.cache_key
         shutil.rmtree(cache, ignore_errors=True)
+        # Remember the deletion so a rescan won't resurrect the file.
+        already = db.scalar(
+            select(ExcludedFile).where(
+                ExcludedFile.source_id == video.source_id,
+                ExcludedFile.rel_path == video.rel_path,
+            )
+        )
+        if already is None:
+            db.add(
+                ExcludedFile(
+                    source_id=video.source_id,
+                    rel_path=video.rel_path,
+                    filename=video.filename,
+                )
+            )
         db.delete(video)
         db.commit()
     broadcaster.publish(pid, "videos", {})
     broadcaster.publish(pid, "timeline", {"source": "video-removed"})
+    return {"ok": True}
+
+
+@router.get("/projects/{pid}/excluded")
+def excluded_list(pid: str) -> list[dict]:
+    """Files the user deleted in Review that a rescan will keep skipping."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        rows = db.scalars(
+            select(ExcludedFile).order_by(ExcludedFile.excluded_at.desc())
+        )
+        return [
+            {
+                "id": e.id,
+                "source_id": e.source_id,
+                "rel_path": e.rel_path,
+                "filename": e.filename,
+                "excluded_at": e.excluded_at.isoformat() if e.excluded_at else None,
+            }
+            for e in rows
+        ]
+
+
+@router.delete("/projects/{pid}/excluded/{eid}")
+def excluded_restore(pid: str, eid: int) -> dict:
+    """Drop a tombstone so the next scan re-adds the file. Returns the file's
+    source_id/rel_path so the caller can trigger a rescan to bring it back."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        exc = db.get(ExcludedFile, eid)
+        if exc is None:
+            raise HTTPException(404, "excluded file not found")
+        db.delete(exc)
+        db.commit()
     return {"ok": True}
 
 

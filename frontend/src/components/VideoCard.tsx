@@ -12,9 +12,11 @@ interface Props {
   onRate: (stars: number) => void
   onTagClick?: (tag: string) => void
   activeTag?: string
+  onPersonClick?: (name: string) => void
+  activePerson?: string
 }
 
-export default function VideoCard({ pid, video, selected, onSelect, onOpen, onRate, onTagClick, activeTag }: Props) {
+export default function VideoCard({ pid, video, selected, onSelect, onOpen, onRate, onTagClick, activeTag, onPersonClick, activePerson }: Props) {
   // Plain click on the thumbnail/title/description opens the detail;
   // hold Ctrl/Cmd/Shift to (multi-)select instead of opening.
   const activate = (e: React.MouseEvent) => {
@@ -40,6 +42,19 @@ export default function VideoCard({ pid, video, selected, onSelect, onOpen, onRa
         <div className="name" title={video.rel_path} onClick={activate}>{video.filename}</div>
         <div className="desc" onClick={activate}>{video.error ? <span className="error-text">{video.error}</span> : video.description || '—'}</div>
         <div className="tag-row">
+          {(video.people ?? []).map((p) => (
+            <span
+              key={`p${p.id}`}
+              className={`person-chip ${activePerson === p.name ? 'active' : ''}`}
+              title={`${p.name} appears in this clip — click to filter`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onPersonClick?.(p.name)
+              }}
+            >
+              @{p.name}
+            </span>
+          ))}
           {video.hashtags.slice(0, 5).map((t) => (
             <span
               key={t}

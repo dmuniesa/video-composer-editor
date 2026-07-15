@@ -227,6 +227,20 @@ def test_delete_video_from_project(client, project):
     # deleting again is a 404
     assert client.delete(f"/api/projects/{pid}/videos/{target['id']}").status_code == 404
 
+    # the deletion is remembered: a rescan must NOT resurrect the file
+    excluded = client.get(f"/api/projects/{pid}/excluded").json()
+    assert [e["rel_path"] for e in excluded] == [target["rel_path"]]
+    client.post(f"/api/projects/{pid}/scan")
+    after = client.get(f"/api/projects/{pid}/videos").json()
+    assert [v["id"] for v in after] == [other["id"]]
+
+    # restoring the tombstone lets the next scan bring the file back
+    assert client.delete(f"/api/projects/{pid}/excluded/{excluded[0]['id']}").status_code == 200
+    assert client.get(f"/api/projects/{pid}/excluded").json() == []
+    client.post(f"/api/projects/{pid}/scan")
+    restored = client.get(f"/api/projects/{pid}/videos").json()
+    assert {v["rel_path"] for v in restored} == {target["rel_path"], other["rel_path"]}
+
 
 def test_compose_endpoint(client, project):
     """Auto-compose through the fake agy: queues a job, applies the model's

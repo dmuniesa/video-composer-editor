@@ -108,13 +108,47 @@ star rating.
   reject. Rejected clips dim out and never reach the montage bin or Claude.
 - You can also click the stars on the card directly (clicking the current
   rating clears it).
-- Filter with the top bar: free-text **search** (matches filename, description
-  and tags; start with `#` to search hashtags only), **subfolder** of the
-  project, minimum stars, hide rejected, sort by name / AI score / stars /
-  duration. Click any **#hashtag** to filter by it.
+- Filter with the top bar: free-text **search** (matches filename, description,
+  tags and people; start with `#` to search hashtags only, `@` for people
+  only), **subfolder** of the project, minimum stars, hide rejected, sort by
+  name / AI score / stars / duration. Click any **#hashtag** or **@person**
+  chip to filter by it.
 
 Suggested workflow: sort by **AI score**, reject the junk with `X`, then give
 4–5 stars to the must-haves.
+
+## 2b. Know who's in each clip (People)
+
+The **People** page detects the people appearing in your footage — locally on
+your machine, nothing is uploaded. It needs the optional face libraries
+(`pip install -e ".[faces]"` in `backend/`; the page tells you if they're
+missing).
+
+- Press **Detect people**: each clip is sampled every ~2 s and every face gets
+  a compact "identity fingerprint". The first run downloads the face model
+  (~280 MB) — later runs are offline.
+- Similar faces are **grouped automatically**. Groups appear unnamed at the
+  bottom; **type a name** ("Ana", "abuelo"…) to identify that person. Typing a
+  name that **already exists merges** the two groups — the quickest way to fix
+  the same person split in two.
+- Once named, that person is **matched automatically** whenever you detect
+  faces in new clips — and the matching **learns**: every face confirmed for a
+  person covers another pose/lighting, so future matches get easier.
+- Open **Faces** on a card (the face count is clickable too): **click a face**
+  to view it large — the full frame with the face highlighted — and **👁**
+  opens the video at that exact moment in a new tab. **📌** makes a face the
+  card's cover picture, **↷** detaches a mis-grouped face and **🚫** marks a
+  false positive as not-a-person. **Merge into…** joins whole groups;
+  **Re-cluster** re-groups the unassigned faces (named people are never
+  touched).
+- **🙈 Hide** a person you're not interested in (strangers in the background):
+  they move to a collapsed **Hidden** section and leave the Review chips and
+  the AI context, but their faces are kept — new detections keep matching them
+  instead of creating new unnamed groups. Unhide them anytime.
+- Named people show as **@name chips** on the Review cards, and both the
+  in-app AI composer and Claude (MCP `list_people`, `list_videos(person=…)`)
+  see who appears in each clip — so "only clips with Ana" works as a montage
+  instruction.
 
 ## 3. Mark the interesting parts
 

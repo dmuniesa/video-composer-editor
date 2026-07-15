@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage'
 import NewProjectPage from './pages/NewProjectPage'
 import SetupPage from './pages/SetupPage'
 import ReviewPage from './pages/ReviewPage'
+import PeoplePage from './pages/PeoplePage'
 import MusicPage from './pages/MusicPage'
 import MontagePage from './pages/MontagePage'
 import SettingsPage from './pages/SettingsPage'
@@ -48,6 +49,7 @@ function ProjectShell() {
         </Link>
         <NavLink to={`/p/${pid}/setup`}>Setup</NavLink>
         <NavLink to={`/p/${pid}/review`}>Review</NavLink>
+        <NavLink to={`/p/${pid}/people`}>People</NavLink>
         <NavLink to={`/p/${pid}/music`}>Music</NavLink>
         <NavLink to={`/p/${pid}/montage`}>Montage</NavLink>
         <NavLink to={`/p/${pid}/guide`}>Guide</NavLink>
@@ -60,6 +62,7 @@ function ProjectShell() {
         <Routes>
           <Route path="setup" element={<SetupPage project={project} onChanged={refreshProject} />} />
           <Route path="review" element={<ReviewPage pid={pid} project={project} />} />
+          <Route path="people" element={<PeoplePage pid={pid} />} />
           <Route path="music" element={<MusicPage pid={pid} />} />
           <Route path="montage" element={<MontagePage pid={pid} />} />
           <Route path="guide" element={<GuidePage />} />
