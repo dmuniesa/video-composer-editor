@@ -676,6 +676,19 @@ kbd {
 .bin-head { display: flex; align-items: center; gap: 6px; }
 .bin-title { flex: 1; font-size: 13px; font-weight: 600; }
 .bin-title .hint { font-weight: 400; }
+/* unobtrusive sort picker: shows just the ↕ glyph, expands on hover/focus */
+.bin-sort {
+  appearance: none; -webkit-appearance: none;
+  width: 26px; font-size: 12px; padding: 2px 4px; text-align: center;
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--text-dim); cursor: pointer; overflow: hidden; white-space: nowrap;
+  transition: width 0.15s ease;
+}
+.bin-sort:hover, .bin-sort:focus {
+  width: 150px; text-align: left; border-color: var(--border); color: var(--text);
+}
+/* solid, readable dropdown popup (native option list) */
+.bin-sort option { background: var(--bg-panel); color: var(--text); }
 
 /* ---- bin filter ---- */
 .bin-filter { display: flex; gap: 6px; align-items: center; }
@@ -695,6 +708,13 @@ kbd {
   border-radius: 6px; overflow: hidden; cursor: grab; font-size: 11px;
 }
 .tl-clip.selected { outline: 2px solid #fff; }
+/* preview of where a bin item will drop: dashed outline + bright insertion edge */
+.tl-clip.drop-ghost {
+  background: rgba(52, 81, 140, 0.35); border: 1px dashed #8fb0ff;
+  box-shadow: -2px 0 0 0 #8fb0ff; cursor: copy; pointer-events: none; opacity: 0.9;
+}
+.tl-clip.drop-ghost .film { opacity: 0.5; }
+.tl-clip.drop-ghost .label { color: #cfe0ff; font-weight: 600; }
 .tl-clip.by-ai { background: #6a4a8c; border-color: #9b6fd0; }
 .tl-clip .label { position: relative; padding: 2px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 /* Premiere-style single thumbnail at the head of the clip, below the label bar. */

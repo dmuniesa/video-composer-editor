@@ -31,6 +31,27 @@ const SEQ_TIERS = [
   { label: '480p', v: 480 },
 ]
 
+type SortKey = 'recorded' | 'name' | 'duration' | 'stars' | 'ai'
+
+const SORT_OPTIONS: { key: SortKey; label: string; cmp: (a: Video, b: Video) => number }[] = [
+  {
+    key: 'recorded',
+    label: 'Recording order',
+    // shot_at ascending; files without a capture date fall to the end, then by name
+    cmp: (a, b) =>
+      (a.shot_at ? Date.parse(a.shot_at) : Infinity) - (b.shot_at ? Date.parse(b.shot_at) : Infinity) ||
+      a.filename.localeCompare(b.filename),
+  },
+  { key: 'name', label: 'Name (A→Z)', cmp: (a, b) => a.filename.localeCompare(b.filename) },
+  { key: 'duration', label: 'Duration (long→short)', cmp: (a, b) => b.duration - a.duration },
+  {
+    key: 'stars',
+    label: 'Rating',
+    cmp: (a, b) => b.stars - a.stars || (b.ai_score ?? 0) - (a.ai_score ?? 0),
+  },
+  { key: 'ai', label: 'AI score', cmp: (a, b) => (b.ai_score ?? -1) - (a.ai_score ?? -1) },
+]
+
 interface DragState {
   clipId: number
   mode: 'move' | 'trim-l' | 'trim-r'
@@ -65,8 +86,15 @@ export default function MontagePage({ pid }: { pid: string }) {
     () => (localStorage.getItem('montageBinView') as 'list' | 'details' | 'grid') || 'list',
   )
   const [binWidth, setBinWidth] = useState(() => Number(localStorage.getItem('montageBinWidth')) || 300)
+  const [binSort, setBinSort] = useState<SortKey>(
+    () => (localStorage.getItem('montageBinSort') as SortKey) || 'recorded',
+  )
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dropTrack, setDropTrack] = useState<number | null>(null)
+  /** payload of the bin item being dragged, so we can preview its size/position over a track */
+  const [binDrag, setBinDrag] = useState<{ video_id: number; t_in: number; t_out: number } | null>(null)
+  /** snapped drop position while hovering a track with a bin item */
+  const [dropPos, setDropPos] = useState<{ trackId: number; time: number } | null>(null)
   const [playhead, setPlayhead] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(true)
   const [previewLowRes, setPreviewLowRes] = useState(true)
@@ -151,6 +179,9 @@ export default function MontagePage({ pid }: { pid: string }) {
   useEffect(() => {
     localStorage.setItem('montageBinWidth', String(binWidth))
   }, [binWidth])
+  useEffect(() => {
+    localStorage.setItem('montageBinSort', binSort)
+  }, [binSort])
 
   // ---- composition frame size: resolution tier × aspect ratio ----
   const applySeqSize = (tier: number, ratioW: number, ratioH: number) => {
@@ -199,14 +230,13 @@ export default function MontagePage({ pid }: { pid: string }) {
   const videoById = useMemo(() => new Map(videos.map((v) => [v.id, v])), [videos])
   const kept = useMemo(() => videos.filter((v) => !v.rejected), [videos])
   const folders = useMemo(() => folderKeyList(kept), [kept])
-  const binVideos = useMemo(
-    () =>
-      kept
-        .filter((v) => matchesQuery(v, binQuery))
-        .filter((v) => binFolder === '*' || folderKey(v) === binFolder)
-        .sort((a, b) => b.stars - a.stars || (b.ai_score ?? 0) - (a.ai_score ?? 0)),
-    [kept, binQuery, binFolder],
-  )
+  const binVideos = useMemo(() => {
+    const cmp = (SORT_OPTIONS.find((o) => o.key === binSort) ?? SORT_OPTIONS[0]).cmp
+    return kept
+      .filter((v) => matchesQuery(v, binQuery))
+      .filter((v) => binFolder === '*' || folderKey(v) === binFolder)
+      .sort(cmp)
+  }, [kept, binQuery, binFolder, binSort])
 
   const snapPoints = useMemo(() => {
     if (!song) return []
@@ -411,15 +441,33 @@ export default function MontagePage({ pid }: { pid: string }) {
       .catch((e) => setToast(e.message))
   }
 
+  // ---- drag from bin ----
+  const startBinDrag = (payload: { video_id: number; t_in: number; t_out: number }) => (e: React.DragEvent) => {
+    e.dataTransfer.setData('application/x-montage', JSON.stringify(payload))
+    e.dataTransfer.effectAllowed = 'copy'
+    setBinDrag(payload)
+  }
+
+  const endBinDrag = () => {
+    setBinDrag(null)
+    setDropTrack(null)
+    setDropPos(null)
+  }
+
+  // where a bin item would land on `track` given the pointer position
+  const dropTimeAt = (track: HTMLElement, clientX: number) => {
+    const rect = track.getBoundingClientRect()
+    return snapTime((clientX - rect.left) / pxPerSec)
+  }
+
   // ---- drop from bin ----
   const onDrop = (track: Track) => (e: React.DragEvent) => {
     e.preventDefault()
-    setDropTrack(null)
+    endBinDrag()
     const raw = e.dataTransfer.getData('application/x-montage')
     if (!raw) return
     const data = JSON.parse(raw) as { video_id: number; t_in: number; t_out: number }
-    const rect = e.currentTarget.getBoundingClientRect()
-    const t = snapTime((e.clientX - rect.left) / pxPerSec)
+    const t = dropTimeAt(e.currentTarget as HTMLElement, e.clientX)
     api
       .addClip(pid, {
         track_id: track.id,
@@ -585,6 +633,16 @@ export default function MontagePage({ pid }: { pid: string }) {
           <span className="bin-title">
             Clips <span className="hint">{binVideos.length}</span>
           </span>
+          <select
+            className="bin-sort"
+            value={binSort}
+            onChange={(e) => setBinSort(e.target.value as SortKey)}
+            title="sort order"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.key} value={o.key}>↕ {o.label}</option>
+            ))}
+          </select>
           <div className="bin-view-toggle">
             <button className={binView === 'list' ? 'active' : ''} title="compact list" onClick={() => setBinView('list')}>☰</button>
             <button className={binView === 'details' ? 'active' : ''} title="list with details" onClick={() => setBinView('details')}>≣</button>
@@ -639,12 +697,8 @@ export default function MontagePage({ pid }: { pid: string }) {
                 className="bin-item"
                 draggable
                 onDoubleClick={() => setDetailId(v.id)}
-                onDragStart={(e) =>
-                  e.dataTransfer.setData(
-                    'application/x-montage',
-                    JSON.stringify({ video_id: v.id, t_in: 0, t_out: v.duration }),
-                  )
-                }
+                onDragStart={startBinDrag({ video_id: v.id, t_in: 0, t_out: v.duration })}
+                onDragEnd={endBinDrag}
               >
                 <ScrubThumb pid={pid} videoId={v.id} duration={v.duration}>
                   {binView === 'grid' && <span className="bin-grid-dur">{fmtTime(v.duration)}</span>}
@@ -677,12 +731,8 @@ export default function MontagePage({ pid }: { pid: string }) {
                     key={r.id}
                     className="bin-range"
                     draggable
-                    onDragStart={(e) =>
-                      e.dataTransfer.setData(
-                        'application/x-montage',
-                        JSON.stringify({ video_id: v.id, t_in: r.t_in, t_out: r.t_out }),
-                      )
-                    }
+                    onDragStart={startBinDrag({ video_id: v.id, t_in: r.t_in, t_out: r.t_out })}
+                    onDragEnd={endBinDrag}
                   >
                     ◳ {r.label || 'range'} {fmtTime(r.t_in)}–{fmtTime(r.t_out)}
                   </div>
@@ -916,9 +966,19 @@ export default function MontagePage({ pid }: { pid: string }) {
                 className={`tl-track ${dropTrack === track.id ? 'drop-target' : ''}`}
                 onDragOver={(e) => {
                   e.preventDefault()
+                  e.dataTransfer.dropEffect = 'copy'
                   setDropTrack(track.id)
+                  const time = dropTimeAt(e.currentTarget as HTMLElement, e.clientX)
+                  setDropPos((cur) =>
+                    cur && cur.trackId === track.id && cur.time === time ? cur : { trackId: track.id, time },
+                  )
                 }}
-                onDragLeave={() => setDropTrack((cur) => (cur === track.id ? null : cur))}
+                onDragLeave={(e) => {
+                  // ignore leaves into child elements of the same track
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return
+                  setDropTrack((cur) => (cur === track.id ? null : cur))
+                  setDropPos((cur) => (cur && cur.trackId === track.id ? null : cur))
+                }}
                 onDrop={onDrop(track)}
                 onPointerDown={(e) => {
                   if (e.target === e.currentTarget) {
@@ -967,6 +1027,21 @@ export default function MontagePage({ pid }: { pid: string }) {
                     </div>
                   )
                 })}
+                {/* preview of where a bin item will land */}
+                {binDrag && dropPos?.trackId === track.id && (
+                  <div
+                    className="tl-clip drop-ghost"
+                    style={{
+                      left: dropPos.time * pxPerSec,
+                      width: Math.max((binDrag.t_out - binDrag.t_in) * pxPerSec, 8),
+                    }}
+                  >
+                    {videoById.has(binDrag.video_id) && (
+                      <img className="film" src={media.thumb(pid, binDrag.video_id)} alt="" draggable={false} />
+                    )}
+                    <div className="label">{fmtTime(dropPos.time)}</div>
+                  </div>
+                )}
                 {/* ghost while dragging across tracks */}
                 {drag && drag.previewTrackId === track.id && drag.trackId !== track.id && (
                   <div
