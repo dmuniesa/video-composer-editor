@@ -488,6 +488,21 @@ kbd {
 .range-list .row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
 .range-list .row.active { color: var(--accent); }
 .hint { font-size: 12px; color: var(--text-dim); }
+.keys-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; margin-left: 6px; padding: 0;
+  border: 1px solid var(--border); border-radius: 50%;
+  background: transparent; color: var(--text-dim);
+  font-size: 11px; line-height: 1; cursor: pointer; vertical-align: middle;
+}
+.keys-toggle:hover { color: var(--text); border-color: var(--text-dim); }
+.keys-toggle[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.keys-help {
+  margin: 6px 0 0; display: grid; grid-template-columns: auto 1fr;
+  gap: 3px 12px; font-size: 12px; color: var(--text-dim);
+}
+.keys-help dt { white-space: nowrap; }
+.keys-help dd { margin: 0; }
 
 /* ---- Music page ---- */
 .music-page { padding: 16px; display: flex; flex-direction: column; gap: 16px; }

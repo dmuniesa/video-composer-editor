@@ -17,7 +17,8 @@ interface Props {
 }
 
 /** Detail drawer: player + trim bar with in/out handles over a filmstrip.
- *  Keyboard: I = set in, O = set out, Enter = save range, L = loop range. */
+ *  Keyboard: I = set in, O = set out, Enter = save range, L = loop range.
+ *  The hint line shows the common keys; the full list is behind the ? toggle. */
 export default function VideoDetail({ pid, video, aiAvailable, initialTime, onClose, onChanged, onRate, onReject, onDelete }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const barRef = useRef<HTMLDivElement>(null)
@@ -30,6 +31,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
   const [playMode, setPlayMode] = useState<'once' | 'loop' | null>(null)
   const [editTags, setEditTags] = useState(false)
   const [tagsText, setTagsText] = useState(video.hashtags.join(' '))
+  const [showKeys, setShowKeys] = useState(false)
   const duration = video.duration || 1
 
   // Technical/EXIF info for this clip — shown here in Review, never on thumbnails.
@@ -246,9 +248,29 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
           <div className="playhead" style={{ left: `${(playhead / duration) * 100}%` }} />
         </div>
         <div className="hint">
-          <b>I</b> set in · <b>O</b> set out · <b>Enter</b> save range · <b>Space</b> play/pause · <b>←/→</b> step one frame · <b>Shift+←/→</b> prev/next clip · <b>L</b> loop selected · ▶ / 🔁 on a range play once or loop (click again to stop)
+          <b>I</b>/<b>O</b> set in/out · <b>Enter</b> save range · <b>Space</b> play
+          <button
+            type="button"
+            className="keys-toggle"
+            title="Keyboard shortcuts"
+            aria-expanded={showKeys}
+            onClick={() => setShowKeys((v) => !v)}
+          >
+            ?
+          </button>
           {draftIn != null && <> — draft: {fmtTime(draftIn)} → {fmtTime(draftOut ?? playhead)}</>}
         </div>
+        {showKeys && (
+          <dl className="keys-help">
+            <dt><b>I</b> / <b>O</b></dt><dd>set in / out point</dd>
+            <dt><b>Enter</b></dt><dd>save range from in to out</dd>
+            <dt><b>Space</b></dt><dd>play / pause</dd>
+            <dt><b>←</b> / <b>→</b></dt><dd>step one frame back / forward</dd>
+            <dt><b>Shift+←</b> / <b>Shift+→</b></dt><dd>jump to previous / next clip</dd>
+            <dt><b>L</b></dt><dd>loop the selected range</dd>
+            <dt>▶ / 🔁</dt><dd>on a range: play once or loop (click again to stop)</dd>
+          </dl>
+        )}
 
         <div className="range-list">
           {video.ranges.length === 0 && <span className="hint">No ranges yet — mark the interesting parts with I/O + Enter.</span>}
