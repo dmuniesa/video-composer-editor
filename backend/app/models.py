@@ -66,6 +66,10 @@ class Video(Base):
     codec: Mapped[str] = mapped_column(String, default="")
     size: Mapped[int] = mapped_column(Integer, default=0)
     shot_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Curated ffprobe container tags (camera make/model, lens, software,
+    # location, plus any other tags). JSON object, "{}" when none. New column,
+    # back-filled onto legacy databases by db._ensure_columns.
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
     # cache_key names this video's folder inside .montage-cache/
     cache_key: Mapped[str] = mapped_column(String, default="")
     # pending -> extracting -> extracted -> analyzing -> ready | error
@@ -75,6 +79,17 @@ class Video(Base):
     frame_count: Mapped[int] = mapped_column(Integer, default=0)
     # none -> detecting -> done | error (independent of the media/AI pipeline)
     faces_status: Mapped[str] = mapped_column(String, default="none")
+
+    @property
+    def meta(self) -> dict:
+        try:
+            return json.loads(self.meta_json)
+        except (ValueError, TypeError):
+            return {}
+
+    @meta.setter
+    def meta(self, value: dict) -> None:
+        self.meta_json = json.dumps(value)
 
     source: Mapped[Source | None] = relationship(back_populates="videos")
     analysis: Mapped[VideoAnalysis | None] = relationship(

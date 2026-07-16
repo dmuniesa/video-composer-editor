@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, media, fmtTime } from '../lib/api'
+import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import type { Video, VideoRange } from '../lib/types'
 import StarRating from './StarRating'
 
@@ -29,6 +29,27 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
   const [editTags, setEditTags] = useState(false)
   const [tagsText, setTagsText] = useState(video.hashtags.join(' '))
   const duration = video.duration || 1
+
+  // Technical/EXIF info for this clip — shown here in Review, never on thumbnails.
+  const meta = video.meta || {}
+  const camera = [meta.make, meta.model].filter(Boolean).join(' ')
+  const shotAt = (() => {
+    if (!video.shot_at) return null
+    const d = new Date(video.shot_at)
+    return isNaN(d.getTime()) ? video.shot_at : d.toLocaleString()
+  })()
+  const infoRows: [string, string][] = [
+    ...(shotAt ? [['Shot', shotAt] as [string, string]] : []),
+    ...(camera ? [['Camera', camera] as [string, string]] : []),
+    ...(meta.lens ? [['Lens', meta.lens] as [string, string]] : []),
+    ...(meta.software ? [['Software', meta.software] as [string, string]] : []),
+    ...(video.width && video.height ? [['Resolution', `${video.width}×${video.height}`] as [string, string]] : []),
+    ...(video.codec ? [['Codec', video.codec] as [string, string]] : []),
+    ...(video.fps ? [['Frame rate', `${video.fps.toFixed(2)} fps`] as [string, string]] : []),
+    ...(video.size ? [['Size', fmtBytes(video.size)] as [string, string]] : []),
+    ...(meta.location ? [['Location', meta.location] as [string, string]] : []),
+  ]
+  const extraTags = meta.tags ? Object.entries(meta.tags) : []
 
   const timeAt = (clientX: number) => {
     const rect = barRef.current!.getBoundingClientRect()
@@ -218,34 +239,69 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
           ))}
         </div>
 
-        <div className="panel">
-          <div className="panel-title-row">
-            <h2>AI analysis {video.ai_score != null && <span className="ai-score">score <b>{video.ai_score}</b>/10</span>}</h2>
-            {aiAvailable && (
-              <button
-                className="primary small"
-                disabled={video.status === 'analyzing'}
-                title={video.description ? 'Re-run the AI analysis for this clip' : 'Describe & score this clip with AI'}
-                onClick={() => api.analyze(pid, [video.id], !!video.description).then(onChanged).catch(() => {})}
-              >
-                {video.status === 'analyzing' ? 'Analyzing…' : video.description ? '✨ Re-analyze' : '✨ Analyze with AI'}
-              </button>
+        <div className="detail-panels-2col">
+          <div className="panel">
+            <div className="panel-title-row">
+              <h2>AI analysis {video.ai_score != null && <span className="ai-score">score <b>{video.ai_score}</b>/10</span>}</h2>
+              {aiAvailable && (
+                <button
+                  className="primary small"
+                  disabled={video.status === 'analyzing'}
+                  title={video.description ? 'Re-run the AI analysis for this clip' : 'Describe & score this clip with AI'}
+                  onClick={() => api.analyze(pid, [video.id], !!video.description).then(onChanged).catch(() => {})}
+                >
+                  {video.status === 'analyzing' ? 'Analyzing…' : video.description ? '✨ Re-analyze' : '✨ Analyze with AI'}
+                </button>
+              )}
+            </div>
+            <p style={{ margin: '4px 0' }}>{video.description || <span className="hint">No description yet.</span>}</p>
+            {editTags ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input style={{ flex: 1 }} value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
+                <button className="primary small" onClick={saveTags}>Save</button>
+              </div>
+            ) : (
+              <div className="tag-row" onDoubleClick={() => setEditTags(true)}>
+                {video.hashtags.map((t) => (
+                  <span key={t} className="tag">#{t}</span>
+                ))}
+                <button className="small" onClick={() => setEditTags(true)}>edit tags</button>
+              </div>
             )}
           </div>
-          <p style={{ margin: '4px 0' }}>{video.description || <span className="hint">No description yet.</span>}</p>
-          {editTags ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input style={{ flex: 1 }} value={tagsText} onChange={(e) => setTagsText(e.target.value)} />
-              <button className="primary small" onClick={saveTags}>Save</button>
+
+          <div className="panel">
+            <div className="panel-title-row">
+              <h2>Clip info</h2>
             </div>
-          ) : (
-            <div className="tag-row" onDoubleClick={() => setEditTags(true)}>
-              {video.hashtags.map((t) => (
-                <span key={t} className="tag">#{t}</span>
-              ))}
-              <button className="small" onClick={() => setEditTags(true)}>edit tags</button>
-            </div>
-          )}
+            {infoRows.length === 0 ? (
+              <span className="hint">No technical metadata found in this file.</span>
+            ) : (
+              <div className="clip-info">
+                {infoRows.map(([label, value]) => (
+                  <div key={label} className="row">
+                    <span className="hint">{label}</span>
+                    <span>{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {extraTags.length > 0 && (
+              <details style={{ marginTop: 8 }}>
+                <summary className="hint" style={{ cursor: 'pointer' }}>
+                  Other tags ({extraTags.length})
+                </summary>
+                <div className="clip-info" style={{ marginTop: 6 }}>
+                  {extraTags.map(([k, v]) => (
+                    <div key={k} className="row">
+                      <span className="hint">{k}</span>
+                      <span style={{ wordBreak: 'break-word' }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -77,6 +77,17 @@ export interface VideoRange {
   label: string
 }
 
+/** Curated ffprobe container tags. Fields present only when the file carried
+ *  them; `tags` holds any other raw tags. Not shown on thumbnails. */
+export interface VideoMeta {
+  make?: string
+  model?: string
+  lens?: string
+  software?: string
+  location?: string
+  tags?: Record<string, string>
+}
+
 export interface Video {
   id: number
   rel_path: string
@@ -90,6 +101,7 @@ export interface Video {
   codec: string
   size: number
   shot_at: string | null
+  meta: VideoMeta
   status: string
   error: string | null
   has_proxy: boolean

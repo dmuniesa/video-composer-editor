@@ -121,6 +121,7 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
                 video.height = probe.height
                 video.codec = probe.codec
                 video.shot_at = probe.shot_at
+                video.meta = probe.meta
                 db.commit()
 
                 jobs.update(job, 0.1, "extracting frames")

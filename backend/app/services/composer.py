@@ -68,7 +68,11 @@ Rules:
 - Videos may list "people": the named people appearing in them. Honor
   instructions that reference people (e.g. "more shots of Ana", "only clips
   with Marc"), and when no instruction says otherwise, vary who is on screen
-  across the montage.\
+  across the montage.
+- Videos may carry "shot_at" (recording timestamp), "camera" and "lens". Use
+  these for continuity: clips shot close in time or on the same camera likely
+  belong to the same moment/scene, so keep them together and roughly ordered by
+  shot_at unless an instruction says otherwise.\
 """
 
 
@@ -164,26 +168,36 @@ def build_context(db: Session) -> dict:
     for v in db.scalars(select(Video).order_by(Video.filename)):
         if v.rating and v.rating.rejected:
             continue
-        videos.append(
-            {
-                "id": v.id,
-                "filename": v.filename,
-                "duration": _round(v.duration),
-                "stars": v.rating.stars if v.rating else 0,
-                "ai_score": v.analysis.ai_score if v.analysis else None,
-                "description": v.analysis.description if v.analysis else "",
-                "hashtags": v.analysis.hashtags if v.analysis else [],
-                **(
-                    {"people": sorted(people_by_video[v.id])}
-                    if v.id in people_by_video
-                    else {}
-                ),
-                "ranges": [
-                    {"t_in": _round(r.t_in), "t_out": _round(r.t_out), "label": r.label}
-                    for r in v.ranges
-                ],
-            }
-        )
+        entry = {
+            "id": v.id,
+            "filename": v.filename,
+            "duration": _round(v.duration),
+            "stars": v.rating.stars if v.rating else 0,
+            "ai_score": v.analysis.ai_score if v.analysis else None,
+            "description": v.analysis.description if v.analysis else "",
+            "hashtags": v.analysis.hashtags if v.analysis else [],
+            **(
+                {"people": sorted(people_by_video[v.id])}
+                if v.id in people_by_video
+                else {}
+            ),
+            "ranges": [
+                {"t_in": _round(r.t_in), "t_out": _round(r.t_out), "label": r.label}
+                for r in v.ranges
+            ],
+        }
+        # Technical/EXIF context so the composer can group by shooting time or
+        # camera (e.g. keep angles from the same camera together). Compact: the
+        # curated fields only, no raw tag dump.
+        meta = v.meta
+        cam = " ".join(x for x in (meta.get("make"), meta.get("model")) if x)
+        if v.shot_at:
+            entry["shot_at"] = v.shot_at
+        if cam:
+            entry["camera"] = cam
+        if meta.get("lens"):
+            entry["lens"] = meta["lens"]
+        videos.append(entry)
     timeline = ops.timeline_state(db)
     for track in timeline["tracks"]:
         for clip in track["clips"]:

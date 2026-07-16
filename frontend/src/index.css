@@ -148,6 +148,11 @@ button.primary.big:hover { filter: brightness(1.12); }
 .panel-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .panel-title-row h2 { margin: 0; }
 
+/* Read-only key/value list (clip technical info in the Review detail drawer). */
+.clip-info { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; font-size: 13px; }
+.clip-info .row { display: contents; }
+.clip-info .row > span:first-child { white-space: nowrap; }
+
 .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .project-card {
   display: flex; align-items: center; gap: 12px; text-align: left;
@@ -446,6 +451,10 @@ kbd {
   border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: auto; padding: 16px; gap: 12px;
 }
 .detail-panel video { width: 100%; background: #000; border-radius: 8px; max-height: 46vh; }
+/* AI analysis + Clip info side by side (less vertical scrolling in Review). */
+.detail-panels-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: stretch; }
+.detail-panels-2col .panel { min-width: 0; }
+@media (max-width: 700px) { .detail-panels-2col { grid-template-columns: 1fr; } }
 .detail-header { display: flex; align-items: center; gap: 12px; }
 .detail-header h3 { margin: 0; flex: 1; font-size: 15px; word-break: break-all; }
 

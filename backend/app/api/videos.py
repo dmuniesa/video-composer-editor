@@ -48,6 +48,7 @@ def video_dict(v: Video, people: list[dict] | None = None) -> dict:
         "codec": v.codec,
         "size": v.size,
         "shot_at": v.shot_at,
+        "meta": v.meta,
         "status": v.status,
         "error": v.error,
         "has_proxy": v.has_proxy,
