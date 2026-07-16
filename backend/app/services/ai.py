@@ -21,6 +21,11 @@ class AIError(RuntimeError):
     pass
 
 
+# Longest clip attached as video to the analysis (agy video mode); longer
+# clips fall back to sampled frames to keep uploads/latency bounded.
+VIDEO_ATTACH_MAX_S = 180
+
+
 VIDEO_PROMPT = """\
 You are helping select vacation video clips for a music montage.
 {frames_intro}
@@ -207,6 +212,36 @@ def _label_or_none(value, max_len: int = 24) -> str | None:
     return text[:max_len] or None
 
 
+def _norm_highlight_ranges(value, duration: float) -> list[dict]:
+    """[{"t_in", "t_out", "reason"}] from the model's {start_s, end_s, reason}
+    items: floats clamped to [0, duration], at least 0.5s long, sorted, max 3.
+    Invalid items are dropped; never raises."""
+    if not isinstance(value, list) or duration <= 0:
+        return []
+    out = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        try:
+            start = float(item.get("start_s"))
+            end = float(item.get("end_s"))
+        except (TypeError, ValueError):
+            continue
+        start = max(0.0, min(start, duration))
+        end = max(0.0, min(end, duration))
+        if end - start < 0.5:
+            continue
+        out.append(
+            {
+                "t_in": round(start, 2),
+                "t_out": round(end, 2),
+                "reason": str(item.get("reason", "")).strip()[:200],
+            }
+        )
+    out.sort(key=lambda h: h["t_in"])
+    return out[:3]
+
+
 def _ask(prompt: str, images: list[Path], workdir: Path | None) -> str:
     active = provider()
     if active == "agy":
@@ -216,21 +251,35 @@ def _ask(prompt: str, images: list[Path], workdir: Path | None) -> str:
     raise AIError(unavailable_reason())
 
 
-def analyze_video_frames(
-    frame_paths: list[Path], workdir: Path, people: list[str] | None = None
+def analyze_clip(
+    frame_paths: list[Path],
+    workdir: Path,
+    people: list[str] | None = None,
+    video_file: Path | None = None,
+    duration: float = 0.0,
 ) -> dict:
-    """Describe/score/hashtag a clip from its sampled frames, plus whichever
-    optional aspects are enabled in Settings (mood, energy, scene/time_of_day/
-    shot_type). `people` are names already identified in the clip by face
-    recognition; when given (and the toggle is on) the description can use them.
+    """Describe/score/hashtag a clip, plus whichever optional aspects are
+    enabled in Settings (mood, energy, scene/time_of_day/shot_type, highlights).
+
+    The clip reaches the model either as `video_file` (the low-res preview.mp4,
+    agy only — the caller decides per the agy_media setting; the model sees
+    motion and can return highlight time ranges) or as the sampled
+    `frame_paths`. `people` are names already identified by face recognition;
+    when given (and the toggle is on) the description can use them.
 
     Returns {"description", "score", "hashtags", "mood", "energy", "scene",
-    "time_of_day", "shot_type", "raw"} — every key always present;
-    disabled/missing aspects come back as None/[].
-    Retries once on unparseable output."""
+    "time_of_day", "shot_type", "highlights", "raw"} — every key always
+    present; disabled/missing aspects come back as None/[]. Highlights are
+    only requested in video mode. Retries once on unparseable output."""
     aspects = settings.get().analysis
     active = provider()
-    if active == "agy":
+    if video_file is not None:
+        # Absolute path required for the same reason as the frame refs below.
+        intro = (
+            f"The attached file is ONE video clip, {duration:.1f} seconds long: "
+            f"@{video_file.resolve()}"
+        )
+    elif active == "agy":
         # Absolute paths are required: agy ignores the process cwd and runs in
         # a global shared scratch dir (~/.gemini/antigravity-cli/scratch), so
         # relative @frame_00.jpg refs resolve to whatever stale frames a
@@ -245,6 +294,16 @@ def analyze_video_frames(
     enabled = [k for k in _ASPECT_FIELDS if getattr(aspects, k)]
     fields = _BASE_FIELDS + [f for k in enabled for f in _ASPECT_FIELDS[k]]
     rules = _BASE_RULES + [r for k in enabled for r in _ASPECT_RULES[k]]
+    # Highlights need real timestamps, which only the video attachment gives —
+    # from sampled stills the model cannot judge times, so don't ask.
+    want_highlights = aspects.highlights and video_file is not None
+    if want_highlights:
+        fields.append('"highlights": [{"start_s": <seconds>, "end_s": <seconds>, "reason": "why"}]')
+        rules.append(
+            '"highlights": the 1-3 single best moments as time ranges in seconds '
+            f"from the clip's start (between 0 and {duration:.1f}), about 0.5s "
+            "precision, each at least 1s long. [] if nothing stands out."
+        )
     prompt = VIDEO_PROMPT.format(
         frames_intro=intro,
         people_note=people_note,
@@ -253,7 +312,10 @@ def analyze_video_frames(
     )
 
     log.info(
-        "analyze video: provider=%s, %d frame(s) in %s", active, len(frame_paths), workdir
+        "analyze clip: provider=%s, %s in %s",
+        active,
+        "video attach" if video_file is not None else f"{len(frame_paths)} frame(s)",
+        workdir,
     )
     last_error: Exception | None = None
     for attempt in range(1, 3):
@@ -280,6 +342,11 @@ def analyze_video_frames(
                     _enum_or_none(data.get("time_of_day"), _TIME_OF_DAY) if aspects.scene else None
                 ),
                 "shot_type": shot_type,
+                "highlights": (
+                    _norm_highlight_ranges(data.get("highlights"), duration)
+                    if want_highlights
+                    else []
+                ),
                 "raw": raw,
             }
         except (ValueError, TypeError, AIError) as exc:

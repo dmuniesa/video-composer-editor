@@ -141,11 +141,15 @@ def make_preview(video: Path, cache: Path) -> Path:
 
 
 def clear_derived_frames(cache: Path) -> None:
-    """Delete analysis frames + filmstrip + thumbnail so the next media job
-    regenerates them with the current settings (the proxy is kept)."""
+    """Delete analysis frames + filmstrip + thumbnail + preview so the next
+    media job regenerates them with the current settings. The preview matters:
+    it must honor a changed preview_height, both for the montage SD player and
+    as the video the AI analyzes in video mode. Only the (expensive) proxy is
+    kept."""
     if not cache.is_dir():
         return
     for p in cache.glob("frame_*.jpg"):
         p.unlink(missing_ok=True)
     (cache / "filmstrip.jpg").unlink(missing_ok=True)
     (cache / "thumb.jpg").unlink(missing_ok=True)
+    (cache / "preview.mp4").unlink(missing_ok=True)

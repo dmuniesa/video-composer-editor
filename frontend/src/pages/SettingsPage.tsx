@@ -158,6 +158,15 @@ export default function SettingsPage({ pid }: { pid?: string }) {
                 <option value="Gemini 3.1 Pro (Low)">Gemini 3.1 Pro (Low)</option>
                 <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High) — most capable</option>
               </select>
+
+              <label>Analysis media</label>
+              <select
+                value={settings.analysis.agy_media}
+                onChange={(e) => setAnalysis({ agy_media: e.target.value })}
+              >
+                <option value="video">Video — low-res clip; sees motion, enables highlights</option>
+                <option value="frames">Frames — sampled JPEG stills, as before</option>
+              </select>
             </>
           )}
 
@@ -205,6 +214,14 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             full list your account can reach.
           </p>
         )}
+        {showAgy && settings.analysis.agy_media === 'video' && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            <b>Video mode</b> attaches each clip's small preview MP4 (the "preview height" below)
+            so Gemini sees the actual motion and can suggest the best moments as time ranges.
+            Clips longer than 3 minutes — or scanned before previews existed — automatically fall
+            back to frames. OpenAI-compatible providers always use frames.
+          </p>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
           <button onClick={testAI} disabled={busy}>Save & test AI</button>
           <span className="hint">{testResult}</span>
@@ -245,6 +262,14 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             onChange={(e) => setAnalysis({ scene: e.target.checked })}
           />
           <span><b>Scene & context</b> — scene label, time of day and shot type</span>
+        </label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.analysis.highlights}
+            onChange={(e) => setAnalysis({ highlights: e.target.checked })}
+          />
+          <span><b>Highlights</b> — the clip's best moments as time ranges, suggested in the detail view and savable as ranges (video mode only)</span>
         </label>
         <label className="toggle-row">
           <input
@@ -303,13 +328,14 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <input type="number" min={240} max={1080} step={120} value={f.proxy_height}
             onChange={(e) => setFrames({ proxy_height: num(e.target.value, 720) })} />
 
-          <label>Preview height (px, montage SD mode)</label>
+          <label>Preview height (px, montage SD mode + AI video mode)</label>
           <input type="number" min={144} max={720} step={36} value={f.preview_height}
-            onChange={(e) => setFrames({ preview_height: num(e.target.value, 360) })} />
+            onChange={(e) => setFrames({ preview_height: num(e.target.value, 480) })} />
         </div>
         <p className="hint" style={{ marginTop: 10 }}>
-          Example: min 3, max 10, +1 every 5 s → a 20 s clip gets 7 frames. Changes apply to
-          videos scanned from now on{pid ? ' — or re-extract this project below' : ''}.
+          Example: min 3, max 10, +1 every 5 s → a 20 s clip gets 7 frames. The preview is also
+          the video the AI watches when the analysis media is set to <b>Video</b>. Changes apply
+          to videos scanned from now on{pid ? ' — or re-extract this project below (previews are regenerated too)' : ''}.
         </p>
       </div>
 

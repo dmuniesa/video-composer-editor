@@ -31,18 +31,52 @@ def test_extract_json_missing():
 
 # ---- agy provider ----
 
-def test_analyze_video_frames_with_fake_cli(fake_agy, tmp_path):
+def test_analyze_clip_with_fake_cli(fake_agy, tmp_path):
     frames = []
     for i in range(3):
         p = tmp_path / f"frame_{i:02d}.jpg"
         p.write_bytes(b"jpg")
         frames.append(p)
     assert ai.provider() == "agy"
-    result = ai.analyze_video_frames(frames, workdir=tmp_path)
+    result = ai.analyze_clip(frames, workdir=tmp_path)
     assert result["score"] == 7
     assert "beach" in result["description"].lower()
     # hashtags are normalized: lowercased, stripped of # and spaces
     assert result["hashtags"] == ["beach", "sunny", "peoplewalking"]
+    # frames mode never asks for (or keeps) highlights, even if the model
+    # volunteers them — timestamps can't be judged from stills
+    assert result["highlights"] == []
+
+
+def test_analyze_clip_video_mode_returns_highlight_ranges(fake_agy, tmp_path):
+    clip = tmp_path / "preview.mp4"
+    clip.write_bytes(b"mp4")
+    result = ai.analyze_clip([], workdir=tmp_path, video_file=clip, duration=10.0)
+    assert result["score"] == 7
+    # the fake returns {start_s: 0.5, end_s: 2.0} -> normalized to t_in/t_out
+    assert result["highlights"] == [{"t_in": 0.5, "t_out": 2.0, "reason": "best moment"}]
+
+
+def test_norm_highlight_ranges():
+    norm = ai._norm_highlight_ranges
+    # clamps to [0, duration], drops sub-0.5s and invalid items, sorts, caps at 3
+    raw = [
+        {"start_s": 8, "end_s": 99, "reason": "clamped end"},
+        {"start_s": -2, "end_s": 1.0, "reason": "clamped start"},
+        {"start_s": 3, "end_s": 3.2, "reason": "too short"},
+        {"start_s": "x", "end_s": 5, "reason": "not numeric"},
+        "not a dict",
+        {"start_s": 4, "end_s": 6, "reason": "r" * 500},
+        {"start_s": 2, "end_s": 3, "reason": "ok"},
+    ]
+    out = norm(raw, 10.0)
+    assert [h["t_in"] for h in out] == [0.0, 2.0, 4.0]  # sorted, capped at 3
+    assert out[0] == {"t_in": 0.0, "t_out": 1.0, "reason": "clamped start"}
+    assert out[2]["reason"] == "r" * 200
+    # garbage inputs never raise
+    assert norm(None, 10.0) == []
+    assert norm({"start_s": 1}, 10.0) == []
+    assert norm([{"start_s": 1, "end_s": 5}], 0.0) == []
 
 
 def test_label_sections_with_fake_cli(fake_agy):
@@ -88,7 +122,7 @@ def test_agy_missing_binary(monkeypatch, tmp_path):
     p = tmp_path / "f.jpg"
     p.write_bytes(b"x")
     with pytest.raises(ai.AIError, match="No AI provider"):
-        ai.analyze_video_frames([p], workdir=tmp_path)
+        ai.analyze_clip([p], workdir=tmp_path)
 
 
 # ---- OpenAI-compatible provider ----
@@ -154,7 +188,7 @@ def test_dispatcher_uses_openai_when_agy_missing(tmp_path, monkeypatch):
         p = tmp_path / f"frame_{i:02d}.jpg"
         p.write_bytes(b"x")
         frames.append(p)
-    result = ai.analyze_video_frames(frames, workdir=tmp_path)
+    result = ai.analyze_clip(frames, workdir=tmp_path)
     assert result["score"] == 8
     assert result["hashtags"] == ["lake", "boattrip"]
 

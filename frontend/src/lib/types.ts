@@ -62,6 +62,9 @@ export interface AppSettings {
     energy: boolean
     scene: boolean
     people_in_prompt: boolean
+    highlights: boolean
+    /** How agy receives the clip: 'video' (low-res preview.mp4) or 'frames'. */
+    agy_media: string
   }
   lyrics: {
     enabled: boolean
@@ -125,9 +128,18 @@ export interface Video {
   scene: string | null
   time_of_day: string | null
   shot_type: string | null
+  highlights: VideoHighlight[]
   stars: number
   rejected: boolean
   ranges: VideoRange[]
+}
+
+/** AI-suggested best moment of a clip as a time range (video-mode analysis).
+ *  Seconds from the clip's start; savable as a real VideoRange in the UI. */
+export interface VideoHighlight {
+  t_in: number
+  t_out: number
+  reason: string
 }
 
 /** Named person appearing in a video (Review chips / filters). */

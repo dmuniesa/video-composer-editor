@@ -240,6 +240,12 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           Saved ranges become draggable items in the montage bin, and the AI composer prefers them
           when auto-placing clips.
         </p>
+        <p>
+          With the analysis media set to <b>Video</b> (Settings, agy only), the AI also proposes{' '}
+          <b>suggested moments</b> — time ranges with a reason, shown in the AI analysis panel.
+          Press <b>▶</b> to preview one and <b>＋</b> to save it as a normal range you can edit;
+          your own ranges always take priority.
+        </p>
 
         <h2 id="music">5 · Analyze the song (Music)</h2>
         <p>
@@ -323,9 +329,10 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
         </ul>
         <p>
           Both composers see everything the analysis produced: descriptions, hashtags, scores,
-          star ratings, saved ranges, named people — and, when enabled, mood/energy/scene, used to
-          put high-energy clips on the chorus, calm scenic ones on intros and instrumental
-          passages, and to vary shot types.
+          star ratings, saved ranges, named people — and, when enabled, mood/energy/scene and the
+          AI-suggested highlight ranges, used to put high-energy clips on the chorus, calm scenic
+          ones on intros and instrumental passages, vary shot types, and cut long clips at their
+          best moment.
         </p>
         <p>
           Clips placed by an AI appear <b>purple</b> on the timeline, live. You can drag, trim or

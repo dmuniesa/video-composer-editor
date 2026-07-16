@@ -114,6 +114,17 @@ command work. Rebuild the frontend after this change
 (`cd frontend && npm run build`) since `SettingsPage.tsx`'s placeholder
 changed.
 
+**Video-mode analysis (agy).** By default (`analysis.agy_media = "video"`) the
+per-clip analysis attaches the clip's low-res `preview.mp4` (silent H.264,
+`frames.preview_height`, default 480) instead of sampled JPEGs, so Gemini sees
+motion and returns "highlights" — best moments as time ranges. Falls back to
+frames automatically when the provider isn't agy, the preview is missing
+(projects scanned before the rendition existed), or the clip exceeds
+`ai.VIDEO_ATTACH_MAX_S` (180 s). Verified live 2026-07-16 with a 5 s Bioparc
+clip: valid JSON with in-bounds ranges whose timestamps matched the frames.
+Note `clear_derived_frames` now deletes `preview.mp4` so a re-extract picks up
+a changed preview height.
+
 **Fixed: empty responses in headless mode (agy 1.1.2 permission auto-deny).**
 Since agy 1.1.2, in `-p` (headless) mode the agent sometimes decides to re-read
 the `@`-attached frames with its `read_file` tool instead of using the attached

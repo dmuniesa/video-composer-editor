@@ -75,10 +75,15 @@ Rules:
   belong to the same moment/scene, so keep them together and roughly ordered by
   shot_at unless an instruction says otherwise.
 - Videos may carry AI-analyzed "energy" (low/medium/high motion), "mood"
-  (emotional tone words), "scene", "time_of_day" and "shot_type".
+  (emotional tone words), "scene", "time_of_day", "shot_type" and "highlights"
+  ([{{"t_in", "t_out", "reason"}}]: the clip's best moments as time ranges in
+  seconds from its start).
 - Match energy to the music: put high-energy clips on the chorus/drop and other
   intense sections, low-energy scenic clips on intros, outros and instrumental
   passages. Match mood to the feel of each section.
+- When cutting a segment out of a clip that lists highlights, prefer a
+  source_in/source_out window overlapping a highlight range — it marks the
+  clip's best moment. Hand-picked "ranges" still take priority over highlights.
 - Vary scene and shot_type between consecutive clips (e.g. avoid three drone
   shots in a row), and group time_of_day into coherent progressions (day →
   sunset → night) rather than ping-ponging, unless asked otherwise.\
@@ -210,6 +215,15 @@ def build_context(db: Session) -> dict:
                     entry["time_of_day"] = a.time_of_day
                 if a.shot_type:
                     entry["shot_type"] = a.shot_type
+            if aspects.highlights and a.highlights:
+                entry["highlights"] = [
+                    {
+                        "t_in": _round(h.get("t_in")),
+                        "t_out": _round(h.get("t_out")),
+                        "reason": h.get("reason", ""),
+                    }
+                    for h in a.highlights
+                ]
         # Technical/EXIF context so the composer can group by shooting time or
         # camera (e.g. keep angles from the same camera together). Compact: the
         # curated fields only, no raw tag dump.

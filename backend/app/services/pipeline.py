@@ -4,6 +4,7 @@ their heavy parts as background jobs."""
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 from sqlalchemy import select
@@ -23,6 +24,8 @@ from ..models import (
     VideoRating,
 )
 from . import ai, audio_analysis, faces, frames, jobs, lyrics, scanner
+
+log = logging.getLogger(__name__)
 
 
 def video_cache(video_dir: Path, cache_key: str) -> Path:
@@ -177,7 +180,28 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
                 return
             cache = video_cache(video_dir, video.cache_key)
             frame_paths = sorted(cache.glob("frame_*.jpg"))
-            if not frame_paths:
+            # Video mode (agy only): attach the low-res preview.mp4 so the
+            # model sees motion and can return highlight time ranges. Falls
+            # back to frames when the provider/setting says so, the preview is
+            # missing (project scanned before the rendition existed), or the
+            # clip is too long to upload.
+            video_file = None
+            preview = cache / "preview.mp4"
+            if (
+                ai.provider() == "agy"
+                and settings.get().analysis.agy_media == "video"
+                and preview.is_file()
+                and 0 < video.duration <= ai.VIDEO_ATTACH_MAX_S
+            ):
+                video_file = preview
+            elif settings.get().analysis.agy_media == "video" and ai.provider() == "agy":
+                log.info(
+                    "analysis #%d: video mode unavailable (preview=%s, duration=%.1fs) — using frames",
+                    video_id,
+                    preview.is_file(),
+                    video.duration,
+                )
+            if video_file is None and not frame_paths:
                 raise RuntimeError("no extracted frames to analyze")
             # Names already identified by face recognition, so the description
             # can refer to people by name. Empty when faces haven't run or
@@ -203,7 +227,13 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
             db.commit()
             broadcaster.publish(pid, "video", {"id": video_id})
             try:
-                result = ai.analyze_video_frames(frame_paths, workdir=cache, people=people)
+                result = ai.analyze_clip(
+                    frame_paths,
+                    workdir=cache,
+                    people=people,
+                    video_file=video_file,
+                    duration=video.duration,
+                )
                 analysis = video.analysis or VideoAnalysis(video_id=video_id)
                 analysis.description = result["description"]
                 analysis.ai_score = result["score"]
@@ -214,6 +244,7 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
                 analysis.scene = result["scene"]
                 analysis.time_of_day = result["time_of_day"]
                 analysis.shot_type = result["shot_type"]
+                analysis.highlights = result["highlights"]
                 db.add(analysis)
                 video.status = "ready"
                 video.error = None

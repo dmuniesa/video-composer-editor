@@ -353,6 +353,37 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                 <button className="small" onClick={() => setEditTags(true)}>edit tags</button>
               </div>
             )}
+            {video.highlights.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <h4 style={{ margin: '4px 0' }}>
+                  AI suggestions <span className="hint">— ＋ saves one as an editable range</span>
+                </h4>
+                {video.highlights.map((h, i) => {
+                  const fake: VideoRange = { id: -(i + 1), t_in: h.t_in, t_out: h.t_out, label: h.reason }
+                  return (
+                    <div key={i} className="row">
+                      <button
+                        className={`small ${activeRange?.id === fake.id && playMode === 'once' ? 'primary' : ''}`}
+                        title="Play this suggested moment (click again to stop)"
+                        onClick={() => togglePlay(fake, 'once')}
+                      >
+                        ▶ {fmtTime(h.t_in)} → {fmtTime(h.t_out)}
+                      </button>
+                      <span className="hint" style={{ flex: 1 }}>{h.reason}</span>
+                      <button
+                        className="small"
+                        title="Save as a range you can edit and drag into the montage"
+                        onClick={() =>
+                          api.addRange(pid, video.id, { t_in: h.t_in, t_out: h.t_out, label: h.reason.slice(0, 60) }).then(onChanged)
+                        }
+                      >
+                        ＋
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div className="panel">

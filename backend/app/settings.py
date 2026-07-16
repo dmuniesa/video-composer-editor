@@ -33,8 +33,10 @@ class FrameSettings(BaseModel):
     jpeg_quality: int = Field(3, ge=1, le=10)  # ffmpeg -q:v (lower = better)
     filmstrip_tiles: int = Field(20, ge=5, le=60)
     proxy_height: int = Field(720, ge=240, le=1080)
-    # small silent H.264 used by the montage preview player in "SD" mode
-    preview_height: int = Field(360, ge=144, le=720)
+    # Small silent H.264 used by the montage preview player in "SD" mode and
+    # attached to the AI analysis when it runs in video mode (AnalysisSettings
+    # .agy_media). Changing it takes effect after a re-extract.
+    preview_height: int = Field(480, ge=144, le=720)
 
 
 class AISettings(BaseModel):
@@ -75,6 +77,14 @@ class AnalysisSettings(BaseModel):
     energy: bool = True  # motion/action level: low/medium/high
     scene: bool = True  # scene label + time of day + shot type
     people_in_prompt: bool = True  # feed named people to the analysis prompt
+    # Best moments as time ranges, suggested in the clip detail view. Only
+    # extracted in video mode (from frames the AI can't judge times).
+    highlights: bool = True
+    # How agy receives the clip: "video" attaches the low-res preview.mp4
+    # (sees motion, enables highlights; falls back to frames for clips longer
+    # than ai.VIDEO_ATTACH_MAX_S or when the preview is missing) — "frames"
+    # sends sampled JPEGs. OpenAI-compatible providers always get frames.
+    agy_media: str = Field("video", pattern="^(video|frames)$")
 
 
 class LyricsSettings(BaseModel):

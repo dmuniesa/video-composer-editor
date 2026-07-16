@@ -135,7 +135,10 @@ def list_videos(
     interesting ranges. When the corresponding analysis aspects are enabled in
     Settings, videos may also carry "mood" (emotional tone words), "energy"
     (low/medium/high motion — match it to the music's intensity), "scene",
-    "time_of_day" and "shot_type".
+    "time_of_day", "shot_type" and "highlights" ([{t_in, t_out, reason}]: the
+    clip's AI-picked best moments as time ranges in seconds from its start —
+    prefer cutting windows that overlap one; hand-picked "ranges" still take
+    priority).
 
     min_stars: only videos rated at least this many stars.
     include_unrated: also include videos with 0 stars (unrated).
@@ -186,6 +189,8 @@ def list_videos(
                         entry["time_of_day"] = a.time_of_day
                     if a.shot_type:
                         entry["shot_type"] = a.shot_type
+                if aspects.highlights and a.highlights:
+                    entry["highlights"] = a.highlights
             out.append(entry)
     return out
 

@@ -140,6 +140,9 @@ class VideoAnalysis(Base):
     scene: Mapped[str | None] = mapped_column(String, nullable=True)  # "beach"
     time_of_day: Mapped[str | None] = mapped_column(String, nullable=True)  # day|sunrise|sunset|night
     shot_type: Mapped[str | None] = mapped_column(String, nullable=True)  # drone|wide|close-up|...
+    # AI-suggested best moments as time ranges (video-mode analysis only):
+    # [{"t_in": 2.0, "t_out": 4.0, "reason": "the boy leans into the camera"}]
+    highlights_json: Mapped[str] = mapped_column(Text, default="[]")
 
     video: Mapped[Video] = relationship(back_populates="analysis")
 
@@ -164,6 +167,17 @@ class VideoAnalysis(Base):
     @mood.setter
     def mood(self, value: list[str]) -> None:
         self.mood_json = json.dumps(value)
+
+    @property
+    def highlights(self) -> list[dict]:
+        try:
+            return json.loads(self.highlights_json)
+        except (ValueError, TypeError):
+            return []
+
+    @highlights.setter
+    def highlights(self, value: list[dict]) -> None:
+        self.highlights_json = json.dumps(value)
 
 
 class VideoRating(Base):
