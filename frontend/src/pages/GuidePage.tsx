@@ -22,7 +22,9 @@ const SHORTCUTS: [string, string, string][] = [
   ['Review', 'Esc', 'Clear selection / close the detail view'],
   ['Detail', 'I / O', 'Set in / out point at the playhead'],
   ['Detail', 'Enter', 'Save the drafted range'],
-  ['Detail', 'L', 'Loop-play the active range'],
+  ['Detail', 'L', 'Loop-play the selected range (toggle)'],
+  ['Detail', '← / →', 'Nudge the playhead one frame (paused)'],
+  ['Detail', 'Shift + ← / →', 'Previous / next clip'],
   ['Detail', 'Space', 'Play / pause'],
   ['Montage', 'Space', 'Play / pause the montage preview'],
   ['Montage', 'S', 'Toggle snap to beats & sections'],
@@ -211,14 +213,27 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             wave&quot;, &quot;kids playing&quot;…).
           </li>
           <li>
+            Each saved range row has <b>▶</b> (play it once) and <b>🔁</b> (loop it) — both are
+            toggles that stop when clicked again — plus an editable label and <b>✕</b> to delete.
             Drag the blue handles of a saved range to fine-tune it; <kbd>L</kbd> loop-plays the
-            active range.
+            selected range.
+          </li>
+          <li>
+            <kbd>←</kbd>/<kbd>→</kbd> nudge the playhead <b>one frame</b> (paused) for precise
+            in/out points; <kbd>Shift</kbd>+<kbd>←</kbd>/<kbd>→</kbd> jump to the previous/next
+            clip.
           </li>
           <li>
             You can also edit the AI description and hashtags here. Below the description, badges
             show the AI&apos;s <b>mood</b>, <b>energy</b> (motion level) and <b>scene</b>{' '}
             (setting / time of day / shot type) — the composer uses them to match clips to the
             music. Each aspect can be turned off in Settings if your provider handles it poorly.
+          </li>
+          <li>
+            A <b>Clip info</b> panel beside the analysis lists the technical metadata read from the
+            file&apos;s container tags — capture date, <b>camera</b> make/model, <b>lens</b>,{' '}
+            <b>software</b> and <b>location</b> (GPS) when present. The composer also gets the
+            capture time, camera and lens to keep time-of-day and camera continuity.
           </li>
         </ul>
         <p>

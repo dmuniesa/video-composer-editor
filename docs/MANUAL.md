@@ -161,14 +161,33 @@ missing).
 - Press **I** at the playhead to set the in point, **O** for the out point,
   **Enter** to save the range.
 - A clip can hold **several ranges** ("best wave", "kids playing"…). Each row
-  has ▶ (loop-play the range), an editable label, and ✕ to delete.
+  has ▶ (play the range once), 🔁 (loop the range), an editable label, and ✕ to
+  delete. ▶ and 🔁 are toggles — click again to stop.
 - Drag the blue **handles** of an existing range to fine-tune it.
-- **L** toggles loop playback of the active range; **Space** plays/pauses.
+- **L** loops the selected range (or the first one) and toggles it off again;
+  **Space** plays/pauses.
+- **←/→** nudge the playhead **one frame** (1/fps) while paused — precise in/out
+  points. **Shift+←/→** jump to the previous/next clip.
 
 These ranges become draggable items in the montage bin, and Claude prefers them
 when auto-placing.
 
 You can also fix the AI description/hashtags here (**edit tags**).
+
+### AI aspects and clip info
+
+Below the description the detail view shows the extra aspects the AI extracted,
+as badges: **⚡ energy** (low/medium/high motion), **🎭 mood** words, **📍 scene**,
+**🕒 time of day** and **🎥 shot type**. Each aspect is individually toggleable in
+Settings (see §8) — a disabled one isn't requested, shown, nor sent to the
+composer. If your footage has **named people** (People page), their names are fed
+into the analysis prompt so the description can refer to them by name.
+
+Alongside the AI analysis, a **Clip info** panel lists the technical metadata read
+from the file's container tags — capture date, **camera** make/model, **lens**,
+**software** and **location** (GPS) when present. This info never appears on the
+thumbnails. The montage AI also receives the capture time, camera and lens so it
+can keep time-of-day and camera continuity across a sequence.
 
 ## 4. Analyze the song (Music)
 
@@ -256,9 +275,10 @@ Desktop and just ask. Example prompt:
 > saved ranges, don't reuse a clip, and leave track 2 free for my manual
 > overlays.
 
-Claude reads the video descriptions/hashtags/ratings and the song structure,
-then calls `place_clip` — you'll see purple clips appear on the timeline in
-real time while the web app is open. Anything it gets wrong you can drag around
+Claude reads the video descriptions/hashtags/ratings, the extra AI aspects
+(energy, mood, scene, shot type), the clip's capture time/camera/lens and the
+song structure, then calls `place_clip` — you'll see purple clips appear on the
+timeline in real time while the web app is open. Anything it gets wrong you can drag around
 or delete like any other clip, or tell Claude to fix it (`move_clip`,
 `clear_track`).
 
@@ -317,6 +337,20 @@ the result, so you can validate the key/URL before analyzing hundreds of clips.
 Privacy note: the extracted frames are sent to whichever provider you choose —
 use a local endpoint if you don't want them leaving your machine.
 
+### Clip analysis aspects
+
+Besides the description, score and hashtags, the AI can extract optional aspects
+from each clip. Toggle any of them off if your provider handles it poorly — it
+stops being requested, shown (as a badge in the detail view) and used by the
+composer. Already-stored values are kept and reappear if you re-enable it.
+
+- **Mood** — emotional tone words (happy, calm, epic…).
+- **Energy** — motion/action level (low/medium/high), matched to the music's
+  intensity by the composer.
+- **Scene & context** — scene label, time of day and shot type.
+- **People names in prompt** — if a clip has named people (People page), the
+  description can refer to them by name.
+
 ### Frame extraction
 
 Controls how each video is sampled for analysis:
@@ -344,7 +378,9 @@ descriptions).
 | Review | `Esc` | clear selection / close detail |
 | Detail | `I` / `O` | set in / out point at playhead |
 | Detail | `Enter` | save the drafted range |
-| Detail | `L` | loop-play the active range |
+| Detail | `L` | loop-play the selected range (toggle) |
+| Detail | `←` / `→` | nudge playhead one frame (paused) |
+| Detail | `Shift`+`←`/`→` | previous / next clip |
 | Detail | `Space` | play / pause |
 | Montage | `Space` | play / pause the montage preview |
 | Montage | `S` | toggle snap to beats/sections |
