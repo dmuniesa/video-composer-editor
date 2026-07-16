@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
-from .. import db as dbm
+from .. import db as dbm, settings
 from ..events import broadcaster
 from ..models import (
     ExcludedFile,
@@ -35,6 +35,11 @@ def _people_of(v: Video) -> list[dict]:
 
 
 def video_dict(v: Video, people: list[dict] | None = None) -> dict:
+    # Optional analysis aspects are gated by their Settings toggle: a disabled
+    # aspect is served empty even when an old analysis stored a value, so the
+    # UI stays consistent with what the AI is currently asked for.
+    aspects = settings.get().analysis
+    a = v.analysis
     return {
         "id": v.id,
         "rel_path": v.rel_path,
@@ -55,9 +60,14 @@ def video_dict(v: Video, people: list[dict] | None = None) -> dict:
         "frame_count": v.frame_count,
         "faces_status": v.faces_status,
         "people": _people_of(v) if people is None else people,
-        "description": v.analysis.description if v.analysis else "",
-        "ai_score": v.analysis.ai_score if v.analysis else None,
-        "hashtags": v.analysis.hashtags if v.analysis else [],
+        "description": a.description if a else "",
+        "ai_score": a.ai_score if a else None,
+        "hashtags": a.hashtags if a else [],
+        "mood": a.mood if a and aspects.mood else [],
+        "energy": a.energy if a and aspects.energy else None,
+        "scene": a.scene if a and aspects.scene else None,
+        "time_of_day": a.time_of_day if a and aspects.scene else None,
+        "shot_type": a.shot_type if a and aspects.scene else None,
         "stars": v.rating.stars if v.rating else 0,
         "rejected": v.rating.rejected if v.rating else False,
         "ranges": [

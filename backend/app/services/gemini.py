@@ -31,7 +31,11 @@ class AgyError(RuntimeError):
 
 
 def agy_command() -> list[str]:
-    cmd = os.environ.get("AGY_CMD") or settings.get().ai.agy_cmd or "agy -p"
+    cmd = (
+        os.environ.get("AGY_CMD")
+        or settings.get().ai.agy_cmd
+        or "agy --dangerously-skip-permissions -p"
+    )
     return shlex.split(cmd)
 
 
@@ -86,6 +90,12 @@ def run_prompt(prompt: str, cwd: Path | None = None) -> str:
             out.stdout.strip(),
         )
         raise AgyError(f"agy exited {out.returncode}: {(out.stderr or out.stdout).strip()[:400]}")
+    if not out.stdout.strip() and out.stderr.strip():
+        # agy 1.1.2 exits 0 with empty stdout when its agent's tool calls are
+        # auto-denied in headless mode (e.g. read_file without
+        # --dangerously-skip-permissions); the reason only appears on stderr.
+        log.error("agy produced no output in %.1fs\n--- stderr ---\n%s", elapsed, out.stderr.strip())
+        raise AgyError(f"agy produced no output: {out.stderr.strip()[:400]}")
     log.info("agy ok in %.1fs (%d chars out)", elapsed, len(out.stdout))
     log.debug("agy raw output:\n%s", out.stdout)
     return out.stdout

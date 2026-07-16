@@ -54,6 +54,14 @@ export interface AppSettings {
   composer: {
     provider: string
   }
+  /** Optional AI-analysis aspects; a disabled one is neither requested from
+   *  the AI nor shown/used anywhere (stored values are kept). */
+  analysis: {
+    mood: boolean
+    energy: boolean
+    scene: boolean
+    people_in_prompt: boolean
+  }
   lyrics: {
     enabled: boolean
     provider: string
@@ -111,6 +119,11 @@ export interface Video {
   description: string
   ai_score: number | null
   hashtags: string[]
+  mood: string[]
+  energy: 'low' | 'medium' | 'high' | null
+  scene: string | null
+  time_of_day: string | null
+  shot_type: string | null
   stars: number
   rejected: boolean
   ranges: VideoRange[]

@@ -307,6 +307,17 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
               )}
             </div>
             <p style={{ margin: '4px 0' }}>{video.description || <span className="hint">No description yet.</span>}</p>
+            {(video.energy || video.mood.length > 0 || video.scene || video.time_of_day || video.shot_type) && (
+              <div className="tag-row">
+                {video.energy && <span className="tag" title="Motion/action level">⚡ {video.energy}</span>}
+                {video.mood.map((m) => (
+                  <span key={m} className="tag" title="Mood">🎭 {m}</span>
+                ))}
+                {video.scene && <span className="tag" title="Scene">📍 {video.scene}</span>}
+                {video.time_of_day && <span className="tag" title="Time of day">🕒 {video.time_of_day}</span>}
+                {video.shot_type && <span className="tag" title="Shot type">🎥 {video.shot_type}</span>}
+              </div>
+            )}
             {editTags ? (
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ flex: 1 }} value={tagsText} onChange={(e) => setTagsText(e.target.value)} />

@@ -12,6 +12,8 @@ from .. import db as dbm, settings
 from ..events import broadcaster
 from ..models import (
     ExcludedFile,
+    Face,
+    Person,
     Song,
     SongLyrics,
     SongSection,
@@ -177,21 +179,50 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
             frame_paths = sorted(cache.glob("frame_*.jpg"))
             if not frame_paths:
                 raise RuntimeError("no extracted frames to analyze")
+            # Names already identified by face recognition, so the description
+            # can refer to people by name. Empty when faces haven't run or
+            # nobody is named yet; a later re-analyze picks names up.
+            people: list[str] = []
+            if settings.get().analysis.people_in_prompt:
+                people = sorted(
+                    {
+                        name
+                        for (name,) in db.execute(
+                            select(Person.name)
+                            .join(Face, Face.person_id == Person.id)
+                            .where(
+                                Face.video_id == video_id,
+                                Face.ignored.is_(False),
+                                Person.name != "",
+                                Person.hidden.is_(False),
+                            )
+                        )
+                    }
+                )
             video.status = "analyzing"
             db.commit()
             broadcaster.publish(pid, "video", {"id": video_id})
             try:
-                result = ai.analyze_video_frames(frame_paths, workdir=cache)
+                result = ai.analyze_video_frames(frame_paths, workdir=cache, people=people)
                 analysis = video.analysis or VideoAnalysis(video_id=video_id)
                 analysis.description = result["description"]
                 analysis.ai_score = result["score"]
                 analysis.hashtags = result["hashtags"]
                 analysis.raw_response = result["raw"]
+                analysis.mood = result["mood"]
+                analysis.energy = result["energy"]
+                analysis.scene = result["scene"]
+                analysis.time_of_day = result["time_of_day"]
+                analysis.shot_type = result["shot_type"]
                 db.add(analysis)
                 video.status = "ready"
                 video.error = None
                 db.commit()
             except Exception as exc:
+                # If the failure happened inside commit() the session is in a
+                # rolled-back state; clear it or the error commit below raises
+                # PendingRollbackError and the clip stays stuck in "analyzing".
+                db.rollback()
                 video.status = "error"
                 video.error = f"AI analysis failed: {exc}"
                 db.commit()

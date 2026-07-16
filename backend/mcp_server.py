@@ -132,7 +132,10 @@ def list_videos(
     """List candidate videos (never includes rejected ones) with their AI
     description, hashtags, user star rating (0-5), AI score (1-10), duration
     in seconds, the named people detected in them, and the user's hand-picked
-    interesting ranges.
+    interesting ranges. When the corresponding analysis aspects are enabled in
+    Settings, videos may also carry "mood" (emotional tone words), "energy"
+    (low/medium/high motion — match it to the music's intensity), "scene",
+    "time_of_day" and "shot_type".
 
     min_stars: only videos rated at least this many stars.
     include_unrated: also include videos with 0 stars (unrated).
@@ -140,6 +143,7 @@ def list_videos(
     person: filter to videos where this person appears (case-insensitive name,
     see list_people)."""
     out = []
+    aspects = settings.get().analysis
     with dbm.open_session(PROJECT_DIR) as db:
         people = _people_by_video(db)
         for v in db.scalars(select(Video).order_by(Video.filename)):
@@ -154,22 +158,35 @@ def list_videos(
             names = people.get(v.id, [])
             if person and person.strip().lower() not in (n.lower() for n in names):
                 continue
-            out.append(
-                {
-                    "id": v.id,
-                    "filename": v.filename,
-                    "source": (v.source.label or v.source.path) if v.source else "",
-                    "duration": v.duration,
-                    "stars": stars,
-                    "ai_score": v.analysis.ai_score if v.analysis else None,
-                    "description": v.analysis.description if v.analysis else "",
-                    "hashtags": tags,
-                    "people": names,
-                    "ranges": [
-                        {"t_in": r.t_in, "t_out": r.t_out, "label": r.label} for r in v.ranges
-                    ],
-                }
-            )
+            entry = {
+                "id": v.id,
+                "filename": v.filename,
+                "source": (v.source.label or v.source.path) if v.source else "",
+                "duration": v.duration,
+                "stars": stars,
+                "ai_score": v.analysis.ai_score if v.analysis else None,
+                "description": v.analysis.description if v.analysis else "",
+                "hashtags": tags,
+                "people": names,
+                "ranges": [
+                    {"t_in": r.t_in, "t_out": r.t_out, "label": r.label} for r in v.ranges
+                ],
+            }
+            # Optional analysis aspects, gated by their Settings toggle and
+            # included only when present (mirrors composer.build_context).
+            if (a := v.analysis) is not None:
+                if aspects.mood and a.mood:
+                    entry["mood"] = a.mood
+                if aspects.energy and a.energy:
+                    entry["energy"] = a.energy
+                if aspects.scene:
+                    if a.scene:
+                        entry["scene"] = a.scene
+                    if a.time_of_day:
+                        entry["time_of_day"] = a.time_of_day
+                    if a.shot_type:
+                        entry["shot_type"] = a.shot_type
+            out.append(entry)
     return out
 
 

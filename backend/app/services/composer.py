@@ -32,9 +32,10 @@ MAX_LYRIC_LINES_IN_PROMPT = 200
 COMPOSE_PROMPT = """\
 You are composing a video montage timeline synced to a song. Below is the
 full project state as JSON: the song (sections, BPM, beat timestamps), the
-candidate videos (with AI descriptions, hashtags, user star ratings 0-5, AI
-scores 1-10, and hand-picked interesting ranges), and the current timeline
-(it may already contain clips, which you may keep, move or remove).
+candidate videos (with AI descriptions, hashtags, mood/energy/scene data,
+user star ratings 0-5, AI scores 1-10, and hand-picked interesting ranges),
+and the current timeline (it may already contain clips, which you may keep,
+move or remove).
 
 PROJECT:
 {context}
@@ -72,7 +73,15 @@ Rules:
 - Videos may carry "shot_at" (recording timestamp), "camera" and "lens". Use
   these for continuity: clips shot close in time or on the same camera likely
   belong to the same moment/scene, so keep them together and roughly ordered by
-  shot_at unless an instruction says otherwise.\
+  shot_at unless an instruction says otherwise.
+- Videos may carry AI-analyzed "energy" (low/medium/high motion), "mood"
+  (emotional tone words), "scene", "time_of_day" and "shot_type".
+- Match energy to the music: put high-energy clips on the chorus/drop and other
+  intense sections, low-energy scenic clips on intros, outros and instrumental
+  passages. Match mood to the feel of each section.
+- Vary scene and shot_type between consecutive clips (e.g. avoid three drone
+  shots in a row), and group time_of_day into coherent progressions (day →
+  sunset → night) rather than ping-ponging, unless asked otherwise.\
 """
 
 
@@ -164,6 +173,7 @@ def build_context(db: Session) -> dict:
         .where(Face.ignored.is_(False), Person.name != "", Person.hidden.is_(False))
     ):
         people_by_video.setdefault(vid, set()).add(name)
+    aspects = settings.get().analysis
     videos = []
     for v in db.scalars(select(Video).order_by(Video.filename)):
         if v.rating and v.rating.rejected:
@@ -186,6 +196,20 @@ def build_context(db: Session) -> dict:
                 for r in v.ranges
             ],
         }
+        # Optional analysis aspects: only when enabled in Settings AND present
+        # (keeps the prompt compact for old/partial analyses).
+        if (a := v.analysis) is not None:
+            if aspects.mood and a.mood:
+                entry["mood"] = a.mood
+            if aspects.energy and a.energy:
+                entry["energy"] = a.energy
+            if aspects.scene:
+                if a.scene:
+                    entry["scene"] = a.scene
+                if a.time_of_day:
+                    entry["time_of_day"] = a.time_of_day
+                if a.shot_type:
+                    entry["shot_type"] = a.shot_type
         # Technical/EXIF context so the composer can group by shooting time or
         # camera (e.g. keep angles from the same camera together). Compact: the
         # curated fields only, no raw tag dump.

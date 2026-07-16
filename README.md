@@ -10,7 +10,7 @@ Turn a folder of vacation videos + a song into an **Adobe Premiere Pro** project
 A locally-run web app that:
 
 1. **Scans** one or more folders of videos, extracts frames, thumbnails, filmstrips and browser-playable proxies (ffmpeg).
-2. **Analyzes every clip with AI**: description, 1–10 score, and hashtags — via Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`, Gemini) or any **OpenAI-compatible endpoint** (z.ai GLM, OpenAI, OpenRouter, Ollama…), selectable on the in-app Settings page.
+2. **Analyzes every clip with AI**: description, 1–10 score, hashtags — plus optional **mood** (emotional tone), **energy** (motion level) and **scene context** (scene / time of day / shot type), each toggleable in Settings; if a clip already has named people, the AI uses their names in the description. Via Google's [Antigravity CLI](https://antigravity.google/product/antigravity-cli) (`agy`, Gemini) or any **OpenAI-compatible endpoint** (z.ai GLM, OpenAI, OpenRouter, Ollama…), selectable on the in-app Settings page.
 3. Lets you **review and rate** clips Lightroom-style (0–5 stars, reject flag, batch rating, keyboard shortcuts) and mark the interesting part(s) of each clip with in/out points over a filmstrip.
 4. **Analyzes your song locally with librosa** (BPM, beats, structure sections) and asks Gemini to label the sections (intro / verse / chorus / …). Optionally (Settings) it also **transcribes the lyrics** — locally with Whisper, or with Gemini listening to the song through the Antigravity CLI — and detects vocal vs. melody-only (instrumental) passages — shown on the Music page and fed to the AI composer.
 5. Gives you a **montage page**: video bin + multi-track timeline over the song waveform, with snapping to beats and sections. Place clips by hand — or let **Claude place them automatically through the built-in MCP server**.
@@ -91,7 +91,10 @@ Notes:
 
 - `agy` must be reachable from the shell that launches the backend. If it lives
   somewhere unusual or its flags change, override the command template:
-  `AGY_CMD="/path/to/agy -p"`.
+  `AGY_CMD="/path/to/agy --dangerously-skip-permissions -p"`.
+- The `--dangerously-skip-permissions` flag is needed since agy 1.1.2: in
+  non-interactive mode its agent sometimes re-reads the attached frames with a
+  tool that gets auto-denied without it, returning an empty response.
 - The AI analysis sends a few JPEG frames per video to Google. Skip installing
   `agy` if you don't want that.
 
@@ -176,7 +179,7 @@ available inside the app under the **Guide** tab.
 | Page | What you do |
 |---|---|
 | **Setup** | Pick a **storage folder** for the project, then **Add** one or more **source folders** of footage → each is scanned and queued for frame extraction + AI analysis. Add/remove sources or **Repoint** one that moved anytime. Pick the song here too. |
-| **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. Named people show as **@name** chips — click one (or search `@name`) to filter. |
+| **Review** | Grid of clips with AI description/score/hashtags. Click to select (Shift/Ctrl for multi), **1–5** to rate, **0** to clear, **X** to reject. Double-click opens the player: **I**/**O** set in/out at the playhead, **Enter** saves the range, **L** loop-plays it. A clip can have several ranges. The detail view also shows the AI's mood/energy/scene badges. Named people show as **@name** chips — click one (or search `@name`) to filter. |
 | **People** | Press **Detect people** to find faces in every clip (runs locally). Similar faces are grouped; type a name on a group to identify that person — they're then matched automatically in newly detected clips. Merge groups, detach single faces or ignore false positives. The AI composer and the MCP server see who appears in each clip. |
 | **Music** | Waveform, BPM, beats and structure sections. Fix labels, split at the playhead, or merge sections. With lyrics enabled: timestamped lyrics (click a line to seek), a vocal/melody-only strip over the waveform, and a vocals % per section. |
 | **Montage** | Drag clips (or their ranges) from the bin onto the tracks. Drag to move, edge-drag to trim, snapping to beats/sections (**S** toggles). **Space** previews audio + a jump-cut video preview. **Del** removes the selected clip. |

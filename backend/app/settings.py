@@ -48,11 +48,28 @@ class AISettings(BaseModel):
     """
 
     provider: str = Field("auto", pattern="^(auto|agy|openai|off)$")
-    agy_cmd: str = "agy -p"
+    # --dangerously-skip-permissions is required since agy 1.1.2: in headless
+    # (-p) mode its agent sometimes re-reads the @-attached frames with its
+    # read_file tool, which auto-denies without the flag (allow-rules in agy's
+    # settings.json fail with "context canceled"), returning empty output.
+    agy_cmd: str = "agy --dangerously-skip-permissions -p"
     openai_base_url: str = ""  # e.g. https://api.z.ai/api/paas/v4
     openai_api_key: str = ""
     openai_model: str = ""  # e.g. glm-4.6v-flash
     timeout_s: int = Field(300, ge=10, le=1800)
+
+
+class AnalysisSettings(BaseModel):
+    """Which optional aspects the per-clip AI analysis extracts, besides the
+    always-on description/score/hashtags. Disable an aspect if the provider
+    handles it poorly: it is then neither requested in the analysis prompt nor
+    shown in the UI nor used by the composer. Stored values are kept, so
+    re-enabling an aspect brings old results back without re-analyzing."""
+
+    mood: bool = True  # emotional tone words (happy, calm, epic...)
+    energy: bool = True  # motion/action level: low/medium/high
+    scene: bool = True  # scene label + time of day + shot type
+    people_in_prompt: bool = True  # feed named people to the analysis prompt
 
 
 class LyricsSettings(BaseModel):
@@ -116,6 +133,7 @@ class ComposerSettings(BaseModel):
 class Settings(BaseModel):
     frames: FrameSettings = Field(default_factory=FrameSettings)
     ai: AISettings = Field(default_factory=AISettings)
+    analysis: AnalysisSettings = Field(default_factory=AnalysisSettings)
     composer: ComposerSettings = Field(default_factory=ComposerSettings)
     lyrics: LyricsSettings = Field(default_factory=LyricsSettings)
     faces: FacesSettings = Field(default_factory=FacesSettings)

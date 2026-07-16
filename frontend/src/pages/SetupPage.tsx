@@ -344,7 +344,8 @@ export default function SetupPage({ project, onChanged }: Props) {
           )}
         </div>
         <p className="hint" style={{ marginTop: 0 }}>
-          The AI writes a description, a 1–10 score and hashtags for every clip — the raw material
+          The AI writes a description, a 1–10 score and hashtags for every clip — plus mood,
+          energy and scene context (toggle each in Settings) — the raw material
           for sorting on the Review page and for AI auto-placement. It runs only when you ask:
           analyze every not-yet-analyzed clip, or expand the list to pick just the ones you want.
         </p>

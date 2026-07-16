@@ -40,6 +40,7 @@ else:
         '```json\n'
         '{"description": "A sunny beach with people walking along the shore.", '
         '"score": 7, "hashtags": ["Beach", "#sunny", "people walking"], '
-        '"highlights": [{"frame": 1, "reason": "best light"}]}\n'
+        '"mood": ["Happy", "calm"], "energy": "medium", '
+        '"scene": "beach", "time_of_day": "day", "shot_type": "wide"}\n'
         '```'
     )

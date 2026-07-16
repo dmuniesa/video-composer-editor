@@ -86,7 +86,8 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
           <code>.mov</code>, <code>.mts</code>, <code>.mkv</code>…), read with ffprobe; frames, a
           thumbnail and a filmstrip are extracted per clip and browser-friendly proxies are
           transcoded for formats like HEVC/10-bit. If an AI provider is configured, every clip also
-          gets a description, a 1–10 score and hashtags. Two clips with the same name in different
+          gets a description, a 1–10 score and hashtags — plus mood, energy and scene context
+          (each aspect can be toggled in Settings). Two clips with the same name in different
           source folders coexist without clashing.
         </p>
         <ul>
@@ -189,6 +190,12 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             appears in each clip — so &quot;only clips with Ana&quot; works as a montage
             instruction.
           </li>
+          <li>
+            If a clip already has named people when you run (or re-run) its AI analysis, the
+            description uses their names (&quot;Ana diving off the boat&quot;). Detection order
+            doesn&apos;t matter: name people first and then analyze, or just <b>Re-analyze</b>{' '}
+            later. Toggleable in Settings.
+          </li>
         </ul>
 
         <h2 id="ranges">4 · Mark the best parts</h2>
@@ -207,7 +214,12 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             Drag the blue handles of a saved range to fine-tune it; <kbd>L</kbd> loop-plays the
             active range.
           </li>
-          <li>You can also edit the AI description and hashtags here.</li>
+          <li>
+            You can also edit the AI description and hashtags here. Below the description, badges
+            show the AI&apos;s <b>mood</b>, <b>energy</b> (motion level) and <b>scene</b>{' '}
+            (setting / time of day / shot type) — the composer uses them to match clips to the
+            music. Each aspect can be turned off in Settings if your provider handles it poorly.
+          </li>
         </ul>
         <p>
           Saved ranges become draggable items in the montage bin, and the AI composer prefers them
@@ -294,6 +306,12 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             calmer clips on the verses, prefer saved ranges, don&apos;t repeat clips.&quot;</i>
           </li>
         </ul>
+        <p>
+          Both composers see everything the analysis produced: descriptions, hashtags, scores,
+          star ratings, saved ranges, named people — and, when enabled, mood/energy/scene, used to
+          put high-energy clips on the chorus, calm scenic ones on intros and instrumental
+          passages, and to vary shot types.
+        </p>
         <p>
           Clips placed by an AI appear <b>purple</b> on the timeline, live. You can drag, trim or
           delete them like any other clip.

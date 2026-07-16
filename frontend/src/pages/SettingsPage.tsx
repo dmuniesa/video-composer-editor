@@ -28,6 +28,8 @@ export default function SettingsPage({ pid }: { pid?: string }) {
     set({ lyrics: { ...settings.lyrics, ...patch } })
   const setFaces = (patch: Partial<AppSettings['faces']>) =>
     set({ faces: { ...settings.faces, ...patch } })
+  const setAnalysis = (patch: Partial<AppSettings['analysis']>) =>
+    set({ analysis: { ...settings.analysis, ...patch } })
 
   const save = async () => {
     setBusy(true)
@@ -144,7 +146,7 @@ export default function SettingsPage({ pid }: { pid?: string }) {
               <input
                 value={a.agy_cmd}
                 onChange={(e) => setAI({ agy_cmd: e.target.value })}
-                placeholder="agy -p"
+                placeholder="agy --dangerously-skip-permissions -p"
               />
             </>
           )}
@@ -195,6 +197,45 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <b>Claude via MCP</b> the button is disabled — compose by talking to Claude with the MCP
           server registered, as before (see README).
         </p>
+        <h3 style={{ marginTop: 16 }}>Clip analysis aspects</h3>
+        <p className="hint">
+          Besides the description, score and hashtags, the AI can extract these optional aspects
+          from each clip. Disable an aspect if your provider handles it poorly — it stops being
+          requested, shown and used by the composer (already stored values are kept and reappear
+          if you re-enable it).
+        </p>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.analysis.mood}
+            onChange={(e) => setAnalysis({ mood: e.target.checked })}
+          />
+          <span><b>Mood</b> — emotional tone words (happy, calm, epic…)</span>
+        </label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.analysis.energy}
+            onChange={(e) => setAnalysis({ energy: e.target.checked })}
+          />
+          <span><b>Energy</b> — motion/action level (low/medium/high), matched to the music's intensity</span>
+        </label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.analysis.scene}
+            onChange={(e) => setAnalysis({ scene: e.target.checked })}
+          />
+          <span><b>Scene & context</b> — scene label, time of day and shot type</span>
+        </label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.analysis.people_in_prompt}
+            onChange={(e) => setAnalysis({ people_in_prompt: e.target.checked })}
+          />
+          <span><b>People names in prompt</b> — if the clip has named people (People page), the description can use their names</span>
+        </label>
         {showOpenAI && (
           <p className="hint" style={{ marginTop: 10 }}>
             For <b>z.ai GLM</b>, the base URL depends on your plan: API plan →{' '}

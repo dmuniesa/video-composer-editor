@@ -132,6 +132,14 @@ class VideoAnalysis(Base):
     ai_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     hashtags_json: Mapped[str] = mapped_column(Text, default="[]")
     raw_response: Mapped[str] = mapped_column(Text, default="")
+    # Optional analysis aspects (each toggleable in Settings). New columns,
+    # back-filled onto legacy databases by db._ensure_columns; NULL/"[]" on
+    # rows analyzed before the aspect existed or while it was disabled.
+    mood_json: Mapped[str] = mapped_column(Text, default="[]")  # ["happy","funny"]
+    energy: Mapped[str | None] = mapped_column(String, nullable=True)  # low|medium|high
+    scene: Mapped[str | None] = mapped_column(String, nullable=True)  # "beach"
+    time_of_day: Mapped[str | None] = mapped_column(String, nullable=True)  # day|sunrise|sunset|night
+    shot_type: Mapped[str | None] = mapped_column(String, nullable=True)  # drone|wide|close-up|...
 
     video: Mapped[Video] = relationship(back_populates="analysis")
 
@@ -145,6 +153,17 @@ class VideoAnalysis(Base):
     @hashtags.setter
     def hashtags(self, value: list[str]) -> None:
         self.hashtags_json = json.dumps(value)
+
+    @property
+    def mood(self) -> list[str]:
+        try:
+            return json.loads(self.mood_json)
+        except (ValueError, TypeError):
+            return []
+
+    @mood.setter
+    def mood(self, value: list[str]) -> None:
+        self.mood_json = json.dumps(value)
 
 
 class VideoRating(Base):

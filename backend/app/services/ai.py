@@ -24,17 +24,60 @@ class AIError(RuntimeError):
 VIDEO_PROMPT = """\
 You are helping select vacation video clips for a music montage.
 {frames_intro}
-
+{people_note}
 Analyze the clip and reply with ONLY a JSON object (no markdown fence, no prose):
 {{
-  "description": "one or two sentences describing what happens in the clip",
-  "score": <integer 1-10, how visually appealing/usable this clip is for a montage>,
-  "hashtags": ["lowercase", "keywords", "like", "beach", "sunset", "people", "drone", "food"],
-  "highlights": [{{"frame": <0-based index of a standout frame>, "reason": "why"}}]
+{fields}
 }}
-Rules: 3 to 8 hashtags, single words, lowercase, no # symbol. Judge stability,
-light, composition and subject interest for the score.\
+Rules:
+{rules}\
 """
+
+_BASE_FIELDS = [
+    '"description": "one or two sentences describing what happens in the clip"',
+    '"score": <integer 1-10, how visually appealing/usable this clip is for a montage>',
+    '"hashtags": ["lowercase", "keywords", "like", "beach", "sunset", "people", "drone", "food"]',
+]
+_BASE_RULES = [
+    "3 to 8 hashtags, single words, lowercase, no # symbol.",
+    "Judge stability, light, composition and subject interest for the score.",
+]
+
+# Optional analysis aspects, each toggleable in Settings (AnalysisSettings).
+# Keys match the AnalysisSettings field names; a disabled aspect is neither
+# requested in the prompt nor read from the response.
+_ASPECT_FIELDS: dict[str, list[str]] = {
+    "mood": ['"mood": ["one", "to", "three"]'],
+    "energy": ['"energy": "low" | "medium" | "high"'],
+    "scene": [
+        '"scene": "beach"',
+        '"time_of_day": "day" | "sunrise" | "sunset" | "night"',
+        '"shot_type": "drone"',
+    ],
+}
+_ASPECT_RULES: dict[str, list[str]] = {
+    "mood": [
+        '"mood": 1-3 lowercase words for the emotional tone (e.g. happy, calm, '
+        "epic, funny, romantic, peaceful, tense, nostalgic)."
+    ],
+    "energy": [
+        '"energy": how much motion/action is visible (subjects and camera), not '
+        "how good the clip is. Static scenery = low; walking/talking = medium; "
+        "sports, jumping, fast camera moves = high."
+    ],
+    "scene": [
+        '"scene": one short lowercase label for the setting (beach, city, '
+        "mountain, forest, pool, indoor, restaurant, road, boat, snow...).",
+        '"shot_type": the dominant framing: drone, wide, medium, close-up, '
+        "selfie, pov, underwater or timelapse.",
+    ],
+}
+
+PEOPLE_NOTE = (
+    "\nFace recognition already identified these people in this clip: {names}. "
+    "Refer to them by name in the description when you can tell who does what "
+    '(e.g. "Maria diving off the boat"). Do not invent names for anyone else.\n'
+)
 
 SECTION_PROMPT = """\
 You are labeling the structure of a song for a video montage editor.
@@ -123,6 +166,47 @@ def _extract_json(text: str) -> str:
     raise AIError(f"unterminated JSON in model output: {text.strip()[:200]}")
 
 
+# Normalization maps/helpers for the optional aspects. None of these raise:
+# missing keys, wrong types or unexpected vocabulary degrade to None/[] so a
+# partial response never triggers the parse-retry.
+_ENERGY = {
+    "low": "low", "medium": "medium", "med": "medium", "high": "high",
+    "1": "low", "2": "low", "3": "medium", "4": "high", "5": "high",
+}
+_TIME_OF_DAY = {
+    "day": "day", "daytime": "day", "morning": "day", "afternoon": "day", "noon": "day",
+    "sunrise": "sunrise", "dawn": "sunrise",
+    "sunset": "sunset", "dusk": "sunset", "golden hour": "sunset", "goldenhour": "sunset",
+    "night": "night", "evening": "night",
+}
+_SHOT_ALIASES = {
+    "aerial": "drone", "closeup": "close-up", "close up": "close-up",
+    "extreme close-up": "close-up", "point of view": "pov", "time-lapse": "timelapse",
+}
+
+
+def _word_list(value, cap: int) -> list[str]:
+    """Tag-like field: accept a list or a single string, lowercase, strip to
+    [a-z0-9], drop empties, cap the count (same rules as hashtags)."""
+    if isinstance(value, str):
+        value = re.split(r"[\s,/]+", value)
+    if not isinstance(value, list):
+        return []
+    words = (re.sub(r"[^a-z0-9]", "", str(w).lower().lstrip("#")) for w in value)
+    return [w for w in words if w][:cap]
+
+
+def _enum_or_none(value, mapping: dict[str, str]) -> str | None:
+    return mapping.get(str(value or "").strip().lower())
+
+
+def _label_or_none(value, max_len: int = 24) -> str | None:
+    """Free-ish short label (scene/shot_type): lowercase, keep letters, digits,
+    hyphens and spaces; None when empty."""
+    text = re.sub(r"[^a-z0-9 \-]", "", str(value or "").strip().lower()).strip()
+    return text[:max_len] or None
+
+
 def _ask(prompt: str, images: list[Path], workdir: Path | None) -> str:
     active = provider()
     if active == "agy":
@@ -132,11 +216,19 @@ def _ask(prompt: str, images: list[Path], workdir: Path | None) -> str:
     raise AIError(unavailable_reason())
 
 
-def analyze_video_frames(frame_paths: list[Path], workdir: Path) -> dict:
-    """Describe/score/hashtag a clip from its sampled frames.
+def analyze_video_frames(
+    frame_paths: list[Path], workdir: Path, people: list[str] | None = None
+) -> dict:
+    """Describe/score/hashtag a clip from its sampled frames, plus whichever
+    optional aspects are enabled in Settings (mood, energy, scene/time_of_day/
+    shot_type). `people` are names already identified in the clip by face
+    recognition; when given (and the toggle is on) the description can use them.
 
-    Returns {"description", "score", "hashtags", "highlights", "raw"}.
+    Returns {"description", "score", "hashtags", "mood", "energy", "scene",
+    "time_of_day", "shot_type", "raw"} — every key always present;
+    disabled/missing aspects come back as None/[].
     Retries once on unparseable output."""
+    aspects = settings.get().analysis
     active = provider()
     if active == "agy":
         # Absolute paths are required: agy ignores the process cwd and runs in
@@ -147,7 +239,18 @@ def analyze_video_frames(frame_paths: list[Path], workdir: Path) -> dict:
         intro = f"These images are frames sampled evenly from ONE video clip, in order: {refs}"
     else:
         intro = "The attached images are frames sampled evenly from ONE video clip, in order."
-    prompt = VIDEO_PROMPT.format(frames_intro=intro)
+    people_note = ""
+    if people and aspects.people_in_prompt:
+        people_note = PEOPLE_NOTE.format(names=", ".join(people))
+    enabled = [k for k in _ASPECT_FIELDS if getattr(aspects, k)]
+    fields = _BASE_FIELDS + [f for k in enabled for f in _ASPECT_FIELDS[k]]
+    rules = _BASE_RULES + [r for k in enabled for r in _ASPECT_RULES[k]]
+    prompt = VIDEO_PROMPT.format(
+        frames_intro=intro,
+        people_note=people_note,
+        fields=",\n".join(f"  {f}" for f in fields),
+        rules="\n".join(f"- {r}" for r in rules),
+    )
 
     log.info(
         "analyze video: provider=%s, %d frame(s) in %s", active, len(frame_paths), workdir
@@ -161,11 +264,22 @@ def analyze_video_frames(frame_paths: list[Path], workdir: Path) -> dict:
                 re.sub(r"[^a-z0-9]", "", str(h).lower().lstrip("#"))
                 for h in data.get("hashtags", [])
             ]
+            shot_type = None
+            if aspects.scene:
+                shot_type = _enum_or_none(data.get("shot_type"), _SHOT_ALIASES) or _label_or_none(
+                    data.get("shot_type"), 16
+                )
             return {
                 "description": str(data.get("description", "")).strip(),
                 "score": max(1, min(10, int(data.get("score", 5)))),
                 "hashtags": [h for h in hashtags if h][:8],
-                "highlights": data.get("highlights", []),
+                "mood": _word_list(data.get("mood"), cap=3) if aspects.mood else [],
+                "energy": _enum_or_none(data.get("energy"), _ENERGY) if aspects.energy else None,
+                "scene": _label_or_none(data.get("scene")) if aspects.scene else None,
+                "time_of_day": (
+                    _enum_or_none(data.get("time_of_day"), _TIME_OF_DAY) if aspects.scene else None
+                ),
+                "shot_type": shot_type,
                 "raw": raw,
             }
         except (ValueError, TypeError, AIError) as exc:

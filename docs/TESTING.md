@@ -114,6 +114,22 @@ command work. Rebuild the frontend after this change
 (`cd frontend && npm run build`) since `SettingsPage.tsx`'s placeholder
 changed.
 
+**Fixed: empty responses in headless mode (agy 1.1.2 permission auto-deny).**
+Since agy 1.1.2, in `-p` (headless) mode the agent sometimes decides to re-read
+the `@`-attached frames with its `read_file` tool instead of using the attached
+copies. Headless mode cannot prompt for that permission, so it is auto-denied
+and agy exits **0 with empty stdout** (the reason only appears on stderr:
+`jetski: no output produced — a tool required the "read_file" permission…`).
+It is nondeterministic — the same prompt can work one run and come back empty
+the next. Allow-rules in `~/.gemini/antigravity-cli/settings.json` do not fix
+it (`read_file(<dir>)` never matches; `read_file(*)` matches but then fails
+with "context canceled" — CLI bug). Working fix: run agy with
+`--dangerously-skip-permissions`, now part of the default `agy_cmd`
+(`backend/app/settings.py`, `gemini.py` fallback, Settings-page placeholder).
+Existing installs with a persisted `settings.json` must update the command once
+from the in-app Settings page. `gemini.run_prompt` now also raises (instead of
+returning "") when agy exits 0 with empty stdout, surfacing the stderr reason.
+
 **Fixed: descriptions mixed between videos (agy shared scratch).** `agy -p`
 does **not** run in the caller's cwd — every invocation executes in one global
 scratch dir (`~/.gemini/antigravity-cli/scratch`), and its agent copies
