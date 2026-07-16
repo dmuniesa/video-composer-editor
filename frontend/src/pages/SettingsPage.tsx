@@ -148,6 +148,16 @@ export default function SettingsPage({ pid }: { pid?: string }) {
                 onChange={(e) => setAI({ agy_cmd: e.target.value })}
                 placeholder="agy --dangerously-skip-permissions -p"
               />
+
+              <label>Model</label>
+              <select value={a.agy_model} onChange={(e) => setAI({ agy_model: e.target.value })}>
+                <option value="">Default (agy's own selection)</option>
+                <option value="Gemini 3.5 Flash (Low)">Gemini 3.5 Flash (Low) — fastest</option>
+                <option value="Gemini 3.5 Flash (Medium)">Gemini 3.5 Flash (Medium)</option>
+                <option value="Gemini 3.5 Flash (High)">Gemini 3.5 Flash (High)</option>
+                <option value="Gemini 3.1 Pro (Low)">Gemini 3.1 Pro (Low)</option>
+                <option value="Gemini 3.1 Pro (High)">Gemini 3.1 Pro (High) — most capable</option>
+              </select>
             </>
           )}
 
@@ -187,6 +197,14 @@ export default function SettingsPage({ pid }: { pid?: string }) {
             onChange={(e) => setAI({ timeout_s: num(e.target.value, 300) })}
           />
         </div>
+        {showAgy && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            <b>Model</b> applies to every Antigravity call (clip analysis, lyrics and — if selected
+            above — the composer). Leave it on <i>Default</i> to use whatever agy is configured for;
+            the Gemini options handle both images and audio. Run <code>agy models</code> to see the
+            full list your account can reach.
+          </p>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
           <button onClick={testAI} disabled={busy}>Save & test AI</button>
           <span className="hint">{testResult}</span>

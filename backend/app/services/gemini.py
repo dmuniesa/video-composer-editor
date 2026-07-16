@@ -30,13 +30,20 @@ class AgyError(RuntimeError):
     pass
 
 
+# agy swallows any flag placed after the print flag into the prompt text, so
+# --model must be inserted before it (see the agy-cli-quirks note).
+_PRINT_FLAGS = {"-p", "--print", "--prompt"}
+
+
 def agy_command() -> list[str]:
-    cmd = (
-        os.environ.get("AGY_CMD")
-        or settings.get().ai.agy_cmd
-        or "agy --dangerously-skip-permissions -p"
-    )
-    return shlex.split(cmd)
+    ai = settings.get().ai
+    cmd = os.environ.get("AGY_CMD") or ai.agy_cmd or "agy --dangerously-skip-permissions -p"
+    parts = shlex.split(cmd)
+    model = ai.agy_model.strip()
+    if model:
+        i = next((n for n, p in enumerate(parts) if p in _PRINT_FLAGS), len(parts))
+        parts[i:i] = ["--model", model]
+    return parts
 
 
 def agy_available() -> bool:

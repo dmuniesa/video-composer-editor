@@ -53,6 +53,11 @@ class AISettings(BaseModel):
     # read_file tool, which auto-denies without the flag (allow-rules in agy's
     # settings.json fail with "context canceled"), returning empty output.
     agy_cmd: str = "agy --dangerously-skip-permissions -p"
+    # Which model agy uses, passed as `--model` (inserted BEFORE -p, since agy
+    # swallows flags placed after the print flag into the prompt). Empty = omit
+    # the flag and let agy use its own default. Must match one of agy's known
+    # model names exactly (run `agy models`), e.g. "Gemini 3.5 Flash (High)".
+    agy_model: str = ""
     openai_base_url: str = ""  # e.g. https://api.z.ai/api/paas/v4
     openai_api_key: str = ""
     openai_model: str = ""  # e.g. glm-4.6v-flash

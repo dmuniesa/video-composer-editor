@@ -46,6 +46,7 @@ export interface AppSettings {
   ai: {
     provider: string
     agy_cmd: string
+    agy_model: string
     openai_base_url: string
     openai_api_key: string
     openai_model: string
