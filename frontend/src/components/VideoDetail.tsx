@@ -25,7 +25,9 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
   const [draftIn, setDraftIn] = useState<number | null>(null)
   const [draftOut, setDraftOut] = useState<number | null>(null)
   const [activeRange, setActiveRange] = useState<VideoRange | null>(null)
-  const [looping, setLooping] = useState(false)
+  // null = free playback; 'once' plays the active range then pauses at its out
+  // point; 'loop' repeats it until stopped.
+  const [playMode, setPlayMode] = useState<'once' | 'loop' | null>(null)
   const [editTags, setEditTags] = useState(false)
   const [tagsText, setTagsText] = useState(video.hashtags.join(' '))
   const duration = video.duration || 1
@@ -80,13 +82,45 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
     if (!el) return
     const onTime = () => {
       setPlayhead(el.currentTime)
-      if (looping && activeRange && el.currentTime >= activeRange.t_out) {
-        el.currentTime = activeRange.t_in
+      if (playMode && activeRange && el.currentTime >= activeRange.t_out) {
+        if (playMode === 'loop') {
+          el.currentTime = activeRange.t_in
+        } else {
+          el.pause()
+          setPlayMode(null)
+        }
       }
     }
     el.addEventListener('timeupdate', onTime)
     return () => el.removeEventListener('timeupdate', onTime)
-  }, [looping, activeRange])
+  }, [playMode, activeRange])
+
+  // Play the given range once (pausing at its out point) or on a loop.
+  const playRange = (r: VideoRange, mode: 'once' | 'loop') => {
+    setActiveRange(r)
+    setPlayMode(mode)
+    seek(r.t_in)
+    videoRef.current?.play()
+  }
+
+  const stopPlayback = () => {
+    setPlayMode(null)
+    videoRef.current?.pause()
+  }
+
+  // Clicking the same play/loop control again stops it.
+  const togglePlay = (r: VideoRange, mode: 'once' | 'loop') => {
+    if (activeRange?.id === r.id && playMode === mode) stopPlayback()
+    else playRange(r, mode)
+  }
+
+  // Nudge the playhead by one frame (paused), used by the ←/→ arrows.
+  const stepFrame = (dir: -1 | 1) => {
+    const el = videoRef.current
+    if (!el) return
+    el.pause()
+    seek(Math.min(duration, Math.max(0, el.currentTime + dir / (video.fps || 25))))
+  }
 
   const saveDraft = useCallback(async () => {
     if (draftIn == null || draftOut == null || draftOut - draftIn < 0.1) return
@@ -103,7 +137,19 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
       else if (e.key === 'i' || e.key === 'I') setDraftIn(playhead)
       else if (e.key === 'o' || e.key === 'O') setDraftOut(playhead)
       else if (e.key === 'Enter') saveDraft()
-      else if (e.key === 'l' || e.key === 'L') setLooping((v) => !v)
+      else if (e.key === 'l' || e.key === 'L') {
+        // Toggle looping the selected range (falls back to the first range).
+        if (playMode === 'loop') stopPlayback()
+        else {
+          const target = activeRange ?? video.ranges[0]
+          if (target) playRange(target, 'loop')
+        }
+      }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (e.shiftKey) return  // Shift+←/→ steps clips (handled in ReviewPage)
+        e.preventDefault()
+        stepFrame(e.key === 'ArrowLeft' ? -1 : 1)
+      }
       else if (e.key === ' ') {
         e.preventDefault()
         const el = videoRef.current
@@ -112,7 +158,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [playhead, onClose, saveDraft])
+  }, [playhead, onClose, saveDraft, playMode, activeRange, video.ranges])
 
   const dragHandle = (range: VideoRange, side: 'in' | 'out') => (e: React.PointerEvent) => {
     e.stopPropagation()
@@ -200,24 +246,29 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
           <div className="playhead" style={{ left: `${(playhead / duration) * 100}%` }} />
         </div>
         <div className="hint">
-          <b>I</b> set in · <b>O</b> set out · <b>Enter</b> save range · <b>L</b> loop selected · <b>Space</b> play/pause
+          <b>I</b> set in · <b>O</b> set out · <b>Enter</b> save range · <b>Space</b> play/pause · <b>←/→</b> step one frame · <b>Shift+←/→</b> prev/next clip · <b>L</b> loop selected · ▶ / 🔁 on a range play once or loop (click again to stop)
           {draftIn != null && <> — draft: {fmtTime(draftIn)} → {fmtTime(draftOut ?? playhead)}</>}
         </div>
 
         <div className="range-list">
           {video.ranges.length === 0 && <span className="hint">No ranges yet — mark the interesting parts with I/O + Enter.</span>}
-          {video.ranges.map((r) => (
-            <div key={r.id} className={`row ${activeRange?.id === r.id ? 'active' : ''}`}>
+          {video.ranges.map((r) => {
+            const isActive = activeRange?.id === r.id
+            return (
+            <div key={r.id} className={`row ${isActive ? 'active' : ''}`}>
               <button
-                className="small"
-                onClick={() => {
-                  setActiveRange(r)
-                  setLooping(true)
-                  seek(r.t_in)
-                  videoRef.current?.play()
-                }}
+                className={`small ${isActive && playMode === 'once' ? 'primary' : ''}`}
+                title="Play this range once (click again to stop)"
+                onClick={() => togglePlay(r, 'once')}
               >
                 ▶
+              </button>
+              <button
+                className={`small ${isActive && playMode === 'loop' ? 'primary' : ''}`}
+                title="Loop this range (click again to stop)"
+                onClick={() => togglePlay(r, 'loop')}
+              >
+                🔁
               </button>
               <span>
                 {fmtTime(r.t_in)} → {fmtTime(r.t_out)} ({fmtTime(r.t_out - r.t_in)})
@@ -236,7 +287,8 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                 ✕
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="detail-panels-2col">

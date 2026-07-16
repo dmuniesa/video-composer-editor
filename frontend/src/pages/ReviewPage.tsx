@@ -167,11 +167,13 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
     setLastClicked(video.id)
   }
 
-  // While the detail is open, ←/→ step to the previous/next clip in view.
+  // While the detail is open, Shift+←/→ step to the previous/next clip in view
+  // (plain ←/→ nudge the playhead one frame, handled inside VideoDetail).
   useEffect(() => {
     if (openId == null) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      if (!e.shiftKey) return
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       const idx = shown.findIndex((v) => v.id === openId)
