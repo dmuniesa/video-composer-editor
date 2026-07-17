@@ -71,11 +71,16 @@ def test_structure_and_frame_math():
     pathurls = [e.text for e in root.iter("pathurl")]
     assert any(u.startswith("file://localhost/") and "%C3%B1" in u for u in pathurls)
 
-    # stereo song = two audio tracks referencing one shared file id
+    # stereo song = one audio track carrying both channel clipitems
     audio_tracks = seq.findall("media/audio/track")
-    assert len(audio_tracks) == 2
-    song_clip = audio_tracks[0].find("clipitem")
+    assert len(audio_tracks) == 1
+    channel_clips = audio_tracks[0].findall("clipitem")
+    assert len(channel_clips) == 2
+    song_clip = channel_clips[0]
     assert song_clip.findtext("end") == "500"  # 20s * 25fps
+    # declared as a single 2-channel stereo output group
+    assert seq.findtext("media/audio/numOutputChannels") == "2"
+    assert seq.findtext("media/audio/outputs/group/numchannels") == "2"
 
 
 def test_files_deduplicated():

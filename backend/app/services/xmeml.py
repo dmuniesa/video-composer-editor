@@ -189,8 +189,26 @@ def build_xmeml(
     audio_el = _el(media, "audio")
     if song:
         song_frames = frames(song["duration"])
+        # Keep the song as a single stereo clip on ONE track: declare a 2-channel
+        # stereo output group and place both channel clipitems on the same
+        # <track>, linked together. Emitting a separate <track> per channel is
+        # what makes Premiere split the song into two mono L/R tracks on import.
+        _el(audio_el, "numOutputChannels", "2")
+        fmt = _el(audio_el, "format")
+        asc = _el(fmt, "samplecharacteristics")
+        _el(asc, "depth", "16")
+        _el(asc, "samplerate", "48000")
+        outputs = _el(audio_el, "outputs")
+        group = _el(outputs, "group")
+        _el(group, "index", "1")
+        _el(group, "numchannels", "2")
+        _el(group, "downmix", "0")
+        for ch in (1, 2):
+            channel_el = _el(group, "channel")
+            _el(channel_el, "index", str(ch))
+
+        track_el = _el(audio_el, "track")
         for channel in (1, 2):
-            track_el = _el(audio_el, "track")
             item = _el(track_el, "clipitem")
             item.set("id", f"audioclip-{channel}")
             _el(item, "name", Path(song["path"]).name)
@@ -219,6 +237,13 @@ def build_xmeml(
             source_track = _el(item, "sourcetrack")
             _el(source_track, "mediatype", "audio")
             _el(source_track, "trackindex", str(channel))
+            # Link both channels so Premiere pairs them into one stereo clip.
+            for ch in (1, 2):
+                link = _el(item, "link")
+                _el(link, "linkclipref", f"audioclip-{ch}")
+                _el(link, "mediatype", "audio")
+                _el(link, "trackindex", "1")
+                _el(link, "clipindex", "1")
 
     xml_bytes = ET.tostring(root, encoding="unicode")
     pretty = minidom.parseString(xml_bytes).toprettyxml(indent="  ")

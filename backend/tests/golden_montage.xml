@@ -55,7 +55,7 @@
             </file>
           </clipitem>
           <clipitem id="clipitem-2">
-            <name>dinner with Ã±.mov</name>
+            <name>dinner with ñ.mov</name>
             <enabled>TRUE</enabled>
             <duration>900</duration>
             <rate>
@@ -67,7 +67,7 @@
             <in>300</in>
             <out>438</out>
             <file id="file-2">
-              <name>dinner with Ã±.mov</name>
+              <name>dinner with ñ.mov</name>
               <pathurl>file://localhost/media/trip/dinner%20with%20%C3%B1.mov</pathurl>
               <rate>
                 <timebase>30</timebase>
@@ -104,6 +104,26 @@
         </track>
       </video>
       <audio>
+        <numOutputChannels>2</numOutputChannels>
+        <format>
+          <samplecharacteristics>
+            <depth>16</depth>
+            <samplerate>48000</samplerate>
+          </samplecharacteristics>
+        </format>
+        <outputs>
+          <group>
+            <index>1</index>
+            <numchannels>2</numchannels>
+            <downmix>0</downmix>
+            <channel>
+              <index>1</index>
+            </channel>
+            <channel>
+              <index>2</index>
+            </channel>
+          </group>
+        </outputs>
         <track>
           <clipitem id="audioclip-1">
             <name>song.mp3</name>
@@ -139,9 +159,19 @@
               <mediatype>audio</mediatype>
               <trackindex>1</trackindex>
             </sourcetrack>
+            <link>
+              <linkclipref>audioclip-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>1</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>1</clipindex>
+            </link>
           </clipitem>
-        </track>
-        <track>
           <clipitem id="audioclip-2">
             <name>song.mp3</name>
             <enabled>TRUE</enabled>
@@ -159,6 +189,18 @@
               <mediatype>audio</mediatype>
               <trackindex>2</trackindex>
             </sourcetrack>
+            <link>
+              <linkclipref>audioclip-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>1</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>1</clipindex>
+            </link>
           </clipitem>
         </track>
       </audio>
