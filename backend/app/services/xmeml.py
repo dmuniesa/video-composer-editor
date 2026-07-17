@@ -31,7 +31,13 @@ def _rate_for(fps: float) -> tuple[int, str]:
 
 
 def _pathurl(path: str) -> str:
-    return "file://localhost" + urllib.request.pathname2url(str(Path(path).resolve()))
+    # pathname2url is platform-specific: on Windows a drive path yields
+    # '///C:/...' (three slashes), on POSIX '/path/...'. Normalise to a single
+    # leading slash so the URL is always file://localhost/<path> — otherwise the
+    # extra slashes make Windows drive paths import as UNC (\\C:\...) and
+    # Premiere shows the media as missing.
+    url = urllib.request.pathname2url(str(Path(path).resolve()))
+    return "file://localhost/" + url.lstrip("/")
 
 
 def _el(parent: ET.Element, tag: str, text: str | None = None) -> ET.Element:

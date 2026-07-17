@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
 from xml.etree import ElementTree as ET
+
+import pytest
 
 from app.services.xmeml import build_xmeml
 
@@ -29,6 +32,12 @@ def build() -> str:
     return build_xmeml("trip montage", VIDEOS, TRACKS, SONG)
 
 
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="golden fixtures use POSIX paths; Path.resolve() rewrites them to "
+    "drive paths (C:\\media\\...) elsewhere, so only the byte-for-byte compare "
+    "is platform-bound — the structural tests still run everywhere",
+)
 def test_matches_golden_file():
     xml = build()
     if not GOLDEN.exists():  # pragma: no cover - first run generates it

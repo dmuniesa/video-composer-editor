@@ -33,7 +33,13 @@ def _frame_duration(fps: float) -> tuple[int, int]:
 
 
 def _src_url(path: str) -> str:
-    return "file://" + urllib.request.pathname2url(str(Path(path).resolve()))
+    # pathname2url is platform-specific: on Windows a drive path yields
+    # '///C:/...' (three slashes), on POSIX '/path/...'. Normalise to a single
+    # leading slash so the URL is always the canonical file:///<path> form —
+    # otherwise the extra slashes make Windows drive paths import as UNC
+    # (\\C:\...) and the media can't be relinked.
+    url = urllib.request.pathname2url(str(Path(path).resolve()))
+    return "file:///" + url.lstrip("/")
 
 
 def build_fcpxml(
