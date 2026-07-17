@@ -17,13 +17,17 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
   // Seek target when the detail was opened via a deep link (?video=ID&t=SECONDS,
   // e.g. clicking a face on the People page); null = start from the beginning.
   const [openTime, setOpenTime] = useState<number | null>(null)
-  const [minStars, setMinStars] = useState(0)
-  const [hideRejected, setHideRejected] = useState(false)
+  // Filter options persist for the browser session so they survive navigating
+  // away and back (but reset when the tab is closed).
+  const [minStars, setMinStars] = useState(() => Number(sessionStorage.getItem('review.minStars')) || 0)
+  const [hideRejected, setHideRejected] = useState(() => sessionStorage.getItem('review.hideRejected') === '1')
   const [tagFilter, setTagFilter] = useState('')
   const [personFilter, setPersonFilter] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('*')
-  const [sortBy, setSortBy] = useState<'name' | 'ai' | 'stars' | 'duration'>('name')
+  const [sortBy, setSortBy] = useState<'name' | 'ai' | 'stars' | 'duration'>(
+    () => (sessionStorage.getItem('review.sortBy') as 'name' | 'ai' | 'stars' | 'duration') || 'name',
+  )
   const [thumbSize, setThumbSize] = useState(() => Number(localStorage.getItem('review.thumbSize')) || 240)
   const [toast, setToast] = useState('')
   const [excluded, setExcluded] = useState<ExcludedFile[]>([])
@@ -64,6 +68,16 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
   useEffect(() => {
     localStorage.setItem('review.thumbSize', String(thumbSize))
   }, [thumbSize])
+
+  useEffect(() => {
+    sessionStorage.setItem('review.minStars', String(minStars))
+  }, [minStars])
+  useEffect(() => {
+    sessionStorage.setItem('review.hideRejected', hideRejected ? '1' : '0')
+  }, [hideRejected])
+  useEffect(() => {
+    sessionStorage.setItem('review.sortBy', sortBy)
+  }, [sortBy])
 
   const folders = useMemo(() => folderList(videos), [videos])
 
