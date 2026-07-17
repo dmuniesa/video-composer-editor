@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from .. import db as dbm
 from ..events import broadcaster
+from ..services import timeline_history as history
 from ..services import timeline_ops as ops
 from .deps import resolve_project
 
@@ -18,6 +19,8 @@ def timeline_get(pid: str) -> dict:
     with dbm.open_session(video_dir) as db:
         state = ops.timeline_state(db)
         db.commit()
+        state["can_undo"] = history.can_undo(pid)
+        state["can_redo"] = history.can_redo(pid)
         return state
 
 
@@ -25,8 +28,10 @@ def timeline_get(pid: str) -> dict:
 def track_add(pid: str) -> dict:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         track = ops.add_track(db)
         db.commit()
+        history.record(pid, snap)
         result = {"id": track.id, "index": track.index, "name": track.name}
     broadcaster.publish(pid, "timeline", {})
     return result
@@ -36,11 +41,43 @@ def track_add(pid: str) -> dict:
 def track_remove(pid: str, tid: int) -> dict:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         try:
             ops.remove_track(db, tid)
         except ops.TimelineError as exc:
             raise HTTPException(400, str(exc))
         db.commit()
+        history.record(pid, snap)
+    broadcaster.publish(pid, "timeline", {})
+    return {"ok": True}
+
+
+@router.post("/projects/{pid}/timeline/undo")
+def timeline_undo(pid: str) -> dict:
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        target = history.peek(pid, "undo")
+        if target is None:
+            raise HTTPException(409, "nothing to undo")
+        current = history.snapshot(db)
+        history.restore(db, target)
+        db.commit()
+        history.commit_undo(pid, current)
+    broadcaster.publish(pid, "timeline", {})
+    return {"ok": True}
+
+
+@router.post("/projects/{pid}/timeline/redo")
+def timeline_redo(pid: str) -> dict:
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        target = history.peek(pid, "redo")
+        if target is None:
+            raise HTTPException(409, "nothing to redo")
+        current = history.snapshot(db)
+        history.restore(db, target)
+        db.commit()
+        history.commit_redo(pid, current)
     broadcaster.publish(pid, "timeline", {})
     return {"ok": True}
 
@@ -58,6 +95,7 @@ class ClipCreate(BaseModel):
 def clip_create(pid: str, body: ClipCreate) -> dict:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         try:
             clip = ops.place_clip(
                 db,
@@ -72,6 +110,7 @@ def clip_create(pid: str, body: ClipCreate) -> dict:
         except ops.TimelineError as exc:
             raise HTTPException(400, str(exc))
         db.commit()
+        history.record(pid, snap)
         result = {"id": clip.id}
     broadcaster.publish(pid, "timeline", {})
     return result
@@ -89,6 +128,7 @@ class ClipUpdate(BaseModel):
 def clip_update(pid: str, cid: int, body: ClipUpdate) -> dict:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         try:
             ops.update_clip(
                 db,
@@ -102,6 +142,7 @@ def clip_update(pid: str, cid: int, body: ClipUpdate) -> dict:
         except ops.TimelineError as exc:
             raise HTTPException(400, str(exc))
         db.commit()
+        history.record(pid, snap)
     broadcaster.publish(pid, "timeline", {})
     return {"ok": True}
 
@@ -114,11 +155,13 @@ class ClipSplit(BaseModel):
 def clip_split(pid: str, cid: int, body: ClipSplit) -> dict:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         try:
             right = ops.split_clip(db, cid, body.at)
         except ops.TimelineError as exc:
             raise HTTPException(400, str(exc))
         db.commit()
+        history.record(pid, snap)
         result = {"id": right.id}
     broadcaster.publish(pid, "timeline", {})
     return result
@@ -128,10 +171,12 @@ def clip_split(pid: str, cid: int, body: ClipSplit) -> dict:
 def clip_delete(pid: str, cid: int) -> dict:
     video_dir = resolve_project(pid)
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         try:
             ops.remove_clip(db, cid)
         except ops.TimelineError as exc:
             raise HTTPException(404, str(exc))
         db.commit()
+        history.record(pid, snap)
     broadcaster.publish(pid, "timeline", {})
     return {"ok": True}

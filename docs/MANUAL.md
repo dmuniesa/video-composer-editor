@@ -255,14 +255,27 @@ ruler, song row (sections + waveform + beat ticks) and your video tracks.
   subfolder of your project.
 - Drag a clip horizontally to move it, vertically to change tracks. Drag its
   **edges** to trim (limited by the source video's length).
-- **Snap to beats (S)** magnetizes moves/trims to beats and section boundaries.
+- **Snap (S)** magnetizes moves, trims and drops to beats, section boundaries
+  **and the edges of neighbouring clips** — so clips butt together with no
+  black gap between them (like Premiere's magnet). Both the clip's left and
+  right edge are magnetic, so it also clicks into the far side of a gap you're
+  filling.
+- Left a gap anyway? **Right-click the empty space** on a track and choose
+  **Close gap** — the next clip (and everything after it) slides left to butt
+  against the clip in front (or the start of the timeline).
 - Clips can't overlap on the same track; use several tracks (**+ track**) to
   layer alternatives, B-roll, etc. In the export, higher tracks sit on top in
   Premiere (V1 first).
 - Click a clip to select it — the **inspector** at the bottom shows its exact
-  times — and **Del** removes it. Purple clips were placed by Claude.
+  times. **Del** removes it and leaves a gap; **Shift+Del** (or **Ripple
+  delete** in the clip's right-click menu) removes it and pulls the following
+  clips left to close the gap. Purple clips were placed by Claude.
 - **Space** plays the song with a best-effort jump-cut video preview (top-right
   box). The frame-accurate result comes later in Premiere.
+- Made a mess? **Ctrl+Z** undoes the last timeline edit and **Ctrl+Shift+Z** /
+  **Ctrl+Y** redoes it (also via the **↩ undo / ↪ redo** toolbar buttons). This
+  covers clip moves/trims/splits/deletes, track changes and a whole AI compose
+  as a single step. History is kept per project while the backend runs.
 - **+ / − zoom** rescale the timeline.
 
 ## 6. Let Claude place the clips for you
@@ -383,8 +396,11 @@ descriptions).
 | Detail | `Shift`+`←`/`→` | previous / next clip |
 | Detail | `Space` | play / pause |
 | Montage | `Space` | play / pause the montage preview |
-| Montage | `S` | toggle snap to beats/sections |
-| Montage | `Del` | delete selected clip |
+| Montage | `S` | toggle snap to beats/sections/clip edges |
+| Montage | `Del` | delete selected clip (leaves a gap) |
+| Montage | `Shift`+`Del` | ripple delete — remove clip and close the gap |
+| Montage | `Ctrl`+`Z` | undo the last timeline edit |
+| Montage | `Ctrl`+`Shift`+`Z` / `Ctrl`+`Y` | redo |
 
 ## Troubleshooting
 

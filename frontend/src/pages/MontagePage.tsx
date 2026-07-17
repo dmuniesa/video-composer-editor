@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
@@ -73,10 +73,13 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [song, setSong] = useState<SongInfo | null>(null)
   const [peaks, setPeaks] = useState<[number, number][]>([])
   const [tracks, setTracks] = useState<Track[]>([])
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
   const [pxPerSec, setPxPerSec] = useState(20)
   const [snap, setSnap] = useState(true)
   const [selectedClip, setSelectedClip] = useState<number | null>(null)
   const [clipCtx, setClipCtx] = useState<{ x: number; y: number; clipId: number } | null>(null)
+  const [gapCtx, setGapCtx] = useState<{ x: number; y: number; trackId: number; time: number } | null>(null)
   const [speedInput, setSpeedInput] = useState('1')
   const [compFps, setCompFps] = useState(25)
   const [compW, setCompW] = useState(1920)
@@ -113,10 +116,52 @@ export default function MontagePage({ pid }: { pid: string }) {
   const previewRef = useRef<HTMLVideoElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
+  /** viewport x (px) where the playhead should stay after a zoom change */
+  const zoomAnchor = useRef<number | null>(null)
+
+  const zoomAt = useCallback(
+    (factor: number) => {
+      const nz = Math.min(120, Math.max(4, pxPerSec * factor))
+      if (nz === pxPerSec) return
+      const el = scrollRef.current
+      if (el) {
+        const viewX = playhead * pxPerSec - el.scrollLeft
+        // keep the playhead where it is on screen; if it's off-screen, bring it to the centre
+        zoomAnchor.current = viewX >= 0 && viewX <= el.clientWidth ? viewX : el.clientWidth / 2
+      }
+      setPxPerSec(nz)
+    },
+    [pxPerSec, playhead],
+  )
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (el && zoomAnchor.current != null) {
+      el.scrollLeft = Math.max(0, playhead * pxPerSec - zoomAnchor.current)
+      zoomAnchor.current = null
+    }
+  }, [pxPerSec, playhead])
 
   const refreshTimeline = useCallback(() => {
-    api.timeline(pid).then((t) => setTracks(t.tracks)).catch((e) => setToast(e.message))
+    api
+      .timeline(pid)
+      .then((t) => {
+        setTracks(t.tracks)
+        setCanUndo(t.can_undo)
+        setCanRedo(t.can_redo)
+      })
+      .catch((e) => setToast(e.message))
   }, [pid])
+
+  const doUndo = useCallback(() => {
+    setSelectedClip(null) // the selected clip may not exist after the restore
+    api.undoTimeline(pid).then(refreshTimeline).catch((e) => setToast(e.message))
+  }, [pid, refreshTimeline])
+
+  const doRedo = useCallback(() => {
+    setSelectedClip(null)
+    api.redoTimeline(pid).then(refreshTimeline).catch((e) => setToast(e.message))
+  }, [pid, refreshTimeline])
 
   const refreshVideos = useCallback(() => {
     api.videos(pid).then(setVideos).catch(() => {})
@@ -245,22 +290,46 @@ export default function MontagePage({ pid }: { pid: string }) {
     return pts.sort((a, b) => a - b)
   }, [song])
 
+  /** start/end of every placed clip — the magnetic targets that keep clips butted together */
+  const clipEdges = useMemo(() => {
+    const edges: { t: number; clipId: number }[] = []
+    for (const t of tracks)
+      for (const c of t.clips) {
+        edges.push({ t: c.timeline_start, clipId: c.id })
+        edges.push({ t: c.timeline_start + c.duration, clipId: c.id })
+      }
+    return edges
+  }, [tracks])
+
+  // Snaps a start time `t` to the nearest beat/section boundary or clip edge.
+  // With `duration` set, the clip's right edge is a candidate too, so a clip can
+  // butt-join against the clip in front of it or behind the gap it fills.
+  // `excludeClipId` skips a clip's own edges so it doesn't snap to itself.
   const snapTime = useCallback(
-    (t: number) => {
-      if (!snap || snapPoints.length === 0) return Math.max(0, t)
+    (t: number, opts?: { excludeClipId?: number; duration?: number }) => {
+      if (!snap) return Math.max(0, t)
       const threshold = SNAP_PX / pxPerSec
+      const dur = opts?.duration ?? 0
       let best = t
       let bestDist = threshold
-      for (const p of snapPoints) {
-        const d = Math.abs(p - t)
-        if (d < bestDist) {
-          best = p
-          bestDist = d
+      const consider = (candidateStart: number, dist: number) => {
+        if (dist < bestDist) {
+          best = candidateStart
+          bestDist = dist
         }
+      }
+      for (const p of snapPoints) {
+        consider(p, Math.abs(p - t))
+        if (dur) consider(p - dur, Math.abs(p - (t + dur)))
+      }
+      for (const e of clipEdges) {
+        if (e.clipId === opts?.excludeClipId) continue
+        consider(e.t, Math.abs(e.t - t))
+        if (dur) consider(e.t - dur, Math.abs(e.t - (t + dur)))
       }
       return Math.max(0, best)
     },
-    [snap, snapPoints, pxPerSec],
+    [snap, snapPoints, clipEdges, pxPerSec],
   )
 
   // ---- audio/video preview ----
@@ -349,14 +418,16 @@ export default function MontagePage({ pid }: { pid: string }) {
     const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
     const speed = clip.speed || 1
     const want = clip.source_in + (playhead - clip.timeline_start) * speed
+    const playing = audioRef.current && !audioRef.current.paused
+    // While playing, tolerate small drift so we don't fight the video's own playback.
+    // While paused (scrubbing / frame-stepping), seek to the exact frame so the preview follows.
     if (!pv.src.endsWith(src)) {
       pv.src = src
       pv.currentTime = want
-    } else if (Math.abs(pv.currentTime - want) > 0.5 * Math.max(1, speed)) {
+    } else if (!playing || Math.abs(pv.currentTime - want) > 0.5 * Math.max(1, speed)) {
       pv.currentTime = want
     }
     if (pv.playbackRate !== speed) pv.playbackRate = speed
-    const playing = audioRef.current && !audioRef.current.paused
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
   }, [playhead, clipAt, pid, previewOpen, previewLowRes])
@@ -368,27 +439,56 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (ctx || clipCtx) {
+      if (ctx || clipCtx || gapCtx) {
         if (e.key === 'Escape') {
           setCtx(null)
           setClipCtx(null)
+          setGapCtx(null)
         }
         return
       }
       if (detailId != null) return // the detail drawer has its own shortcuts
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        if (e.shiftKey) {
+          if (canRedo) doRedo()
+        } else if (canUndo) doUndo()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault()
+        if (canRedo) doRedo()
+        return
+      }
       if (e.key === ' ') {
         e.preventDefault()
         togglePlay()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedClip != null) {
-        api.deleteClip(pid, selectedClip).then(refreshTimeline).catch((err) => setToast(err.message))
-        setSelectedClip(null)
+        const track = trackOf(selectedClip)
+        const clip = track?.clips.find((c) => c.id === selectedClip)
+        if (e.shiftKey && track && clip) {
+          rippleDelete(clip, track) // close the gap left behind
+        } else {
+          api.deleteClip(pid, selectedClip).then(refreshTimeline).catch((err) => setToast(err.message))
+          setSelectedClip(null)
+        }
       } else if (e.key === 's' || e.key === 'S') setSnap((v) => !v)
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault()
+        const dir = e.key === 'ArrowRight' ? 1 : -1
+        if (e.shiftKey) {
+          scrollRef.current?.scrollBy({ left: dir * 120 })
+        } else {
+          const frame = 1 / Math.max(1, compFps)
+          seek(playhead + dir * frame)
+        }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedClip, pid, refreshTimeline, ctx, clipCtx, detailId])
+  }, [selectedClip, pid, refreshTimeline, ctx, clipCtx, gapCtx, detailId, playhead, compFps, tracks, canUndo, canRedo, doUndo, doRedo])
 
   // ---- bin context menu ----
   const openCtxMenu = (videoId: number) => (e: React.MouseEvent) => {
@@ -433,12 +533,66 @@ export default function MontagePage({ pid }: { pid: string }) {
       .addClip(pid, {
         track_id: track.id,
         video_id: v.id,
-        timeline_start: snapTime(playhead),
+        timeline_start: snapTime(playhead, { duration: tOut - tIn }),
         source_in: tIn,
         source_out: tOut,
       })
       .then(refreshTimeline)
       .catch((e) => setToast(e.message))
+  }
+
+  const trackOf = (clipId: number) => tracks.find((t) => t.clips.some((c) => c.id === clipId))
+
+  // Delete a clip and pull every later clip on its track left by the clip's
+  // duration, so no black gap is left behind (Premiere's Shift+Delete).
+  const rippleDelete = (clip: TimelineClip, track: Track) => {
+    setClipCtx(null)
+    setSelectedClip(null)
+    const later = track.clips.filter((c) => c.id !== clip.id && c.timeline_start >= clip.timeline_start)
+    ;(async () => {
+      try {
+        await api.deleteClip(pid, clip.id)
+        for (const c of later) {
+          await api.updateClip(pid, c.id, { timeline_start: Math.max(0, c.timeline_start - clip.duration) })
+        }
+      } catch (e) {
+        setToast((e as Error).message)
+      } finally {
+        refreshTimeline()
+      }
+    })()
+  }
+
+  // Close the empty gap under `t`: pull the next clip (and everything after it)
+  // left until it butts against the clip in front (or the start of the timeline).
+  const closeGapAt = (track: Track, t: number) => {
+    setGapCtx(null)
+    const clips = [...track.clips].sort((a, b) => a.timeline_start - b.timeline_start)
+    const next = clips.find((c) => c.timeline_start > t)
+    if (!next) {
+      setToast('no clip after this point to pull back')
+      return
+    }
+    const prevEnd = clips
+      .filter((c) => c.id !== next.id && c.timeline_start < next.timeline_start)
+      .reduce((m, c) => Math.max(m, c.timeline_start + c.duration), 0)
+    const delta = next.timeline_start - prevEnd
+    if (delta <= 0.0001) {
+      setToast('no gap here')
+      return
+    }
+    const toMove = clips.filter((c) => c.timeline_start >= next.timeline_start)
+    ;(async () => {
+      try {
+        for (const c of toMove) {
+          await api.updateClip(pid, c.id, { timeline_start: c.timeline_start - delta })
+        }
+      } catch (e) {
+        setToast((e as Error).message)
+      } finally {
+        refreshTimeline()
+      }
+    })()
   }
 
   // ---- drag from bin ----
@@ -457,7 +611,8 @@ export default function MontagePage({ pid }: { pid: string }) {
   // where a bin item would land on `track` given the pointer position
   const dropTimeAt = (track: HTMLElement, clientX: number) => {
     const rect = track.getBoundingClientRect()
-    return snapTime((clientX - rect.left) / pxPerSec)
+    const duration = binDrag ? binDrag.t_out - binDrag.t_in : 0
+    return snapTime((clientX - rect.left) / pxPerSec, { duration })
   }
 
   // ---- drop from bin ----
@@ -506,7 +661,10 @@ export default function MontagePage({ pid }: { pid: string }) {
       const p = { ...state.orig }
       let previewTrackId = state.trackId
       if (mode === 'move') {
-        p.timeline_start = snapTime(state.orig.timeline_start + dt)
+        p.timeline_start = snapTime(state.orig.timeline_start + dt, {
+          excludeClipId: state.orig.id,
+          duration: state.orig.duration,
+        })
         // vertical track change
         const dy = ev.clientY - startY
         const rows = Math.round(dy / TRACK_H)
@@ -516,7 +674,7 @@ export default function MontagePage({ pid }: { pid: string }) {
       } else if (mode === 'trim-l') {
         // timeline deltas convert to source seconds at the clip's speed
         const maxIn = state.orig.source_out - 0.2 * speed
-        let newStart = snapTime(state.orig.timeline_start + dt)
+        let newStart = snapTime(state.orig.timeline_start + dt, { excludeClipId: state.orig.id })
         const delta = newStart - state.orig.timeline_start
         let newIn = state.orig.source_in + delta * speed
         if (newIn < 0) {
@@ -530,7 +688,9 @@ export default function MontagePage({ pid }: { pid: string }) {
         p.timeline_start = newStart
         p.source_in = newIn
       } else {
-        const end = snapTime(state.orig.timeline_start + state.orig.duration + dt)
+        const end = snapTime(state.orig.timeline_start + state.orig.duration + dt, {
+          excludeClipId: state.orig.id,
+        })
         let newOut = state.orig.source_in + Math.max(0.2, end - state.orig.timeline_start) * speed
         if (video?.duration) newOut = Math.min(newOut, video.duration)
         p.source_out = newOut
@@ -751,10 +911,10 @@ export default function MontagePage({ pid }: { pid: string }) {
 
       <div className="montage-main">
         <div className="montage-toolbar">
-          <button className="small" onClick={() => setPxPerSec((z) => Math.min(120, z * 1.4))}>＋ zoom</button>
-          <button className="small" onClick={() => setPxPerSec((z) => Math.max(4, z / 1.4))}>－ zoom</button>
-          <label>
-            <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> snap to beats (S)
+          <button className="small" onClick={() => zoomAt(1.4)}>＋ zoom</button>
+          <button className="small" onClick={() => zoomAt(1 / 1.4)}>－ zoom</button>
+          <label title="snap clips to beats and to the edges of neighbouring clips, so they butt together with no black gaps">
+            <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> 🧲 snap (S)
           </label>
           <button className="small" onClick={() => api.addTrack(pid).then(refreshTimeline)}>+ track</button>
           {tracks.length > 1 && (
@@ -765,6 +925,8 @@ export default function MontagePage({ pid }: { pid: string }) {
               − track
             </button>
           )}
+          <button className="small" onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">↩ undo</button>
+          <button className="small" onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z / Ctrl+Y)">↪ redo</button>
           <div className="seq-menu">
             <button className="small" onClick={() => setSeqOpen((v) => !v)} title="composition settings — written to the exported sequence">
               ⚙ {compW}×{compH} · {compFps} fps ▾
@@ -986,6 +1148,18 @@ export default function MontagePage({ pid }: { pid: string }) {
                     seek((e.clientX - rect.left) / pxPerSec)
                     setSelectedClip(null)
                   }
+                }}
+                onContextMenu={(e) => {
+                  // clips stop propagation, so this only fires on empty track space
+                  if (e.target !== e.currentTarget) return
+                  e.preventDefault()
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  setGapCtx({
+                    x: Math.min(e.clientX, window.innerWidth - 240),
+                    y: Math.min(e.clientY, window.innerHeight - 120),
+                    trackId: track.id,
+                    time: (e.clientX - rect.left) / pxPerSec,
+                  })
                 }}
               >
                 <span className="hint" style={{ position: 'absolute', left: 6, top: 4, pointerEvents: 'none' }}>
@@ -1257,6 +1431,16 @@ export default function MontagePage({ pid }: { pid: string }) {
               <button
                 className="ctx-item"
                 onClick={() => {
+                  const track = trackOf(cclip.id)
+                  if (track) rippleDelete(cclip, track)
+                }}
+              >
+                <span style={{ color: 'var(--danger)' }}>⟲ Ripple delete — close gap</span>
+                <span className="hint">⇧Del</span>
+              </button>
+              <button
+                className="ctx-item"
+                onClick={() => {
                   api.deleteClip(pid, cclip.id).then(refreshTimeline).catch((e) => setToast(e.message))
                   setSelectedClip(null)
                   setClipCtx(null)
@@ -1269,6 +1453,29 @@ export default function MontagePage({ pid }: { pid: string }) {
           </>
         )
       })()}
+      {gapCtx && (
+        <>
+          <div
+            className="ctx-overlay"
+            onMouseDown={() => setGapCtx(null)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setGapCtx(null)
+            }}
+          />
+          <div className="ctx-menu" style={{ left: gapCtx.x, top: gapCtx.y }}>
+            <button
+              className="ctx-item"
+              onClick={() => {
+                const track = tracks.find((t) => t.id === gapCtx.trackId)
+                if (track) closeGapAt(track, gapCtx.time)
+              }}
+            >
+              <span>🧲 Close gap — pull next clip back</span>
+            </button>
+          </div>
+        </>
+      )}
       {detailId != null && videoById.get(detailId) && (
         <VideoDetail
           pid={pid}

@@ -206,7 +206,8 @@ export const api = {
       body: JSON.stringify({ instructions }),
     }),
 
-  timeline: (pid: string) => req<{ tracks: Track[] }>(`/api/projects/${pid}/timeline`),
+  timeline: (pid: string) =>
+    req<{ tracks: Track[]; can_undo: boolean; can_redo: boolean }>(`/api/projects/${pid}/timeline`),
   addTrack: (pid: string) => req<Track>(`/api/projects/${pid}/tracks`, { method: 'POST' }),
   removeTrack: (pid: string, tid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/tracks/${tid}`, { method: 'DELETE' }),
@@ -230,6 +231,10 @@ export const api = {
     }),
   deleteClip: (pid: string, cid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/clips/${cid}`, { method: 'DELETE' }),
+  undoTimeline: (pid: string) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/timeline/undo`, { method: 'POST' }),
+  redoTimeline: (pid: string) =>
+    req<{ ok: boolean }>(`/api/projects/${pid}/timeline/redo`, { method: 'POST' }),
 }
 
 export const media = {

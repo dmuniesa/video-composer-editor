@@ -27,8 +27,13 @@ const SHORTCUTS: [string, string, string][] = [
   ['Detail', 'Shift + ← / →', 'Previous / next clip'],
   ['Detail', 'Space', 'Play / pause'],
   ['Montage', 'Space', 'Play / pause the montage preview'],
-  ['Montage', 'S', 'Toggle snap to beats & sections'],
-  ['Montage', 'Del', 'Delete the selected clip'],
+  ['Montage', '← / →', 'Move the playhead one frame'],
+  ['Montage', 'Shift + ← / →', 'Scroll the timeline'],
+  ['Montage', 'S', 'Toggle snap to beats, sections & clip edges'],
+  ['Montage', 'Del', 'Delete the selected clip (leaves a gap)'],
+  ['Montage', 'Shift + Del', 'Ripple delete — remove the clip and close the gap'],
+  ['Montage', 'Ctrl + Z', 'Undo the last timeline edit'],
+  ['Montage', 'Ctrl + Shift + Z / Ctrl + Y', 'Redo'],
 ]
 
 export default function GuidePage({ standalone }: { standalone?: boolean }) {
@@ -294,15 +299,26 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             <b>edges</b> to trim.
           </li>
           <li>
-            <b>Snap</b> (<kbd>S</kbd>) magnetizes moves and trims to beats and section boundaries.
+            <b>Snap</b> (<kbd>S</kbd>) magnetizes moves, trims and drops to beats, section
+            boundaries <b>and the edges of neighbouring clips</b> — so clips butt together with
+            no black gap between them (like Premiere&apos;s magnet). Both the clip&apos;s left and
+            right edge are magnetic, so it also clicks into the far side of a gap you&apos;re
+            filling.
+          </li>
+          <li>
+            Left a gap anyway? <b>Right-click the empty space</b> on a track and choose{' '}
+            <b>Close gap</b> — the next clip (and everything after it) slides left to butt against
+            the clip in front.
           </li>
           <li>
             Clips can&apos;t overlap on a track — add tracks (<b>+ track</b>) to layer
             alternatives or B-roll. Higher tracks sit on top in Premiere.
           </li>
           <li>
-            Click a clip to select it (the inspector at the bottom shows exact times);{' '}
-            <kbd>Del</kbd> removes it.
+            Click a clip to select it (the inspector at the bottom shows exact times).{' '}
+            <kbd>Del</kbd> removes it and leaves a gap; <kbd>Shift</kbd>+<kbd>Del</kbd> (or{' '}
+            <b>Ripple delete</b> in the clip&apos;s right-click menu) removes it and pulls the
+            following clips left to close the gap.
           </li>
           <li>
             <kbd>Space</kbd> plays the song with a best-effort jump-cut preview. The

@@ -20,6 +20,7 @@ from .. import db as dbm
 from .. import settings
 from ..models import Face, Person, Song, Video
 from . import gemini, jobs, lyrics as lyrics_svc, openai_client
+from . import timeline_history as history
 from . import timeline_ops as ops
 from .ai import AIError, _extract_json
 
@@ -361,8 +362,11 @@ def run_compose(pid: str, video_dir: Path, instructions: str, job: jobs.Job) -> 
 
     jobs.update(job, 0.8, f"applying {len(actions)} action(s)")
     with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
         applied, errors = apply_actions(db, actions, placed_by=active)
         db.commit()
+        if applied:
+            history.record(pid, snap)  # the whole compose batch is one undo step
     if errors:
         log.warning("compose: %d/%d action(s) rejected:\n%s", len(errors), len(actions), "\n".join(errors))
     return {
