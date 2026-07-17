@@ -303,7 +303,8 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             boundaries <b>and the edges of neighbouring clips</b> — so clips butt together with
             no black gap between them (like Premiere&apos;s magnet). Both the clip&apos;s left and
             right edge are magnetic, so it also clicks into the far side of a gap you&apos;re
-            filling.
+            filling. A <b>black line with a triangle</b> marks the join whenever an edge locks
+            onto a neighbour.
           </li>
           <li>
             Left a gap anyway? <b>Right-click the empty space</b> on a track and choose{' '}

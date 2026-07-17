@@ -259,7 +259,8 @@ ruler, song row (sections + waveform + beat ticks) and your video tracks.
   **and the edges of neighbouring clips** — so clips butt together with no
   black gap between them (like Premiere's magnet). Both the clip's left and
   right edge are magnetic, so it also clicks into the far side of a gap you're
-  filling.
+  filling. A **black line with a triangle** marks the join whenever an edge
+  locks onto a neighbour.
 - Left a gap anyway? **Right-click the empty space** on a track and choose
   **Close gap** — the next clip (and everything after it) slides left to butt
   against the clip in front (or the start of the timeline).

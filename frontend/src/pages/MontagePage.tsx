@@ -13,6 +13,7 @@ import { sectionColor } from './MusicPage'
 
 const RULER_H = 26
 const TRACK_H = 64
+const TL_AUDIO_H = 88 // mirrors .tl-audio height in index.css — where the video tracks begin
 const SNAP_PX = 8
 
 const SEQ_RATIOS = [
@@ -80,6 +81,8 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [selectedClip, setSelectedClip] = useState<number | null>(null)
   const [clipCtx, setClipCtx] = useState<{ x: number; y: number; clipId: number } | null>(null)
   const [gapCtx, setGapCtx] = useState<{ x: number; y: number; trackId: number; time: number } | null>(null)
+  /** timeline time where a drag/drop is currently butting against a clip edge — drives the black snap line */
+  const [snapEdge, setSnapEdge] = useState<number | null>(null)
   const [speedInput, setSpeedInput] = useState('1')
   const [compFps, setCompFps] = useState(25)
   const [compW, setCompW] = useState(1920)
@@ -330,6 +333,22 @@ export default function MontagePage({ pid }: { pid: string }) {
       return Math.max(0, best)
     },
     [snap, snapPoints, clipEdges, pxPerSec],
+  )
+
+  // Which clip edge, if any, the given positions (a clip's left/right edges)
+  // currently line up with — drives the black snap indicator. Only clip-to-clip
+  // butt joins are shown; beats snap silently so the line doesn't flicker.
+  const snappedEdge = useCallback(
+    (positions: number[], excludeClipId?: number): number | null => {
+      if (!snap) return null
+      for (const pos of positions)
+        for (const e of clipEdges) {
+          if (e.clipId === excludeClipId) continue
+          if (Math.abs(e.t - pos) < 1e-4) return e.t
+        }
+      return null
+    },
+    [snap, clipEdges],
   )
 
   // ---- audio/video preview ----
@@ -606,6 +625,7 @@ export default function MontagePage({ pid }: { pid: string }) {
     setBinDrag(null)
     setDropTrack(null)
     setDropPos(null)
+    setSnapEdge(null)
   }
 
   // where a bin item would land on `track` given the pointer position
@@ -698,12 +718,21 @@ export default function MontagePage({ pid }: { pid: string }) {
       p.duration = (p.source_out - p.source_in) / speed
       state.preview = p
       state.previewTrackId = previewTrackId
+      // black snap line: which edge of the dragged clip is currently butting a neighbour
+      const positions =
+        mode === 'move'
+          ? [p.timeline_start, p.timeline_start + p.duration]
+          : mode === 'trim-l'
+            ? [p.timeline_start]
+            : [p.timeline_start + p.duration]
+      setSnapEdge(snappedEdge(positions, state.orig.id))
       setDrag({ ...state })
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       setDrag(null)
+      setSnapEdge(null)
       const p = state.preview
       const changed =
         p.timeline_start !== state.orig.timeline_start ||
@@ -1134,12 +1163,15 @@ export default function MontagePage({ pid }: { pid: string }) {
                   setDropPos((cur) =>
                     cur && cur.trackId === track.id && cur.time === time ? cur : { trackId: track.id, time },
                   )
+                  const dur = binDrag ? binDrag.t_out - binDrag.t_in : 0
+                  setSnapEdge(snappedEdge([time, time + dur]))
                 }}
                 onDragLeave={(e) => {
                   // ignore leaves into child elements of the same track
                   if (e.currentTarget.contains(e.relatedTarget as Node)) return
                   setDropTrack((cur) => (cur === track.id ? null : cur))
                   setDropPos((cur) => (cur && cur.trackId === track.id ? null : cur))
+                  setSnapEdge(null)
                 }}
                 onDrop={onDrop(track)}
                 onPointerDown={(e) => {
@@ -1234,6 +1266,9 @@ export default function MontagePage({ pid }: { pid: string }) {
               </div>
             ))}
 
+            {snapEdge != null && (
+              <div className="tl-snapline" style={{ left: snapEdge * pxPerSec, top: RULER_H + TL_AUDIO_H }} />
+            )}
             <div className="tl-playhead" style={{ left: playhead * pxPerSec }} />
           </div>
         </div>

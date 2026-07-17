@@ -725,6 +725,18 @@ kbd {
 .tl-clip .trim { position: absolute; top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
 .tl-clip .trim.l { left: 0; } .tl-clip .trim.r { right: 0; }
 .tl-playhead { position: absolute; top: 0; bottom: 0; width: 1.5px; background: #ff5555; z-index: 6; pointer-events: none; }
+/* Premiere-style snap indicator: a black line down the track area with a triangle
+   at the junction, shown while a dragged/dropped clip butts against a neighbour. */
+.tl-snapline {
+  position: absolute; bottom: 0; width: 0; z-index: 7; pointer-events: none;
+  border-left: 2px solid #000;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.85));
+}
+.tl-snapline::before {
+  content: ''; position: absolute; top: 0; left: -5px;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 7px solid #000;
+}
 .inspector {
   display: flex; gap: 12px; align-items: center; padding: 8px 12px;
   border-top: 1px solid var(--border); background: var(--bg-panel); font-size: 12px; color: var(--text-dim);
