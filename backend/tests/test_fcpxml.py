@@ -95,3 +95,37 @@ def test_no_song():
     # gap now ends with the last clip (track V2 clip ends at 11 s)
     assert _rational_seconds(gap.get("duration")) == 11.0
     assert all(c.get("lane") != "-1" for c in gap.findall("asset-clip"))
+
+
+def test_clip_audio_gain_adjust_volume():
+    # gain = norm(-5.5) + user(+2.5) = -3 dB
+    tracks = [
+        {
+            "name": "V1",
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0,
+                 "audio_gain_db": 2.5, "norm_gain_db": -5.5},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_fcpxml("t", VIDEOS, tracks, None, normalize_audio=True))
+    clip = root.find(".//spine/gap/asset-clip")
+    av = clip.find("adjust-volume")
+    assert av is not None
+    assert av.get("amount") == "-3dB"
+
+
+def test_clip_audio_gain_normalize_off_ignored():
+    tracks = [
+        {
+            "name": "V1",
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0,
+                 "audio_gain_db": 0.0, "norm_gain_db": -8.0},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_fcpxml("t", VIDEOS, tracks, None, normalize_audio=False))
+    clip = root.find(".//spine/gap/asset-clip")
+    # normalize off + 0 user gain -> no adjust-volume emitted
+    assert clip.find("adjust-volume") is None

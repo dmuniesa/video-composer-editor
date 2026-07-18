@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import TimelineClip, Track, Video
+from ..models import Project, TimelineClip, Track, Video
 
 EPS = 1e-6
 SPEED_MIN = 0.05
@@ -207,7 +207,10 @@ def clear_track(db: Session, track_ref: int, track_by_index: bool = False) -> in
 
 def timeline_state(db: Session) -> dict:
     tracks = ensure_default_tracks(db)
+    project = db.scalar(select(Project))
     return {
+        "normalize_audio": bool(project.normalize_audio) if project else False,
+        "normalize_target_lufs": (project.normalize_target_lufs if project else None) or -16.0,
         "tracks": [
             {
                 "id": t.id,
@@ -225,10 +228,12 @@ def timeline_state(db: Session) -> dict:
                         "speed": c.speed or 1.0,
                         "duration": c.duration,
                         "placed_by": c.placed_by,
+                        "audio_gain_db": c.audio_gain_db,
+                        "norm_gain_db": c.norm_gain_db,
                     }
                     for c in t.clips
                 ],
             }
             for t in tracks
-        ]
+        ],
     }

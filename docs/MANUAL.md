@@ -273,6 +273,17 @@ ruler, song row (sections + waveform + beat ticks) and your video tracks.
   clips left to close the gap. Purple clips were placed by Claude.
 - **Space** plays the song with a best-effort jump-cut video preview (top-right
   box). The frame-accurate result comes later in Premiere.
+- **Normalize** (toolbar toggle) levels every clip's audio to a common loudness
+  (EBU R128, ≈ −16 LUFS) so no clip sticks out as much louder or quieter than the
+  rest — it targets a shared level, not the loudest or the quietest clip. Only
+  the clips are affected, not the music track. Each clip is measured once the
+  first time you enable it; if you re-trim clips later, toggle it again to
+  re-measure.
+- **Right-click a clip's audio waveform** to set that clip's gain in dB (quick
+  buttons −12…+12, a fine input, or reset). The offset stacks on top of
+  normalization and the track's volume control — both keep working.
+- Per-clip gain and normalization are carried into the export (Premiere/Resolve
+  audio level filters, Final Cut `<adjust-volume>`) and play back in the preview.
 - Made a mess? **Ctrl+Z** undoes the last timeline edit and **Ctrl+Shift+Z** /
   **Ctrl+Y** redoes it (also via the **↩ undo / ↪ redo** toolbar buttons). This
   covers clip moves/trims/splits/deletes, track changes and a whole AI compose

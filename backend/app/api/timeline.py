@@ -3,14 +3,19 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from .. import db as dbm
 from ..events import broadcaster
+from ..services import audio_loudness
 from ..services import timeline_history as history
 from ..services import timeline_ops as ops
 from .deps import resolve_project
 
 router = APIRouter()
+
+# Pids with a loudness-normalisation run in flight, to reject concurrent calls.
+_NORMALIZE_IN_FLIGHT: set[str] = set()
 
 
 @router.get("/projects/{pid}/timeline")
@@ -78,6 +83,61 @@ def track_audio_update(pid: str, tid: int, body: TrackAudioUpdate) -> dict:
         }
     broadcaster.publish(pid, "timeline", {"source": "track-audio"})
     return result
+
+
+class ClipAudioUpdate(BaseModel):
+    audio_gain_db: float
+
+
+@router.patch("/projects/{pid}/clips/{cid}/audio")
+def clip_audio_update(pid: str, cid: int, body: ClipAudioUpdate) -> dict:
+    """Per-clip audio gain offset (dB), set from the clip's right-click menu.
+    A mix parameter (like track volume), so it stays out of the undo history."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        clip = db.get(ops.TimelineClip, cid)
+        if clip is None:
+            raise HTTPException(404, "clip not found")
+        clip.audio_gain_db = max(-24.0, min(24.0, float(body.audio_gain_db)))
+        db.commit()
+        result = {"id": clip.id, "audio_gain_db": clip.audio_gain_db}
+    broadcaster.publish(pid, "timeline", {"source": "clip-audio"})
+    return result
+
+
+class NormalizeAudioRequest(BaseModel):
+    enabled: bool
+    target_lufs: float = -16.0
+
+
+@router.post("/projects/{pid}/normalize-audio")
+def normalize_audio(pid: str, body: NormalizeAudioRequest) -> dict:
+    """Toggle EBU R128 loudness normalisation across all clips.
+
+    When enabling, measures each clip's integrated LUFS (ffmpeg loudnorm) and
+    stores a per-clip ``norm_gain_db = target - measured`` so every clip lands at
+    ``target_lufs``. Runs synchronously (one ffmpeg decode per clip). Bulk and
+    slow, so like other mix parameters it bypasses the undo history. Only the
+    clips' audio is normalised — the background song is left untouched."""
+    if pid in _NORMALIZE_IN_FLIGHT:
+        raise HTTPException(409, "normalization already running")
+    video_dir = resolve_project(pid)
+    _NORMALIZE_IN_FLIGHT.add(pid)
+    try:
+        with dbm.open_session(video_dir) as db:
+            project = db.scalar(select(ops.Project))
+            if project is None:
+                raise HTTPException(404, "project not found")
+            project.normalize_audio = body.enabled
+            project.normalize_target_lufs = body.target_lufs
+            report: list[dict] = []
+            if body.enabled:
+                report = audio_loudness.normalize_project(db, video_dir, body.target_lufs)
+            db.commit()
+    finally:
+        _NORMALIZE_IN_FLIGHT.discard(pid)
+    broadcaster.publish(pid, "timeline", {"source": "normalize"})
+    return {"enabled": body.enabled, "target_lufs": body.target_lufs, "report": report}
 
 
 @router.post("/projects/{pid}/timeline/undo")

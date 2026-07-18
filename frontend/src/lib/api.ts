@@ -10,6 +10,7 @@ import type {
   ProjectInfo,
   SongInfo,
   Source,
+  TimelineState,
   Track,
   Video,
   VideoRange,
@@ -213,8 +214,7 @@ export const api = {
       body: JSON.stringify({ instructions }),
     }),
 
-  timeline: (pid: string) =>
-    req<{ tracks: Track[]; can_undo: boolean; can_redo: boolean }>(`/api/projects/${pid}/timeline`),
+  timeline: (pid: string) => req<TimelineState>(`/api/projects/${pid}/timeline`),
   addTrack: (pid: string) => req<Track>(`/api/projects/${pid}/tracks`, { method: 'POST' }),
   removeTrack: (pid: string, tid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/tracks/${tid}`, { method: 'DELETE' }),
@@ -235,6 +235,16 @@ export const api = {
     req<{ ok: boolean }>(`/api/projects/${pid}/clips/${cid}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    }),
+  clipAudio: (pid: string, cid: number, patch: { audio_gain_db: number }) =>
+    req<{ id: number; audio_gain_db: number }>(`/api/projects/${pid}/clips/${cid}/audio`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  normalizeAudio: (pid: string, body: { enabled: boolean; target_lufs?: number }) =>
+    req<{ enabled: boolean; target_lufs: number }>(`/api/projects/${pid}/normalize-audio`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
   splitClip: (pid: string, cid: number, at: number) =>
     req<{ id: number }>(`/api/projects/${pid}/clips/${cid}/split`, {

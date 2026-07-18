@@ -238,6 +238,8 @@ export interface TimelineClip {
   speed: number
   duration: number
   placed_by: string
+  audio_gain_db: number
+  norm_gain_db: number
 }
 
 export interface Track {
@@ -247,6 +249,14 @@ export interface Track {
   audio_muted: boolean
   audio_volume: number
   clips: TimelineClip[]
+}
+
+export interface TimelineState {
+  tracks: Track[]
+  can_undo: boolean
+  can_redo: boolean
+  normalize_audio: boolean
+  normalize_target_lufs: number
 }
 
 export interface JobInfo {

@@ -194,3 +194,53 @@ def test_audio_mute_and_volume():
     # tracks 3-4 = V1 clip audio: muted -> track disabled, full volume -> no filter
     assert audio_tracks[2].findtext("enabled") == "FALSE"
     assert audio_tracks[2].find("clipitem/filter") is None
+
+
+def test_clip_audio_gain_normalize_on():
+    # final db = norm(-3) + user(-6) = -9; level = 1.0 * 10^(-9/20)
+    tracks = [
+        {
+            "name": "V1", "audio_muted": False, "audio_volume": 1.0,
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0,
+                 "audio_gain_db": -6.0, "norm_gain_db": -3.0},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_xmeml("t", VIDEOS, tracks, None, normalize_audio=True))
+    clip = root.find("sequence/media/audio/track/clipitem")
+    val = float(clip.findtext("filter/effect/parameter/value"))
+    assert abs(val - 10 ** (-9 / 20)) < 1e-3
+    assert clip.findtext("filter/effect/effectid") == "audiolevels"
+
+
+def test_clip_audio_gain_normalize_off_ignores_norm_gain():
+    tracks = [
+        {
+            "name": "V1", "audio_muted": False, "audio_volume": 1.0,
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0,
+                 "audio_gain_db": 6.0, "norm_gain_db": -20.0},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_xmeml("t", VIDEOS, tracks, None, normalize_audio=False))
+    clip = root.find("sequence/media/audio/track/clipitem")
+    # only the +6 dB user offset applies; norm_gain_db is ignored when off
+    val = float(clip.findtext("filter/effect/parameter/value"))
+    assert abs(val - 10 ** (6 / 20)) < 1e-3
+
+
+def test_clip_audio_gain_zero_emits_no_filter():
+    tracks = [
+        {
+            "name": "V1", "audio_muted": False, "audio_volume": 1.0,
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0,
+                 "audio_gain_db": 0.0, "norm_gain_db": 0.0},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_xmeml("t", VIDEOS, tracks, None, normalize_audio=True))
+    clip = root.find("sequence/media/audio/track/clipitem")
+    assert clip.find("filter") is None  # unity -> no Audio Levels filter

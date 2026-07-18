@@ -32,6 +32,7 @@ def _gather(pid: str) -> dict:
             "sequence_fps": (project.composition_fps if project else None) or 25.0,
             "sequence_width": (project.composition_width if project else None) or 0,
             "sequence_height": (project.composition_height if project else None) or 0,
+            "normalize_audio": bool(project.normalize_audio) if project else False,
             "videos": {
                 v.id: {
                     "path": str((Path(v.source.path) if v.source else video_dir) / v.rel_path),
@@ -54,6 +55,8 @@ def _gather(pid: str) -> dict:
                             "source_in": c.source_in,
                             "source_out": c.source_out,
                             "speed": c.speed or 1.0,
+                            "audio_gain_db": c.audio_gain_db,
+                            "norm_gain_db": c.norm_gain_db,
                         }
                         for c in t.clips
                     ],

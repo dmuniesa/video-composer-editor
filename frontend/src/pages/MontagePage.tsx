@@ -2,12 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useNavigate } from 'react-router-dom'
 import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
+import { usePreviewGain } from '../lib/usePreviewGain'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
 import {
-  IcChevronDown, IcDownload, IcGear, IcLevels, IcMagnet, IcMonitor, IcPause, IcPlay,
-  IcRedo, IcSkipBack, IcTrackMinus, IcTrackPlus, IcUndo, IcVolumeOff, IcVolumeOn,
-  IcZoomIn, IcZoomOut,
+  IcChevronDown, IcDownload, IcFilm, IcGear, IcLevels, IcMagnet, IcMonitor, IcNormalize, IcPause, IcPlay,
+  IcPlus, IcRange, IcRedo, IcRefresh, IcRipple, IcScissors, IcSkipBack, IcStar, IcTrackMinus,
+  IcTrackPlus, IcTrash, IcUndo, IcVolumeOff, IcVolumeOn, IcZoomIn, IcZoomOut,
 } from '../components/icons'
 import ScrubThumb from '../components/ScrubThumb'
 import StarRating from '../components/StarRating'
@@ -174,6 +175,12 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [selectedClip, setSelectedClip] = useState<number | null>(null)
   const [clipCtx, setClipCtx] = useState<{ x: number; y: number; clipId: number } | null>(null)
   const [gapCtx, setGapCtx] = useState<{ x: number; y: number; trackId: number; time: number } | null>(null)
+  /** right-click menu on a clip's audio lane (per-clip dB editor) */
+  const [audioClipCtx, setAudioClipCtx] = useState<{ x: number; y: number; clipId: number } | null>(null)
+  const [audioGainInput, setAudioGainInput] = useState('0')
+  const [normalizeAudio, setNormalizeAudio] = useState(false)
+  const [normalizeTargetLufs, setNormalizeTargetLufs] = useState(-16)
+  const [normalizing, setNormalizing] = useState(false)
   /** timeline time where a drag/drop is currently butting against a clip edge — drives the black snap line */
   const [snapEdge, setSnapEdge] = useState<number | null>(null)
   const [speedInput, setSpeedInput] = useState('1')
@@ -215,6 +222,10 @@ export default function MontagePage({ pid }: { pid: string }) {
   /** viewport x (px) where the playhead should stay after a zoom change */
   const zoomAnchor = useRef<number | null>(null)
 
+  // Routes the preview <video> through a Web Audio GainNode so per-clip gains
+  // (including boosts above 0 dB) are audible in the montage preview.
+  const { bind: bindPreviewGain, setGain: setPreviewGain, resume: resumePreviewGain } = usePreviewGain()
+
   const zoomAt = useCallback(
     (factor: number) => {
       const nz = Math.min(120, Math.max(4, pxPerSec * factor))
@@ -245,6 +256,8 @@ export default function MontagePage({ pid }: { pid: string }) {
         setTracks(t.tracks)
         setCanUndo(t.can_undo)
         setCanRedo(t.can_redo)
+        setNormalizeAudio(!!t.normalize_audio)
+        setNormalizeTargetLufs(t.normalize_target_lufs ?? -16)
       })
       .catch((e) => setToast(e.message))
   }, [pid])
@@ -402,6 +415,37 @@ export default function MontagePage({ pid }: { pid: string }) {
       ),
     )
     api.trackAudio(pid, tid, patch).catch((e) => setToast(e.message))
+  }
+  /** Per-clip audio gain (dB) from the clip's right-click menu. A mix parameter,
+   * so (like track volume) it updates optimistically and stays out of undo. */
+  const setClipGain = (clip: TimelineClip, db: number) => {
+    const clamped = Math.max(-24, Math.min(24, isFinite(db) ? db : 0))
+    setAudioGainInput(String(clamped))
+    setTracks((ts) =>
+      ts.map((t) => ({
+        ...t,
+        clips: t.clips.map((c) => (c.id === clip.id ? { ...c, audio_gain_db: clamped } : c)),
+      })),
+    )
+    api.clipAudio(pid, clip.id, { audio_gain_db: clamped }).catch((e) => {
+      setToast(e.message)
+      refreshTimeline()
+    })
+  }
+  /** Toggle EBU R128 loudness normalisation across all clips. Enabling measures
+   * each clip server-side (one ffmpeg decode each) and stores a per-clip gain. */
+  const toggleNormalize = () => {
+    const next = !normalizeAudio
+    setNormalizing(true)
+    setNormalizeAudio(next) // optimistic
+    api
+      .normalizeAudio(pid, { enabled: next, target_lufs: normalizeTargetLufs })
+      .then(refreshTimeline)
+      .catch((e) => {
+        setToast(e.message)
+        refreshTimeline()
+      })
+      .finally(() => setNormalizing(false))
   }
   /** the slice of a video's waveform peaks covered by one clip's source range */
   const clipPeaks = (clip: { video_id: number; source_in: number; source_out: number }): [number, number][] => {
@@ -569,6 +613,7 @@ export default function MontagePage({ pid }: { pid: string }) {
       // effect is outside the gesture and gets silently blocked by autoplay
       // policy, which is why clip audio wasn't heard. Once started here the
       // element is unlocked and the effect can drive clip switches.
+      resumePreviewGain() // also unlock the Web Audio context in this gesture
       const pv = previewRef.current
       const clip = clipAt(playhead)
       if (pv && clip) {
@@ -579,7 +624,9 @@ export default function MontagePage({ pid }: { pid: string }) {
         pv.playbackRate = speed
         const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
         pv.muted = !!(tr?.audio_muted)
-        pv.volume = Math.max(0, Math.min(1, tr?.audio_volume ?? 1))
+        bindPreviewGain(pv)
+        const finalDb = (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
+        setPreviewGain((tr?.audio_volume ?? 1) * Math.pow(10, finalDb / 20))
         pv.play().catch(() => {})
       }
     } else {
@@ -611,14 +658,17 @@ export default function MontagePage({ pid }: { pid: string }) {
       pv.currentTime = want
     }
     if (pv.playbackRate !== speed) pv.playbackRate = speed
-    // Preview audio = the playing clip's track settings (mute/volume), so the
-    // montage preview sounds the active clip audio alongside the song.
+    // Preview audio = the playing clip's track settings (mute) plus the clip's
+    // own gain (normalisation gain when on + user offset), routed through a Web
+    // Audio GainNode so boosts above 0 dB are audible. The song plays alongside.
     const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
     pv.muted = !!(tr?.audio_muted)
-    pv.volume = Math.max(0, Math.min(1, tr?.audio_volume ?? 1))
+    bindPreviewGain(pv)
+    const finalDb = (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
+    setPreviewGain((tr?.audio_volume ?? 1) * Math.pow(10, finalDb / 20))
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
-  }, [playhead, clipAt, pid, previewOpen, previewLowRes, tracks])
+  }, [playhead, clipAt, pid, previewOpen, previewLowRes, tracks, normalizeAudio, bindPreviewGain, setPreviewGain])
 
   const seek = (t: number) => {
     if (audioRef.current) audioRef.current.currentTime = Math.max(0, t)
@@ -627,11 +677,12 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (ctx || clipCtx || gapCtx) {
+      if (ctx || clipCtx || gapCtx || audioClipCtx) {
         if (e.key === 'Escape') {
           setCtx(null)
           setClipCtx(null)
           setGapCtx(null)
+          setAudioClipCtx(null)
         }
         return
       }
@@ -1138,6 +1189,15 @@ export default function MontagePage({ pid }: { pid: string }) {
           >
             <IcMagnet /> Snap
           </button>
+          <button
+            className={`tb-btn tb-toggle${normalizeAudio ? ' active' : ''}`}
+            aria-pressed={normalizeAudio}
+            disabled={normalizing}
+            onClick={toggleNormalize}
+            title="normalise every clip's audio to a common loudness (EBU R128, -16 LUFS) so no clip is much louder or quieter than the others — only the clips, not the music track"
+          >
+            <IcNormalize /> {normalizing ? 'Analyzing…' : 'Normalize'}
+          </button>
           <span className="tb-sep" />
           <div className="tb-group">
             <button className="tb-btn" onClick={() => api.addTrack(pid).then(refreshTimeline)} title="add a video track">
@@ -1569,15 +1629,32 @@ export default function MontagePage({ pid }: { pid: string }) {
                       if (isDragged && shownTrack !== track.id) return null
                       const w = Math.max(shown.duration * pxPerSec, 4)
                       const cp = clipPeaks(shown)
+                      // visual-only: scale the waveform by the clip's effective
+                      // audio level — track volume (0 if muted) × the clip's gain
+                      // (normalisation gain when on + user dB offset).
+                      const clipGainDb =
+                        (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
+                      const trackLin = track.audio_muted ? 0 : track.audio_volume ?? 1
+                      const clipGain = trackLin * Math.pow(10, clipGainDb / 20)
                       return (
                         <div
                           key={clip.id}
                           className="tl-audio-clip"
                           style={{ left: shown.timeline_start * pxPerSec, width: w }}
                           title={videoById.get(clip.video_id)?.filename ?? ''}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setAudioGainInput(String(clip.audio_gain_db ?? 0))
+                            setAudioClipCtx({
+                              x: Math.min(e.clientX, window.innerWidth - 300),
+                              y: Math.min(e.clientY, window.innerHeight - 240),
+                              clipId: clip.id,
+                            })
+                          }}
                         >
                           {cp.length > 0 ? (
-                            <Waveform peaks={cp} width={w} height={40} color="#3f7d5a" />
+                            <Waveform peaks={cp} width={w} height={40} color="#3f7d5a" gain={clipGain} />
                           ) : (
                             <div className="no-audio">
                               {videoPeaks.has(clip.video_id) ? 'no audio' : '…'}
@@ -1686,12 +1763,14 @@ export default function MontagePage({ pid }: { pid: string }) {
                 </span>
               </div>
               <button className="ctx-item" onClick={() => placeAtPlayhead(v, 0, v.duration)}>
-                <span>➕ Place at playhead</span>
+                <span className="ctx-ic"><IcPlus /></span>
+                <span className="ctx-label">Place at playhead</span>
                 <span className="hint">{fmtTime(playhead)}</span>
               </button>
               {v.ranges.map((r) => (
                 <button key={r.id} className="ctx-item" onClick={() => placeAtPlayhead(v, r.t_in, r.t_out)}>
-                  <span>◳ Place “{r.label || 'range'}”</span>
+                  <span className="ctx-ic"><IcRange /></span>
+                  <span className="ctx-label">Place “{r.label || 'range'}”</span>
                   <span className="hint">{fmtTime(r.t_in)}–{fmtTime(r.t_out)}</span>
                 </button>
               ))}
@@ -1703,10 +1782,12 @@ export default function MontagePage({ pid }: { pid: string }) {
                   setCtx(null)
                 }}
               >
-                <span>🎞 Details — player, ranges & tags</span>
+                <span className="ctx-ic"><IcFilm /></span>
+                <span className="ctx-label">Details — player, ranges & tags</span>
               </button>
               <button className="ctx-item" onClick={() => navigate(`/p/${pid}/review?video=${v.id}`)}>
-                <span>⭐ Show in Review</span>
+                <span className="ctx-ic"><IcStar /></span>
+                <span className="ctx-label">Show in Review</span>
                 <span className="hint">→</span>
               </button>
               <div className="ctx-sep" />
@@ -1794,7 +1875,8 @@ export default function MontagePage({ pid }: { pid: string }) {
                   setClipCtx(null)
                 }}
               >
-                <span>✂ Split at playhead</span>
+                <span className="ctx-ic"><IcScissors /></span>
+                <span className="ctx-label">Split at playhead</span>
                 <span className="hint">{fmtTime(playhead)}</span>
               </button>
               <button
@@ -1809,7 +1891,8 @@ export default function MontagePage({ pid }: { pid: string }) {
                   setClipCtx(null)
                 }}
               >
-                <span>🧲 Snap to nearest beat</span>
+                <span className="ctx-ic"><IcMagnet /></span>
+                <span className="ctx-label">Snap to nearest beat</span>
                 {nearestBeat != null && <span className="hint">{fmtTime(nearestBeat)}</span>}
               </button>
               <div className="ctx-sep" />
@@ -1820,32 +1903,36 @@ export default function MontagePage({ pid }: { pid: string }) {
                   setClipCtx(null)
                 }}
               >
-                <span>🎞 Details — player, ranges & tags</span>
+                <span className="ctx-ic"><IcFilm /></span>
+                <span className="ctx-label">Details — player, ranges & tags</span>
               </button>
               <button className="ctx-item" onClick={() => navigate(`/p/${pid}/review?video=${cclip.video_id}`)}>
-                <span>⭐ Show in Review</span>
+                <span className="ctx-ic"><IcStar /></span>
+                <span className="ctx-label">Show in Review</span>
                 <span className="hint">→</span>
               </button>
               <div className="ctx-sep" />
               <button
-                className="ctx-item"
+                className="ctx-item danger"
                 onClick={() => {
                   const track = trackOf(cclip.id)
                   if (track) rippleDelete(cclip, track)
                 }}
               >
-                <span style={{ color: 'var(--danger)' }}>⟲ Ripple delete — close gap</span>
+                <span className="ctx-ic"><IcRipple /></span>
+                <span className="ctx-label">Ripple delete — close gap</span>
                 <span className="hint">⇧Del</span>
               </button>
               <button
-                className="ctx-item"
+                className="ctx-item danger"
                 onClick={() => {
                   api.deleteClip(pid, cclip.id).then(refreshTimeline).catch((e) => setToast(e.message))
                   setSelectedClip(null)
                   setClipCtx(null)
                 }}
               >
-                <span style={{ color: 'var(--danger)' }}>🗑 Delete clip</span>
+                <span className="ctx-ic"><IcTrash /></span>
+                <span className="ctx-label">Delete clip</span>
                 <span className="hint">Del</span>
               </button>
             </div>
@@ -1870,11 +1957,82 @@ export default function MontagePage({ pid }: { pid: string }) {
                 if (track) closeGapAt(track, gapCtx.time)
               }}
             >
-              <span>🧲 Close gap — pull next clip back</span>
+              <span className="ctx-ic"><IcRipple /></span>
+              <span className="ctx-label">Close gap — pull next clip back</span>
             </button>
           </div>
         </>
       )}
+      {audioClipCtx && (() => {
+        const cclip = tracks.flatMap((t) => t.clips).find((c) => c.id === audioClipCtx.clipId)
+        if (!cclip) return null // clip vanished (SSE refresh)
+        const v = videoById.get(cclip.video_id)
+        const userDb = cclip.audio_gain_db || 0
+        const normDb = normalizeAudio ? (cclip.norm_gain_db || 0) : 0
+        const eff = normDb + userDb
+        const fmt = (d: number) => `${d > 0 ? '+' : ''}${d.toFixed(1)} dB`
+        return (
+          <>
+            <div
+              className="ctx-overlay"
+              onMouseDown={() => setAudioClipCtx(null)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                setAudioClipCtx(null)
+              }}
+            />
+            <div className="ctx-menu" style={{ left: audioClipCtx.x, top: audioClipCtx.y }}>
+              <div className="ctx-header">
+                <span className="ctx-title">{v?.filename ?? `clip #${cclip.id}`}</span>
+                <span className="hint">clip audio gain</span>
+              </div>
+              <div className="ctx-speed">
+                <span className="hint">gain</span>
+                {[-12, -6, -3, 0, 3, 6, 12].map((d) => (
+                  <button
+                    key={d}
+                    className={`small ${Math.abs(userDb - d) < 1e-6 ? 'primary' : ''}`}
+                    onClick={() => setClipGain(cclip, d)}
+                  >
+                    {d > 0 ? `+${d}` : d}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={-24}
+                  max={24}
+                  step={0.5}
+                  value={audioGainInput}
+                  onChange={(e) => setAudioGainInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') setClipGain(cclip, Number(audioGainInput))
+                  }}
+                  onBlur={() => {
+                    const n = Number(audioGainInput)
+                    if (isFinite(n) && Math.abs(n - userDb) > 1e-6) setClipGain(cclip, n)
+                  }}
+                />
+                <span className="hint">dB</span>
+              </div>
+              <div className="ctx-rate hint">
+                <span>{normalizeAudio ? 'norm + user' : 'user gain'}</span>
+                <span>{normalizeAudio ? `${fmt(normDb)} + ${fmt(userDb)} = ${fmt(eff)}` : fmt(userDb)}</span>
+              </div>
+              <div className="ctx-sep" />
+              <button
+                className="ctx-item"
+                onClick={() => {
+                  setClipGain(cclip, 0)
+                  setAudioClipCtx(null)
+                }}
+              >
+                <span className="ctx-ic"><IcRefresh /></span>
+                <span className="ctx-label">Reset gain to 0 dB</span>
+              </button>
+            </div>
+          </>
+        )
+      })()}
       {detailId != null && videoById.get(detailId) && (
         <VideoDetail
           pid={pid}

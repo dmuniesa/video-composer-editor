@@ -42,6 +42,19 @@ def _src_url(path: str) -> str:
     return "file:///" + url.lstrip("/")
 
 
+def _db_str(db: float) -> str:
+    """Format a dB value for a FCPXML ``amount`` attribute: -3 -> '-3dB',
+    0 -> '0dB', 2.5 -> '+2.5dB'."""
+    if abs(db) < 1e-3:
+        return "0dB"
+    return f"{round(db, 2):+g}dB"
+
+
+def _clip_gain_db(audio_gain_db: float, norm_gain_db: float, normalize_audio: bool) -> float:
+    """Per-clip audio gain in dB = normalisation gain (when on) + user offset."""
+    return (norm_gain_db if normalize_audio else 0.0) + audio_gain_db
+
+
 def build_fcpxml(
     sequence_name: str,
     videos: dict[int, dict],
@@ -50,6 +63,7 @@ def build_fcpxml(
     sequence_fps: float = 0.0,
     sequence_width: int = 0,
     sequence_height: int = 0,
+    normalize_audio: bool = False,
 ) -> str:
     """Build the project XML. Takes the same inputs as xmeml.build_xmeml:
 
@@ -157,7 +171,7 @@ def build_fcpxml(
             dur_f = frames(clip["timeline_start"] + clip_len(clip)) - start_f
             if dur_f <= 0:
                 continue
-            ET.SubElement(
+            clip_el = ET.SubElement(
                 gap,
                 "asset-clip",
                 ref=asset_ids[clip["video_id"]],
@@ -167,6 +181,16 @@ def build_fcpxml(
                 duration=t(dur_f),
                 name=Path(v["path"]).name,
             )
+            # Per-clip audio gain (normalisation gain when enabled + user offset)
+            # as a FCPXML <adjust-volume> effect, the representation Final Cut
+            # reads for a clip volume change.
+            gain_db = _clip_gain_db(
+                clip.get("audio_gain_db") or 0.0,
+                clip.get("norm_gain_db") or 0.0,
+                normalize_audio,
+            )
+            if abs(gain_db) > 1e-3:
+                ET.SubElement(clip_el, "adjust-volume", amount=_db_str(gain_db))
 
     xml_bytes = ET.tostring(root, encoding="unicode")
     pretty = minidom.parseString(xml_bytes).toprettyxml(indent="  ")

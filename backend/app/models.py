@@ -31,6 +31,10 @@ class Project(Base):
     composition_fps: Mapped[float] = mapped_column(Float, default=25.0)
     composition_width: Mapped[int] = mapped_column(Integer, default=1920)
     composition_height: Mapped[int] = mapped_column(Integer, default=1080)
+    # When true, each clip's audio is gain-shifted by its stored norm_gain_db so
+    # every clip lands at normalize_target_lufs (EBU R128 loudness equalisation).
+    normalize_audio: Mapped[bool] = mapped_column(Boolean, default=False)
+    normalize_target_lufs: Mapped[float] = mapped_column(Float, default=-16.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
@@ -362,6 +366,13 @@ class TimelineClip(Base):
     # playback rate: 0.5 = slow motion at half speed, 2.0 = double speed
     speed: Mapped[float] = mapped_column(Float, default=1.0)
     placed_by: Mapped[str] = mapped_column(String, default="user")  # user | claude | agy | openai
+    # User per-clip audio offset (dB) set via the clip's right-click menu; applied
+    # on top of normalisation. 0 == no change.
+    audio_gain_db: Mapped[float] = mapped_column(Float, default=0.0)
+    # Auto-computed gain (dB) to reach Project.normalize_target_lufs, set by the
+    # "normalise audio" action (loudnorm measurement). Only applied when the
+    # project's normalize_audio flag is on.
+    norm_gain_db: Mapped[float] = mapped_column(Float, default=0.0)
 
     track: Mapped[Track] = relationship(back_populates="clips")
     video: Mapped[Video] = relationship()

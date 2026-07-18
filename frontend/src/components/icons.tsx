@@ -177,3 +177,55 @@ export const IcLevels = () => (
   </svg>
 )
 
+export const IcNormalize = () => (
+  <svg {...base}>
+    <path d="M4 21V11M8 21V5M12 21V8M16 21V13" />
+    <path d="M20 7v10M20 7l-2.2 2.2M20 7l2.2 2.2M20 17l-2.2-2.2M20 17l2.2-2.2" />
+  </svg>
+)
+
+// ---- context-menu icons (same 15px language as the toolbar) ----
+
+export const IcPlus = () => (
+  <svg {...base}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+)
+
+/** crop/selection brackets — placing a sub-range of a clip */
+export const IcRange = () => (
+  <svg {...base}>
+    <path d="M6 9V6h3M18 9V6h-3M6 15v3h3M18 15v3h-3" />
+  </svg>
+)
+
+/** film strip — details / player / ranges & tags */
+export const IcFilm = () => (
+  <svg {...base}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M7 3v18M17 3v18M3 7.5h4M3 12h18M17 7.5h4M3 16.5h4M17 16.5h4" />
+  </svg>
+)
+
+export const IcStar = () => (
+  <svg {...base}>
+    <path d="M12 17.8l-6.2 3.2 1.2-6.9-5-4.9 6.9-1L12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.9z" />
+  </svg>
+)
+
+export const IcScissors = () => (
+  <svg {...base}>
+    <circle cx="6" cy="6" r="2.6" />
+    <circle cx="6" cy="18" r="2.6" />
+    <path d="M20 4 8.5 15.5M14.5 14.5 20 20M8.5 8.5 12 12" />
+  </svg>
+)
+
+/** a clip block being shifted left — ripple delete / close gap */
+export const IcRipple = () => (
+  <svg {...base}>
+    <rect x="13" y="7" width="7" height="10" rx="1" />
+    <path d="M11 12H3.5M7 8 3.5 12 7 16" />
+  </svg>
+)
+

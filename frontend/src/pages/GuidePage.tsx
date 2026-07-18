@@ -325,6 +325,20 @@ export default function GuidePage({ standalone }: { standalone?: boolean }) {
             <kbd>Space</kbd> plays the song with a best-effort jump-cut preview. The
             frame-accurate result comes later in Premiere.
           </li>
+          <li>
+            <b>Normalize</b> (toolbar toggle) levels every clip&apos;s audio to a
+            common loudness (EBU&nbsp;R128, about −16&nbsp;LUFS) so no clip is much
+            louder or quieter than the others — it targets a shared level, not the
+            loudest or the quietest clip. Only the clips&apos; audio is affected;
+            the music track keeps its own level. Each clip is measured once when
+            you first turn it on.
+          </li>
+          <li>
+            <b>Right-click a clip&apos;s audio waveform</b> (the lane under a track)
+            to set that clip&apos;s gain in dB: quick buttons (−12…+12), a fine
+            input, or reset. The offset stacks on top of normalization <b>and</b>{' '}
+            the track&apos;s own volume control — both keep working.
+          </li>
         </ul>
 
         <h2 id="ai-compose">7 · AI auto-placement</h2>

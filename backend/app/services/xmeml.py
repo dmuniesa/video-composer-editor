@@ -117,6 +117,22 @@ def _audio_level_filter(item: ET.Element, level: float) -> None:
     _el(param, "value", str(round(level, 4)))
 
 
+# FCP7 Audio Levels filter caps at 3.98107 (~+12 dB); clamp the combined level so
+# the emitted <value> stays in range.
+_LEVEL_MAX = 3.98107
+
+
+def _clip_linear_level(
+    track_volume: float, audio_gain_db: float, norm_gain_db: float, normalize_audio: bool
+) -> float:
+    """Linear audio level for one clip = track volume × per-clip dB gain, clamped
+    to the filter's max. The per-clip gain folds the stored normalisation gain
+    (only when normalisation is on) and the user's manual dB offset."""
+    final_db = (norm_gain_db if normalize_audio else 0.0) + audio_gain_db
+    level = (track_volume or 1.0) * 10.0 ** (final_db / 20.0)
+    return max(0.0, min(level, _LEVEL_MAX))
+
+
 def build_xmeml(
     sequence_name: str,
     videos: dict[int, dict],
@@ -125,6 +141,7 @@ def build_xmeml(
     sequence_fps: float = 0.0,
     sequence_width: int = 0,
     sequence_height: int = 0,
+    normalize_audio: bool = False,
 ) -> str:
     """Build the project XML.
 
@@ -262,6 +279,13 @@ def build_xmeml(
                     "a_dur": int(math.ceil((v.get("duration") or 0) * timebase)),
                     "vid_id": vid_id, "a_l": a_l, "a_r": a_r,
                     "vt": vt, "vc": vc, "at1": at1, "at2": at2,
+                    # Pre-combined linear level (track volume × per-clip gain).
+                    "level": _clip_linear_level(
+                        track.get("audio_volume", 1.0),
+                        clip.get("audio_gain_db") or 0.0,
+                        clip.get("norm_gain_db") or 0.0,
+                        normalize_audio,
+                    ),
                 }
             )
 
@@ -314,8 +338,11 @@ def build_xmeml(
                     _el(faudio, "channelcount", "2")
                 else:
                     file_el.set("id", spec["file_id"])
-                if abs(volume - 1.0) > 1e-3:
-                    _audio_level_filter(item, volume)
+                # Per-clip level when the spec carries one (clip audio), else the
+                # track/song volume passed in (song has no per-clip gain).
+                level = spec.get("level", volume)
+                if abs(level - 1.0) > 1e-3:
+                    _audio_level_filter(item, level)
                 source_track = _el(item, "sourcetrack")
                 _el(source_track, "mediatype", "audio")
                 _el(source_track, "trackindex", str(channel))
