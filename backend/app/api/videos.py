@@ -1,6 +1,7 @@
 """Video listing, ratings (single + batch), manual analysis edits, ranges."""
 from __future__ import annotations
 
+import json
 import shutil
 
 from fastapi import APIRouter, HTTPException
@@ -19,6 +20,7 @@ from ..models import (
     VideoRange,
     VideoRating,
 )
+from ..services import audio_analysis, pipeline
 from .deps import resolve_project
 
 router = APIRouter()
@@ -171,6 +173,25 @@ def video_delete(pid: str, vid: int) -> dict:
     broadcaster.publish(pid, "videos", {})
     broadcaster.publish(pid, "timeline", {"source": "video-removed"})
     return {"ok": True}
+
+
+@router.get("/projects/{pid}/videos/{vid}/audio-peaks")
+def video_audio_peaks(pid: str, vid: int) -> dict:
+    """Waveform peaks for a video's audio track, for the montage clip-audio
+    lanes. Cached alongside the video's other media; computed lazily here for
+    videos that were extracted before this cache existed."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        video = db.get(Video, vid)
+        if video is None:
+            raise HTTPException(404, "video not found")
+        cache = pipeline.video_cache(video_dir, video.cache_key)
+        dest = cache / "audio_peaks.json"
+        if not dest.is_file():
+            path = pipeline.source_root(video) / video.rel_path
+            cache.mkdir(parents=True, exist_ok=True)
+            audio_analysis.compute_video_peaks(path, dest)
+    return json.loads(dest.read_text())
 
 
 @router.get("/projects/{pid}/excluded")

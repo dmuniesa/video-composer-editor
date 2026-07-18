@@ -52,6 +52,34 @@ def track_remove(pid: str, tid: int) -> dict:
     return {"ok": True}
 
 
+class TrackAudioUpdate(BaseModel):
+    muted: bool | None = None
+    volume: float | None = None
+
+
+@router.patch("/projects/{pid}/tracks/{tid}/audio")
+def track_audio_update(pid: str, tid: int, body: TrackAudioUpdate) -> dict:
+    """Mute / volume for a track's clip-audio lane. Not a structural edit, so it
+    stays out of the undo history."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        track = db.get(ops.Track, tid)
+        if track is None:
+            raise HTTPException(404, "track not found")
+        if body.muted is not None:
+            track.audio_muted = body.muted
+        if body.volume is not None:
+            track.audio_volume = max(0.0, min(4.0, body.volume))  # up to ~+12 dB
+        db.commit()
+        result = {
+            "id": track.id,
+            "audio_muted": track.audio_muted,
+            "audio_volume": track.audio_volume,
+        }
+    broadcaster.publish(pid, "timeline", {"source": "track-audio"})
+    return result
+
+
 @router.post("/projects/{pid}/timeline/undo")
 def timeline_undo(pid: str) -> dict:
     video_dir = resolve_project(pid)

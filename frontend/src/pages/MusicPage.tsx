@@ -3,6 +3,7 @@ import { api, media, fmtTime } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { SongInfo } from '../lib/types'
 import Waveform from '../components/Waveform'
+import { IcMic, IcRefresh, IcSparkles } from '../components/icons'
 
 const SECTION_COLORS: Record<string, string> = {
   intro: '#4f8cff',
@@ -64,30 +65,46 @@ export default function MusicPage({ pid }: { pid: string }) {
     <div className="music-page">
       <div className="stat-row">
         <span className="crumb" style={{ margin: 0 }}>{song.path}</span>
+        <span className="tb-sep" />
         <span>status <b>{song.status}</b></span>
         {song.bpm != null && <span><b>{song.bpm.toFixed(1)}</b> BPM</span>}
         <span><b>{fmtTime(song.duration)}</b></span>
         <span><b>{song.beats.length}</b> beats</span>
-        <button className="small" onClick={() => api.songReanalyze(pid).catch((e) => setError(e.message))}>Re-analyze</button>
-        <button className="small" onClick={() => api.songLabel(pid).catch((e) => setError(e.message))}>Label with Gemini</button>
-        <button
-          className="small"
-          disabled={lyrics?.status === 'transcribing'}
-          title={
-            song.lyrics_enabled
-              ? 'Transcribe the lyrics (engine chosen in Settings)'
-              : 'Enable lyrics analysis in Settings first'
-          }
-          onClick={() => api.songTranscribe(pid).catch((e) => setError(e.message))}
-        >
-          {lyrics?.status === 'transcribing' ? 'Transcribing…' : 'Transcribe lyrics'}
-        </button>
         {lyrics && lyrics.status === 'ready' && (
           <span>
             lyrics <b>{lyrics.segments.length}</b> lines
             {lyrics.language ? ` (${lyrics.language})` : ''}
           </span>
         )}
+        <span className="spacer" />
+        <div className="tb-group">
+          <button
+            className="tb-btn"
+            title="Re-run beat detection and section segmentation"
+            onClick={() => api.songReanalyze(pid).catch((e) => setError(e.message))}
+          >
+            <IcRefresh /> Re-analyze
+          </button>
+          <button
+            className="tb-btn"
+            title="Ask Gemini to label the sections (intro / verse / chorus…)"
+            onClick={() => api.songLabel(pid).catch((e) => setError(e.message))}
+          >
+            <IcSparkles /> Label
+          </button>
+          <button
+            className="tb-btn"
+            disabled={lyrics?.status === 'transcribing'}
+            title={
+              song.lyrics_enabled
+                ? 'Transcribe the lyrics (engine chosen in Settings)'
+                : 'Enable lyrics analysis in Settings first'
+            }
+            onClick={() => api.songTranscribe(pid).catch((e) => setError(e.message))}
+          >
+            <IcMic /> {lyrics?.status === 'transcribing' ? 'Transcribing…' : 'Transcribe'}
+          </button>
+        </div>
       </div>
       {song.status === 'error' && <div className="error-text">{song.error}</div>}
       {lyrics?.status === 'error' && <div className="error-text">Lyrics: {lyrics.error}</div>}

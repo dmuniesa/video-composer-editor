@@ -71,16 +71,43 @@ def test_structure_and_frame_math():
     pathurls = [e.text for e in root.iter("pathurl")]
     assert any(u.startswith("file://localhost/") and "%C3%B1" in u for u in pathurls)
 
-    # stereo song = one audio track carrying both channel clipitems
+    # audio layout: the song's stereo track first, then one stereo track per
+    # video track for the clip audio. Each stereo track is two "exploded" mono
+    # tracks, so 3 stereo tracks -> 6 <track> elements.
+    assert root.find("sequence").get("explodedTracks") == "true"
     audio_tracks = seq.findall("media/audio/track")
-    assert len(audio_tracks) == 1
-    channel_clips = audio_tracks[0].findall("clipitem")
-    assert len(channel_clips) == 2
-    song_clip = channel_clips[0]
+    assert len(audio_tracks) == 6  # (song + V1 + V2) x 2 exploded channels
+    assert all(t.get("premiereTrackType") == "Stereo" for t in audio_tracks)
+
+    # the song sits on the first (top) stereo track
+    song_clip = audio_tracks[0].find("clipitem")
+    assert song_clip.findtext("name") == "song.mp3"
+    assert song_clip.get("premiereChannelType") == "stereo"
     assert song_clip.findtext("end") == "500"  # 20s * 25fps
-    # declared as a single 2-channel stereo output group
+    assert song_clip.findtext("sourcetrack/trackindex") == "1"
+    assert song_clip.findtext("file/media/audio/channelcount") == "2"
+
+    # V1's two clips' audio ride the next stereo track (exploded tracks 3 & 4)
+    v1_audio = audio_tracks[2].findall("clipitem")
+    assert len(v1_audio) == 2
+    assert v1_audio[0].findtext("sourcetrack/trackindex") == "1"
+    # placed in sequence-rate frames matching the video clip's footprint
+    assert v1_audio[0].findtext("start") == "0"
+    assert v1_audio[0].findtext("end") == "100"
+
+    # each video clip links down to its two audio channels
+    audio_links = [
+        l for l in first.findall("link") if l.findtext("mediatype") == "audio"
+    ]
+    assert [l.findtext("linkclipref") for l in audio_links] == [
+        "audioclip-1-1",
+        "audioclip-1-2",
+    ]
+
+    # one 2-channel stereo output made of two mono groups
     assert seq.findtext("media/audio/numOutputChannels") == "2"
-    assert seq.findtext("media/audio/outputs/group/numchannels") == "2"
+    groups = seq.findall("media/audio/outputs/group")
+    assert [g.findtext("numchannels") for g in groups] == ["1", "1"]
 
 
 def test_files_deduplicated():
@@ -94,7 +121,15 @@ def test_files_deduplicated():
 def test_no_song():
     xml = build_xmeml("no song", VIDEOS, TRACKS, None)
     root = ET.fromstring(xml)
-    assert root.find("sequence/media/audio/track") is None
+    seq = root.find("sequence")
+    # no song, but each video track still lays its clip audio on its own stereo
+    # track: V1 + V2 -> two stereo tracks -> four exploded <track> elements
+    audio_tracks = seq.findall("media/audio/track")
+    assert len(audio_tracks) == 4
+    names = {c.findtext("name") for c in seq.findall("media/audio/track/clipitem")}
+    assert "song.mp3" not in names
+    # with no song on top, the first audio track belongs to V1's first clip
+    assert seq.find("media/audio/track/clipitem").findtext("name") == "beach.mp4"
 
 
 def test_sequence_fps_override():
@@ -133,3 +168,29 @@ def test_clip_speed_time_remap():
     assert params["speed"] == "50.0"  # 0.5x -> 50%
     assert params["variablespeed"] == "0"
     assert params["reverse"] == "FALSE"
+
+
+def test_audio_mute_and_volume():
+    tracks = [
+        {
+            "name": "V1",
+            "audio_muted": True,
+            "audio_volume": 1.0,
+            "clips": [
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0}
+            ],
+        }
+    ]
+    song = {"path": "/media/trip/song.mp3", "duration": 20.0, "muted": False, "volume": 0.5}
+    root = ET.fromstring(build_xmeml("t", VIDEOS, tracks, song))
+    audio_tracks = root.findall("sequence/media/audio/track")
+
+    # tracks 1-2 = song: not muted (enabled) but volume 0.5 -> Audio Levels filter
+    assert audio_tracks[0].findtext("enabled") == "TRUE"
+    song_clip = audio_tracks[0].find("clipitem")
+    assert song_clip.findtext("filter/effect/effectid") == "audiolevels"
+    assert song_clip.findtext("filter/effect/parameter/value") == "0.5"
+
+    # tracks 3-4 = V1 clip audio: muted -> track disabled, full volume -> no filter
+    assert audio_tracks[2].findtext("enabled") == "FALSE"
+    assert audio_tracks[2].find("clipitem/filter") is None

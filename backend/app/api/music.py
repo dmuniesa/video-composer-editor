@@ -49,6 +49,8 @@ def _song_dict(song: Song) -> dict:
         "downbeats": song.downbeats,
         "status": song.status,
         "error": song.error,
+        "muted": song.muted,
+        "volume": song.volume,
         "lyrics": lyr,
         "lyrics_enabled": settings.get().lyrics.enabled,
         "sections": [
@@ -78,6 +80,29 @@ def song_get(pid: str) -> dict:
         if song is None:
             raise HTTPException(404, "no song set")
         return _song_dict(song)
+
+
+class SongAudioUpdate(BaseModel):
+    muted: bool | None = None
+    volume: float | None = None
+
+
+@router.patch("/projects/{pid}/song/audio")
+def song_audio_update(pid: str, body: SongAudioUpdate) -> dict:
+    """Mute / volume for the main song audio lane."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        song = db.scalar(select(Song))
+        if song is None:
+            raise HTTPException(404, "no song set")
+        if body.muted is not None:
+            song.muted = body.muted
+        if body.volume is not None:
+            song.volume = max(0.0, min(4.0, body.volume))  # up to ~+12 dB
+        db.commit()
+        result = {"muted": song.muted, "volume": song.volume}
+    broadcaster.publish(pid, "timeline", {"source": "song-audio"})
+    return result
 
 
 @router.get("/projects/{pid}/song/peaks")

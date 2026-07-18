@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, fmtTime } from '../lib/api'
 import type { ProjectInfo, SongInfo, Source, Video } from '../lib/types'
 import FileBrowser from '../components/FileBrowser'
+import { IcSparkles } from '../components/icons'
 
 interface Props {
   project: ProjectInfo | null
@@ -379,18 +380,20 @@ export default function SetupPage({ project, onChanged }: Props) {
             {pickerOpen && (
               <div className="pick-panel">
                 <div className="pick-actions">
-                  <button className="small" onClick={() => setPicked(new Set(videos.map((v) => v.id)))}>All</button>
-                  <button className="small" onClick={() => setPicked(new Set())}>None</button>
-                  <button
-                    className="small"
-                    title="Select every clip that has no AI description yet"
-                    onClick={() => setPicked(new Set(videos.filter((v) => v.status !== 'ready').map((v) => v.id)))}
-                  >
-                    Un-analyzed
-                  </button>
+                  <div className="tb-group">
+                    <button className="tb-btn" onClick={() => setPicked(new Set(videos.map((v) => v.id)))}>All</button>
+                    <button className="tb-btn" onClick={() => setPicked(new Set())}>None</button>
+                    <button
+                      className="tb-btn"
+                      title="Select every clip that has no AI description yet"
+                      onClick={() => setPicked(new Set(videos.filter((v) => v.status !== 'ready').map((v) => v.id)))}
+                    >
+                      Un-analyzed
+                    </button>
+                  </div>
                   <span className="pick-spacer" />
                   <button className="primary small" disabled={picked.size === 0} onClick={() => analyze([...picked])}>
-                    Analyze {picked.size || ''} selected
+                    <IcSparkles /> Analyze {picked.size || ''} selected
                   </button>
                 </div>
                 <ul className="pick-list">

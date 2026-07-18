@@ -4,6 +4,7 @@ import { api, media, fmtTime } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { FaceInfo, Person } from '../lib/types'
 import InfoTip from '../components/InfoTip'
+import { IcRefresh, IcShuffle, IcUsers } from '../components/icons'
 
 /** Open the clip at the face's exact moment, in a new tab so the People page
  *  stays where it is. */
@@ -286,30 +287,39 @@ export default function PeoplePage({ pid }: { pid: string }) {
   return (
     <div className="people-page">
       <div className="filter-bar">
-        <span>
+        <span className="rt-count">
           {named.length} named · {unnamed.length} unnamed
         </span>
-        <button className="primary small" disabled={!available || detecting} onClick={() => detect(false)}>
-          🔍 Detect people
-        </button>
+        <span className="tb-sep" />
         <button
-          className="small"
+          className="tb-btn primary"
           disabled={!available || detecting}
-          title="Re-detect every clip from scratch (keeps named people, re-matches their faces)"
-          onClick={() => {
-            if (confirm('Re-run detection on ALL clips? Named people are kept; their faces are re-matched.')) detect(true)
-          }}
+          title="Sample frames from every clip and find faces (runs locally)"
+          onClick={() => detect(false)}
         >
-          Re-detect all
+          <IcUsers /> Detect people
         </button>
-        <button
-          className="small"
-          disabled={!available}
-          title="Dissolve unnamed groups and re-group the unassigned faces. Named people are never touched."
-          onClick={() => api.reclusterPeople(pid).catch((e) => setToast(e.message))}
-        >
-          ♻ Re-cluster
-        </button>
+        <div className="tb-group">
+          <button
+            className="tb-btn"
+            disabled={!available || detecting}
+            title="Re-detect every clip from scratch (keeps named people, re-matches their faces)"
+            onClick={() => {
+              if (confirm('Re-run detection on ALL clips? Named people are kept; their faces are re-matched.')) detect(true)
+            }}
+          >
+            <IcRefresh /> Re-detect all
+          </button>
+          <button
+            className="tb-btn"
+            disabled={!available}
+            title="Dissolve unnamed groups and re-group the unassigned faces. Named people are never touched."
+            onClick={() => api.reclusterPeople(pid).catch((e) => setToast(e.message))}
+          >
+            <IcShuffle /> Re-cluster
+          </button>
+        </div>
+        <span className="spacer" />
         <InfoTip>
           <b>People</b>
           <ul>

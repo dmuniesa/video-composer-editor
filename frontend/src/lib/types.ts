@@ -220,6 +220,8 @@ export interface SongInfo {
   downbeats: number[]
   status: string
   error: string | null
+  muted: boolean
+  volume: number
   lyrics: SongLyrics | null
   lyrics_enabled: boolean
   sections: SongSection[]
@@ -240,6 +242,8 @@ export interface Track {
   id: number
   index: number
   name: string
+  audio_muted: boolean
+  audio_volume: number
   clips: TimelineClip[]
 }
 

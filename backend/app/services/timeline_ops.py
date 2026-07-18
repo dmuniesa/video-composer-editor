@@ -213,6 +213,8 @@ def timeline_state(db: Session) -> dict:
                 "id": t.id,
                 "index": t.index,
                 "name": t.name,
+                "audio_muted": t.audio_muted,
+                "audio_volume": t.audio_volume,
                 "clips": [
                     {
                         "id": c.id,

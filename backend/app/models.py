@@ -266,6 +266,10 @@ class Song(Base):
     # pending -> analyzing -> ready | error
     status: Mapped[str] = mapped_column(String, default="pending")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Main audio lane controls (the song). New columns, back-filled by
+    # db._ensure_columns onto legacy databases.
+    muted: Mapped[bool] = mapped_column(Boolean, default=False)
+    volume: Mapped[float] = mapped_column(Float, default=1.0)  # linear gain 0..1
 
     sections: Mapped[list[SongSection]] = relationship(
         back_populates="song", cascade="all, delete-orphan", order_by="SongSection.start"
@@ -335,6 +339,11 @@ class Track(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     index: Mapped[int] = mapped_column(Integer)
     name: Mapped[str] = mapped_column(String, default="")
+    # Clip-audio lane controls: the original audio of this track's clips is laid
+    # on its own stereo audio lane in the montage and export. New columns,
+    # back-filled onto legacy databases by db._ensure_columns.
+    audio_muted: Mapped[bool] = mapped_column(Boolean, default=False)
+    audio_volume: Mapped[float] = mapped_column(Float, default=1.0)  # linear gain 0..1
 
     clips: Mapped[list[TimelineClip]] = relationship(
         back_populates="track", cascade="all, delete-orphan", order_by="TimelineClip.timeline_start"

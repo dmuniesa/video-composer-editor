@@ -39,6 +39,16 @@ def compute_peaks(path: Path, dest: Path, buckets: int = PEAK_BUCKETS) -> None:
     dest.write_text(json.dumps({"peaks": peaks}))
 
 
+def compute_video_peaks(path: Path, dest: Path, buckets: int = PEAK_BUCKETS) -> None:
+    """Waveform peaks for a video's audio track. Same as compute_peaks but never
+    fails the caller: a video with no audio stream (or an undecodable one) just
+    yields an empty waveform instead of raising."""
+    try:
+        compute_peaks(path, dest, buckets)
+    except Exception:
+        dest.write_text(json.dumps({"peaks": []}))
+
+
 def analyze(path: Path) -> AudioAnalysis:
     import librosa
 

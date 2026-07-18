@@ -181,6 +181,13 @@ export const api = {
 
   song: (pid: string) => req<SongInfo>(`/api/projects/${pid}/song`),
   songPeaks: (pid: string) => req<{ peaks: [number, number][] }>(`/api/projects/${pid}/song/peaks`),
+  videoPeaks: (pid: string, vid: number) =>
+    req<{ peaks: [number, number][] }>(`/api/projects/${pid}/videos/${vid}/audio-peaks`),
+  songAudio: (pid: string, patch: { muted?: boolean; volume?: number }) =>
+    req<{ muted: boolean; volume: number }>(`/api/projects/${pid}/song/audio`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
   songReanalyze: (pid: string) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/song/reanalyze`, { method: 'POST' }),
   songLabel: (pid: string) =>
@@ -211,6 +218,11 @@ export const api = {
   addTrack: (pid: string) => req<Track>(`/api/projects/${pid}/tracks`, { method: 'POST' }),
   removeTrack: (pid: string, tid: number) =>
     req<{ ok: boolean }>(`/api/projects/${pid}/tracks/${tid}`, { method: 'DELETE' }),
+  trackAudio: (pid: string, tid: number, patch: { muted?: boolean; volume?: number }) =>
+    req<{ id: number; audio_muted: boolean; audio_volume: number }>(
+      `/api/projects/${pid}/tracks/${tid}/audio`,
+      { method: 'PATCH', body: JSON.stringify(patch) },
+    ),
   addClip: (
     pid: string,
     clip: { track_id: number; video_id: number; timeline_start: number; source_in: number; source_out: number; speed?: number },

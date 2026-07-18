@@ -141,6 +141,8 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
                     video.has_proxy = True
                 jobs.update(job, 0.7, "preview proxy")
                 frames.make_preview(path, cache)
+                jobs.update(job, 0.85, "audio waveform")
+                audio_analysis.compute_video_peaks(path, cache / "audio_peaks.json")
                 video.status = "extracted"
                 video.error = None
                 db.commit()

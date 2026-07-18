@@ -45,6 +45,8 @@ def _gather(pid: str) -> dict:
             "tracks": [
                 {
                     "name": t.name,
+                    "audio_muted": t.audio_muted,
+                    "audio_volume": t.audio_volume,
                     "clips": [
                         {
                             "video_id": c.video_id,
@@ -58,7 +60,12 @@ def _gather(pid: str) -> dict:
                 }
                 for t in tracks
             ],
-            "song": {"path": song.path, "duration": song.duration}
+            "song": {
+                "path": song.path,
+                "duration": song.duration,
+                "muted": song.muted,
+                "volume": song.volume,
+            }
             if song and song.duration
             else None,
         }

@@ -7,6 +7,7 @@ import InfoTip from '../components/InfoTip'
 import VideoCard from '../components/VideoCard'
 import VideoDetail from '../components/VideoDetail'
 import ExcludedPanel from '../components/ExcludedPanel'
+import { IcSparkles, IcTrash } from '../components/icons'
 import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
 
 export default function ReviewPage({ pid, project }: { pid: string; project: ProjectInfo | null }) {
@@ -229,23 +230,24 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
     <div className="review-layout">
       <div className="review-main">
         <div className="filter-bar">
-          <span>{shown.length}/{videos.length} videos</span>
+          <span className="rt-count">{shown.length}/{videos.length} videos</span>
+          <span className="tb-sep" />
           {excluded.length > 0 && (
             <button
-              className="small"
+              className="tb-btn"
               title="Files you deleted — restore any of them"
               onClick={() => setShowExcluded(true)}
             >
-              🗑 Deleted ({excluded.length})
+              <IcTrash /> Deleted ({excluded.length})
             </button>
           )}
           {project?.ai_available && selected.size > 0 && (
             <button
-              className="primary small"
+              className="tb-btn primary"
               title={`Analyze the ${selected.size} selected clip${selected.size === 1 ? '' : 's'} with AI`}
               onClick={() => analyze([...selected])}
             >
-              ✨ Analyze {selected.size} with AI
+              <IcSparkles /> Analyze {selected.size}
             </button>
           )}
           <input
@@ -254,8 +256,9 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <span className="tb-sep" />
           {folders.length > 1 && (
-            <label>
+            <label className="rt-field">
               folder{' '}
               <select value={folder} onChange={(e) => setFolder(e.target.value)}>
                 <option value="*">all</option>
@@ -265,7 +268,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
               </select>
             </label>
           )}
-          <label>
+          <label className="rt-field">
             min ★{' '}
             <select value={minStars} onChange={(e) => setMinStars(Number(e.target.value))}>
               {[0, 1, 2, 3, 4, 5].map((n) => (
@@ -273,10 +276,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
               ))}
             </select>
           </label>
-          <label>
-            <input type="checkbox" checked={hideRejected} onChange={(e) => setHideRejected(e.target.checked)} /> hide rejected
-          </label>
-          <label>
+          <label className="rt-field">
             sort{' '}
             <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
               <option value="name">name</option>
@@ -285,6 +285,14 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
               <option value="duration">duration</option>
             </select>
           </label>
+          <button
+            className={`tb-btn tb-toggle${hideRejected ? ' active' : ''}`}
+            aria-pressed={hideRejected}
+            title="show or hide clips you marked rejected (X)"
+            onClick={() => setHideRejected((v) => !v)}
+          >
+            hide rejected
+          </button>
           {tagFilter && (
             <span className="tag active" onClick={() => setTagFilter('')}>
               #{tagFilter} ✕
@@ -295,6 +303,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
               @{personFilter} ✕
             </span>
           )}
+          <span className="spacer" />
           <label className="thumb-size" title="Thumbnail size">
             <input
               type="range"

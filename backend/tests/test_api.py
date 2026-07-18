@@ -127,6 +127,19 @@ def test_full_flow(client, project):
     )
     assert overlap.status_code == 400
 
+    # --- clip audio: per-video peaks + mute/volume controls ---
+    vpeaks = client.get(f"/api/projects/{pid}/videos/{ids[0]}/audio-peaks")
+    assert vpeaks.status_code == 200
+    assert "peaks" in vpeaks.json()
+    # mute the track's clip-audio lane and lower the song volume
+    r = client.patch(f"/api/projects/{pid}/tracks/{track_id}/audio", json={"muted": True, "volume": 0.5})
+    assert r.status_code == 200 and r.json()["audio_muted"] is True
+    r = client.patch(f"/api/projects/{pid}/song/audio", json={"volume": 0.3})
+    assert r.status_code == 200 and r.json()["volume"] == 0.3
+    tl = client.get(f"/api/projects/{pid}/timeline").json()
+    assert tl["tracks"][0]["audio_muted"] is True
+    assert client.get(f"/api/projects/{pid}/song").json()["volume"] == 0.3
+
     # --- export ---
     res = client.get(f"/api/projects/{pid}/export.xml")
     assert res.status_code == 200
@@ -137,8 +150,12 @@ def test_full_flow(client, project):
     assert clipitem.findtext("in") == "25"  # 1s at 25fps
     pathurl = clipitem.findtext("file/pathurl")
     assert pathurl.startswith("file://localhost/") and pathurl.endswith("beach.mp4")
-    # song included as audio
-    assert root.find("sequence/media/audio/track/clipitem") is not None
+    # song included as audio (first stereo lane), and the muted clip-audio lane
+    # is written disabled while the song carries its Audio Levels volume filter.
+    audio_tracks = root.findall("sequence/media/audio/track")
+    assert audio_tracks[0].find("clipitem") is not None  # song lane
+    assert audio_tracks[0].findtext("clipitem/filter/effect/effectid") == "audiolevels"
+    assert audio_tracks[2].findtext("enabled") == "FALSE"  # muted V1 clip-audio lane
 
 
 def test_clear_analysis(client, project):

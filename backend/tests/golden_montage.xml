@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE xmeml>
 <xmeml version="5">
-  <sequence id="sequence-1">
+  <sequence id="sequence-1" explodedTracks="true">
     <name>trip montage</name>
     <duration>500</duration>
     <rate>
@@ -50,9 +50,35 @@
                     <height>1080</height>
                   </samplecharacteristics>
                 </video>
-                <audio/>
+                <audio>
+                  <samplecharacteristics>
+                    <depth>16</depth>
+                    <samplerate>48000</samplerate>
+                  </samplecharacteristics>
+                  <channelcount>2</channelcount>
+                </audio>
               </media>
             </file>
+            <link>
+              <linkclipref>clipitem-1</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>1</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-1-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>3</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-1-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>4</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
           </clipitem>
           <clipitem id="clipitem-2">
             <name>dinner with ñ.mov</name>
@@ -81,9 +107,35 @@
                     <height>2160</height>
                   </samplecharacteristics>
                 </video>
-                <audio/>
+                <audio>
+                  <samplecharacteristics>
+                    <depth>16</depth>
+                    <samplerate>48000</samplerate>
+                  </samplecharacteristics>
+                  <channelcount>2</channelcount>
+                </audio>
               </media>
             </file>
+            <link>
+              <linkclipref>clipitem-2</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>2</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>3</trackindex>
+              <clipindex>2</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>4</trackindex>
+              <clipindex>2</clipindex>
+              <groupindex>1</groupindex>
+            </link>
           </clipitem>
         </track>
         <track>
@@ -100,6 +152,26 @@
             <in>0</in>
             <out>75</out>
             <file id="file-1"/>
+            <link>
+              <linkclipref>clipitem-3</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>2</trackindex>
+              <clipindex>1</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-3-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>5</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-3-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>6</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
           </clipitem>
         </track>
       </video>
@@ -114,18 +186,23 @@
         <outputs>
           <group>
             <index>1</index>
-            <numchannels>2</numchannels>
+            <numchannels>1</numchannels>
             <downmix>0</downmix>
             <channel>
               <index>1</index>
             </channel>
+          </group>
+          <group>
+            <index>2</index>
+            <numchannels>1</numchannels>
+            <downmix>0</downmix>
             <channel>
               <index>2</index>
             </channel>
           </group>
         </outputs>
-        <track>
-          <clipitem id="audioclip-1">
+        <track premiereTrackType="Stereo" currentExplodedTrackIndex="0" totalExplodedTrackCount="2">
+          <clipitem id="audioclip-song-1" premiereChannelType="stereo">
             <name>song.mp3</name>
             <enabled>TRUE</enabled>
             <duration>500</duration>
@@ -148,8 +225,8 @@
               <media>
                 <audio>
                   <samplecharacteristics>
-                    <samplerate>48000</samplerate>
                     <depth>16</depth>
+                    <samplerate>48000</samplerate>
                   </samplecharacteristics>
                   <channelcount>2</channelcount>
                 </audio>
@@ -160,19 +237,26 @@
               <trackindex>1</trackindex>
             </sourcetrack>
             <link>
-              <linkclipref>audioclip-1</linkclipref>
+              <linkclipref>audioclip-song-1</linkclipref>
               <mediatype>audio</mediatype>
               <trackindex>1</trackindex>
               <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
             </link>
             <link>
-              <linkclipref>audioclip-2</linkclipref>
+              <linkclipref>audioclip-song-2</linkclipref>
               <mediatype>audio</mediatype>
-              <trackindex>1</trackindex>
+              <trackindex>2</trackindex>
               <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
             </link>
           </clipitem>
-          <clipitem id="audioclip-2">
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>
+          <outputchannelindex>1</outputchannelindex>
+        </track>
+        <track premiereTrackType="Stereo" currentExplodedTrackIndex="1" totalExplodedTrackCount="2">
+          <clipitem id="audioclip-song-2" premiereChannelType="stereo">
             <name>song.mp3</name>
             <enabled>TRUE</enabled>
             <duration>500</duration>
@@ -190,18 +274,271 @@
               <trackindex>2</trackindex>
             </sourcetrack>
             <link>
-              <linkclipref>audioclip-1</linkclipref>
+              <linkclipref>audioclip-song-1</linkclipref>
               <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-song-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>2</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+          </clipitem>
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>
+          <outputchannelindex>2</outputchannelindex>
+        </track>
+        <track premiereTrackType="Stereo" currentExplodedTrackIndex="0" totalExplodedTrackCount="2">
+          <clipitem id="audioclip-1-1" premiereChannelType="stereo">
+            <name>beach.mp4</name>
+            <enabled>TRUE</enabled>
+            <duration>300</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>100</end>
+            <in>50</in>
+            <out>150</out>
+            <file id="file-1"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>clipitem-1</linkclipref>
+              <mediatype>video</mediatype>
               <trackindex>1</trackindex>
               <clipindex>1</clipindex>
             </link>
             <link>
-              <linkclipref>audioclip-2</linkclipref>
+              <linkclipref>audioclip-1-1</linkclipref>
               <mediatype>audio</mediatype>
+              <trackindex>3</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-1-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>4</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+          </clipitem>
+          <clipitem id="audioclip-2-1" premiereChannelType="stereo">
+            <name>dinner with ñ.mov</name>
+            <enabled>TRUE</enabled>
+            <duration>750</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>100</start>
+            <end>238</end>
+            <in>250</in>
+            <out>388</out>
+            <file id="file-2"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>clipitem-2</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>2</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>3</trackindex>
+              <clipindex>2</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>4</trackindex>
+              <clipindex>2</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+          </clipitem>
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>
+          <outputchannelindex>1</outputchannelindex>
+        </track>
+        <track premiereTrackType="Stereo" currentExplodedTrackIndex="1" totalExplodedTrackCount="2">
+          <clipitem id="audioclip-1-2" premiereChannelType="stereo">
+            <name>beach.mp4</name>
+            <enabled>TRUE</enabled>
+            <duration>300</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>100</end>
+            <in>50</in>
+            <out>150</out>
+            <file id="file-1"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>2</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>clipitem-1</linkclipref>
+              <mediatype>video</mediatype>
               <trackindex>1</trackindex>
               <clipindex>1</clipindex>
             </link>
+            <link>
+              <linkclipref>audioclip-1-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>3</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-1-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>4</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
           </clipitem>
+          <clipitem id="audioclip-2-2" premiereChannelType="stereo">
+            <name>dinner with ñ.mov</name>
+            <enabled>TRUE</enabled>
+            <duration>750</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>100</start>
+            <end>238</end>
+            <in>250</in>
+            <out>388</out>
+            <file id="file-2"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>2</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>clipitem-2</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>1</trackindex>
+              <clipindex>2</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>3</trackindex>
+              <clipindex>2</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-2-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>4</trackindex>
+              <clipindex>2</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+          </clipitem>
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>
+          <outputchannelindex>2</outputchannelindex>
+        </track>
+        <track premiereTrackType="Stereo" currentExplodedTrackIndex="0" totalExplodedTrackCount="2">
+          <clipitem id="audioclip-3-1" premiereChannelType="stereo">
+            <name>beach.mp4</name>
+            <enabled>TRUE</enabled>
+            <duration>300</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>200</start>
+            <end>275</end>
+            <in>0</in>
+            <out>75</out>
+            <file id="file-1"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>1</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>clipitem-3</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>2</trackindex>
+              <clipindex>1</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-3-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>5</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-3-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>6</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+          </clipitem>
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>
+          <outputchannelindex>1</outputchannelindex>
+        </track>
+        <track premiereTrackType="Stereo" currentExplodedTrackIndex="1" totalExplodedTrackCount="2">
+          <clipitem id="audioclip-3-2" premiereChannelType="stereo">
+            <name>beach.mp4</name>
+            <enabled>TRUE</enabled>
+            <duration>300</duration>
+            <rate>
+              <timebase>25</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>200</start>
+            <end>275</end>
+            <in>0</in>
+            <out>75</out>
+            <file id="file-1"/>
+            <sourcetrack>
+              <mediatype>audio</mediatype>
+              <trackindex>2</trackindex>
+            </sourcetrack>
+            <link>
+              <linkclipref>clipitem-3</linkclipref>
+              <mediatype>video</mediatype>
+              <trackindex>2</trackindex>
+              <clipindex>1</clipindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-3-1</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>5</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+            <link>
+              <linkclipref>audioclip-3-2</linkclipref>
+              <mediatype>audio</mediatype>
+              <trackindex>6</trackindex>
+              <clipindex>1</clipindex>
+              <groupindex>1</groupindex>
+            </link>
+          </clipitem>
+          <enabled>TRUE</enabled>
+          <locked>FALSE</locked>
+          <outputchannelindex>2</outputchannelindex>
         </track>
       </audio>
     </media>

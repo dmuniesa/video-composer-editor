@@ -4,6 +4,10 @@ import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
+import {
+  IcChevronDown, IcDownload, IcGear, IcMagnet, IcMonitor, IcPause, IcPlay,
+  IcRedo, IcSkipBack, IcTrackMinus, IcTrackPlus, IcUndo, IcZoomIn, IcZoomOut,
+} from '../components/icons'
 import ScrubThumb from '../components/ScrubThumb'
 import StarRating from '../components/StarRating'
 import VideoDetail from '../components/VideoDetail'
@@ -12,8 +16,8 @@ import { folderKey, folderKeyList, matchesQuery } from '../lib/videoFilter'
 import { sectionColor } from './MusicPage'
 
 const RULER_H = 26
-const TRACK_H = 64
 const TL_AUDIO_H = 88 // mirrors .tl-audio height in index.css — where the video tracks begin
+const HEADER_W = 44 // width of the fixed (sticky-left) lane-header column
 const SNAP_PX = 8
 
 const SEQ_RATIOS = [
@@ -64,6 +68,75 @@ interface DragState {
   previewTrackId: number
 }
 
+// Volume is stored as linear gain; the lane header offers it as a dB dropdown.
+const DB_OPTIONS = [6, 3, 0, -3, -6, -9, -12, -18, -24]
+const dbToGain = (db: number) => Math.pow(10, db / 20)
+const gainToDbOption = (g: number): number => {
+  if (g <= 0) return DB_OPTIONS[DB_OPTIONS.length - 1]
+  const db = 20 * Math.log10(g)
+  return DB_OPTIONS.reduce((best, o) => (Math.abs(o - db) < Math.abs(best - db) ? o : best), DB_OPTIONS[0])
+}
+
+/** Separate mute toggle + volume icon that opens a compact dB dropdown.
+ * Kept as narrow as possible for the fixed header column. */
+function AudioControls({
+  muted,
+  volume,
+  onToggleMute,
+  onVolume,
+}: {
+  muted: boolean
+  volume: number
+  onToggleMute: () => void
+  onVolume: (v: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const db = gainToDbOption(volume)
+  return (
+    <div className={`vol-drop ${open ? 'open' : ''}`} onPointerDown={(e) => e.stopPropagation()}>
+      <button
+        className={`vol-mute ${muted ? 'on' : ''}`}
+        title={muted ? 'Unmute' : 'Mute'}
+        onClick={onToggleMute}
+      >
+        {muted ? '🔇' : '🔊'}
+      </button>
+      <button
+        className={`vol-trigger ${muted ? 'muted' : ''}`}
+        title={`Volume ${db > 0 ? '+' : ''}${db} dB`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        🎚️
+      </button>
+      {open && (
+        <>
+          <div
+            className="vol-overlay"
+            onPointerDown={(e) => {
+              e.stopPropagation()
+              setOpen(false)
+            }}
+          />
+          <div className="vol-list" onPointerDown={(e) => e.stopPropagation()}>
+            {DB_OPTIONS.map((o) => (
+              <button
+                key={o}
+                className={`vol-opt ${!muted && o === db ? 'sel' : ''}`}
+                onClick={() => {
+                  onVolume(dbToGain(o))
+                  setOpen(false)
+                }}
+              >
+                {o > 0 ? `+${o}` : o} dB
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function MontagePage({ pid }: { pid: string }) {
   const navigate = useNavigate()
   const [videos, setVideos] = useState<Video[]>([])
@@ -73,6 +146,25 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [binFolder, setBinFolder] = useState('*')
   const [song, setSong] = useState<SongInfo | null>(null)
   const [peaks, setPeaks] = useState<[number, number][]>([])
+  /** per-video audio waveform peaks, for the clip-audio lanes (loaded lazily) */
+  const [videoPeaks, setVideoPeaks] = useState<Map<number, [number, number][]>>(new Map())
+  const peaksRequested = useRef<Set<number>>(new Set())
+  /** collapsed lane headers (declutter only): keys 'song' | `v${id}` | `a${id}` */
+  const [hidden, setHidden] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(`montageHidden:${pid}`) || '[]'))
+    } catch {
+      return new Set()
+    }
+  })
+  const toggleHidden = (key: string) =>
+    setHidden((h) => {
+      const n = new Set(h)
+      if (n.has(key)) n.delete(key)
+      else n.add(key)
+      localStorage.setItem(`montageHidden:${pid}`, JSON.stringify([...n]))
+      return n
+    })
   const [tracks, setTracks] = useState<Track[]>([])
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
@@ -170,7 +262,24 @@ export default function MontagePage({ pid }: { pid: string }) {
     api.videos(pid).then(setVideos).catch(() => {})
   }, [pid])
 
+  // Lazily load each used video's audio peaks for the clip-audio lanes; request
+  // each id at most once (waveforms don't change once extracted).
   useEffect(() => {
+    const ids = new Set<number>()
+    for (const t of tracks) for (const c of t.clips) ids.add(c.video_id)
+    for (const id of ids) {
+      if (peaksRequested.current.has(id)) continue
+      peaksRequested.current.add(id)
+      api
+        .videoPeaks(pid, id)
+        .then((p) => setVideoPeaks((m) => new Map(m).set(id, p.peaks)))
+        .catch(() => {})
+    }
+  }, [pid, tracks])
+
+  useEffect(() => {
+    peaksRequested.current = new Set()
+    setVideoPeaks(new Map())
     refreshVideos()
     api.song(pid).then(setSong).catch(() => {})
     api.songPeaks(pid).then((p) => setPeaks(p.peaks)).catch(() => {})
@@ -277,6 +386,31 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   const videoById = useMemo(() => new Map(videos.map((v) => [v.id, v])), [videos])
   const kept = useMemo(() => videos.filter((v) => !v.rejected), [videos])
+
+  // ---- clip-audio lane helpers ----
+  const updateSongAudio = (patch: { muted?: boolean; volume?: number }) => {
+    setSong((s) => (s ? { ...s, ...patch } : s)) // optimistic
+    api.songAudio(pid, patch).catch((e) => setToast(e.message))
+  }
+  const updateTrackAudio = (tid: number, patch: { muted?: boolean; volume?: number }) => {
+    setTracks((ts) =>
+      ts.map((t) =>
+        t.id === tid
+          ? { ...t, audio_muted: patch.muted ?? t.audio_muted, audio_volume: patch.volume ?? t.audio_volume }
+          : t,
+      ),
+    )
+    api.trackAudio(pid, tid, patch).catch((e) => setToast(e.message))
+  }
+  /** the slice of a video's waveform peaks covered by one clip's source range */
+  const clipPeaks = (clip: { video_id: number; source_in: number; source_out: number }): [number, number][] => {
+    const all = videoPeaks.get(clip.video_id)
+    const vid = videoById.get(clip.video_id)
+    if (!all || all.length === 0 || !vid || !vid.duration) return []
+    const a = Math.max(0, Math.floor((clip.source_in / vid.duration) * all.length))
+    const b = Math.min(all.length, Math.ceil((clip.source_out / vid.duration) * all.length))
+    return b > a ? all.slice(a, b) : []
+  }
   const folders = useMemo(() => folderKeyList(kept), [kept])
   const binVideos = useMemo(() => {
     const cmp = (SORT_OPTIONS.find((o) => o.key === binSort) ?? SORT_OPTIONS[0]).cmp
@@ -664,7 +798,6 @@ export default function MontagePage({ pid }: { pid: string }) {
     const video = videoById.get(clip.video_id)
     const speed = clip.speed || 1
     const startX = e.clientX
-    const startY = e.clientY
     const state: DragState = {
       clipId: clip.id,
       mode,
@@ -685,12 +818,25 @@ export default function MontagePage({ pid }: { pid: string }) {
           excludeClipId: state.orig.id,
           duration: state.orig.duration,
         })
-        // vertical track change
-        const dy = ev.clientY - startY
-        const rows = Math.round(dy / TRACK_H)
-        const idx = tracks.findIndex((t) => t.id === state.trackId)
-        const newIdx = Math.min(tracks.length - 1, Math.max(0, idx + rows))
-        previewTrackId = tracks[newIdx].id
+        // vertical track change: hit-test the real track rows by pointer Y so
+        // collapsed / variable-height tracks still map correctly.
+        const rows = Array.from(
+          scrollRef.current?.querySelectorAll<HTMLElement>('.tl-track[data-track-id]') ?? [],
+        )
+        if (rows.length) {
+          const first = rows[0].getBoundingClientRect()
+          const last = rows[rows.length - 1].getBoundingClientRect()
+          if (ev.clientY <= first.top) previewTrackId = Number(rows[0].dataset.trackId)
+          else if (ev.clientY >= last.bottom) previewTrackId = Number(rows[rows.length - 1].dataset.trackId)
+          else
+            for (const el of rows) {
+              const r = el.getBoundingClientRect()
+              if (ev.clientY >= r.top && ev.clientY < r.bottom) {
+                previewTrackId = Number(el.dataset.trackId)
+                break
+              }
+            }
+        }
       } else if (mode === 'trim-l') {
         // timeline deltas convert to source seconds at the clip's speed
         const maxIn = state.orig.source_out - 0.2 * speed
@@ -940,25 +1086,42 @@ export default function MontagePage({ pid }: { pid: string }) {
 
       <div className="montage-main">
         <div className="montage-toolbar">
-          <button className="small" onClick={() => zoomAt(1.4)}>＋ zoom</button>
-          <button className="small" onClick={() => zoomAt(1 / 1.4)}>－ zoom</button>
-          <label title="snap clips to beats and to the edges of neighbouring clips, so they butt together with no black gaps">
-            <input type="checkbox" checked={snap} onChange={(e) => setSnap(e.target.checked)} /> 🧲 snap (S)
-          </label>
-          <button className="small" onClick={() => api.addTrack(pid).then(refreshTimeline)}>+ track</button>
-          {tracks.length > 1 && (
-            <button
-              className="small"
-              onClick={() => api.removeTrack(pid, tracks[tracks.length - 1].id).then(refreshTimeline).catch((e) => setToast(e.message))}
-            >
-              − track
+          <div className="tb-group">
+            <button className="tb-btn" onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)"><IcUndo /></button>
+            <button className="tb-btn" onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z / Ctrl+Y)"><IcRedo /></button>
+          </div>
+          <span className="tb-sep" />
+          <div className="tb-group">
+            <button className="tb-btn" onClick={() => zoomAt(1 / 1.4)} title="zoom out"><IcZoomOut /></button>
+            <button className="tb-btn" onClick={() => zoomAt(1.4)} title="zoom in"><IcZoomIn /></button>
+          </div>
+          <button
+            className={`tb-btn tb-toggle${snap ? ' active' : ''}`}
+            aria-pressed={snap}
+            onClick={() => setSnap((v) => !v)}
+            title="snap clips to beats and to the edges of neighbouring clips, so they butt together with no black gaps (S)"
+          >
+            <IcMagnet /> Snap
+          </button>
+          <span className="tb-sep" />
+          <div className="tb-group">
+            <button className="tb-btn" onClick={() => api.addTrack(pid).then(refreshTimeline)} title="add a video track">
+              <IcTrackPlus />
             </button>
-          )}
-          <button className="small" onClick={doUndo} disabled={!canUndo} title="Undo (Ctrl+Z)">↩ undo</button>
-          <button className="small" onClick={doRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z / Ctrl+Y)">↪ redo</button>
+            {tracks.length > 1 && (
+              <button
+                className="tb-btn"
+                onClick={() => api.removeTrack(pid, tracks[tracks.length - 1].id).then(refreshTimeline).catch((e) => setToast(e.message))}
+                title="remove the top video track"
+              >
+                <IcTrackMinus />
+              </button>
+            )}
+          </div>
+          <span className="tb-sep" />
           <div className="seq-menu">
-            <button className="small" onClick={() => setSeqOpen((v) => !v)} title="composition settings — written to the exported sequence">
-              ⚙ {compW}×{compH} · {compFps} fps ▾
+            <button className="tb-btn" onClick={() => setSeqOpen((v) => !v)} title="composition settings — written to the exported sequence">
+              <IcGear /> {compW}×{compH} · {compFps} fps <IcChevronDown />
             </button>
             {seqOpen && (
               <>
@@ -1011,17 +1174,25 @@ export default function MontagePage({ pid }: { pid: string }) {
             )}
           </div>
           <span className="spacer" style={{ flex: 1 }} />
-          <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
-          <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
-            {playing ? '⏸' : '▶'}
-          </button>
-          <span className="hint">{fmtTime(playhead)}</span>
-          <button className="small" onClick={() => setPreviewOpen((v) => !v)}>
-            {previewOpen ? '✕ preview' : '▶ preview'}
+          <div className="tb-group">
+            <button className="tb-btn" onClick={() => seek(0)} title="go to start"><IcSkipBack /></button>
+            <button className="tb-btn" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>
+              {playing ? <IcPause /> : <IcPlay />}
+            </button>
+          </div>
+          <span className="tb-time">{fmtTime(playhead)}</span>
+          <span className="tb-sep" />
+          <button
+            className={`tb-btn tb-toggle${previewOpen ? ' active' : ''}`}
+            aria-pressed={previewOpen}
+            onClick={() => setPreviewOpen((v) => !v)}
+            title={previewOpen ? 'close the preview window' : 'open a floating video preview'}
+          >
+            <IcMonitor /> Preview
           </button>
           <div className="export-menu">
-            <button className="primary" onClick={() => setExportOpen((v) => !v)}>
-              Export ▾
+            <button className="primary tb-export" onClick={() => setExportOpen((v) => !v)}>
+              <IcDownload /> Export <IcChevronDown />
             </button>
             {exportOpen && (
               <div className="export-dropdown" onClick={() => setExportOpen(false)}>
@@ -1082,30 +1253,61 @@ export default function MontagePage({ pid }: { pid: string }) {
         )}
 
         <div className="timeline-scroll" ref={scrollRef}>
-          <div className="timeline-inner" style={{ width: width + 60 }}>
-            {/* ruler */}
-            <div className="tl-ruler" onPointerDown={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              seek((e.clientX - rect.left + (scrollRef.current?.scrollLeft ?? 0) * 0) / pxPerSec)
-            }}>
-              <svg width={width} height={RULER_H}>
-                {ticks.map((t) => (
-                  <g key={t}>
-                    <line x1={t * pxPerSec} x2={t * pxPerSec} y1={RULER_H - 8} y2={RULER_H} stroke="#555c6b" />
-                    <text x={t * pxPerSec + 3} y={RULER_H - 10} fill="#9aa1b0" fontSize={10}>
-                      {fmtTime(t)}
-                    </text>
-                  </g>
-                ))}
-              </svg>
+          <div className="timeline-inner" style={{ width: HEADER_W + width + 60 }}>
+            {/* ruler (with a fixed corner over the header column) */}
+            <div className="tl-lane-row ruler">
+              <div className="tl-lane-hdr corner" />
+              <div
+                className="tl-ruler"
+                onPointerDown={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  seek((e.clientX - rect.left) / pxPerSec)
+                }}
+              >
+                <svg width={width} height={RULER_H}>
+                  {ticks.map((t) => (
+                    <g key={t}>
+                      <line x1={t * pxPerSec} x2={t * pxPerSec} y1={RULER_H - 8} y2={RULER_H} stroke="#555c6b" />
+                      <text x={t * pxPerSec + 3} y={RULER_H - 10} fill="#9aa1b0" fontSize={10}>
+                        {fmtTime(t)}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              </div>
             </div>
 
-            {/* audio row: sections + waveform + beats */}
-            <div className="tl-audio" onPointerDown={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              seek((e.clientX - rect.left) / pxPerSec)
-            }}>
-              {song && (
+            {/* song lane: fixed header cell + scrolling body (sections + waveform + beats) */}
+            <div className="tl-lane-row">
+              <div
+                className={`tl-lane-hdr main ${hidden.has('song') ? 'collapsed' : ''}`}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <span className="lane-name">A1</span>
+                {song && !hidden.has('song') && (
+                  <AudioControls
+                    muted={song.muted}
+                    volume={song.volume}
+                    onToggleMute={() => updateSongAudio({ muted: !song.muted })}
+                    onVolume={(v) => updateSongAudio({ volume: v })}
+                  />
+                )}
+                <button
+                  className="hide-btn"
+                  title={hidden.has('song') ? 'Show track' : 'Hide track'}
+                  onClick={() => toggleHidden('song')}
+                >
+                  {hidden.has('song') ? '▸' : '▾'}
+                </button>
+              </div>
+              <div
+                className={`tl-audio ${hidden.has('song') ? 'collapsed' : ''}`}
+                onPointerDown={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  seek((e.clientX - rect.left) / pxPerSec)
+                }}
+              >
+              {song && !hidden.has('song') && (
                 <>
                   <div style={{ position: 'relative', height: 18 }}>
                     {song.sections.map((s) => (
@@ -1147,14 +1349,35 @@ export default function MontagePage({ pid }: { pid: string }) {
                   </svg>
                 </>
               )}
-              {!song && <div className="empty-note" style={{ padding: 20 }}>No song analyzed yet — see the Music page.</div>}
+              {!song && !hidden.has('song') && (
+                <div className="empty-note" style={{ padding: 20 }}>
+                  No song analyzed yet — see the Music page.
+                </div>
+              )}
+              </div>
             </div>
 
-            {/* video tracks */}
+            {/* video tracks: fixed header cell + scrolling track body */}
             {tracks.map((track) => (
+              <div key={track.id} className="tl-lane-row">
+                <div
+                  className={`tl-lane-hdr video ${hidden.has(`v${track.id}`) ? 'collapsed' : ''}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <span className="lane-name">{track.name}</span>
+                  <button
+                    className="hide-btn"
+                    title={hidden.has(`v${track.id}`) ? 'Show track' : 'Hide track'}
+                    onClick={() => toggleHidden(`v${track.id}`)}
+                  >
+                    {hidden.has(`v${track.id}`) ? '▸' : '▾'}
+                  </button>
+                </div>
               <div
-                key={track.id}
-                className={`tl-track ${dropTrack === track.id ? 'drop-target' : ''}`}
+                data-track-id={track.id}
+                className={`tl-track ${dropTrack === track.id ? 'drop-target' : ''} ${
+                  hidden.has(`v${track.id}`) ? 'collapsed' : ''
+                }`}
                 onDragOver={(e) => {
                   e.preventDefault()
                   e.dataTransfer.dropEffect = 'copy'
@@ -1194,10 +1417,7 @@ export default function MontagePage({ pid }: { pid: string }) {
                   })
                 }}
               >
-                <span className="hint" style={{ position: 'absolute', left: 6, top: 4, pointerEvents: 'none' }}>
-                  {track.name}
-                </span>
-                {track.clips.map((clip) => {
+                {!hidden.has(`v${track.id}`) && track.clips.map((clip) => {
                   const isDragged = drag?.clipId === clip.id
                   const shown = isDragged ? drag.preview : clip
                   const shownTrack = isDragged ? drag.previewTrackId : track.id
@@ -1264,12 +1484,121 @@ export default function MontagePage({ pid }: { pid: string }) {
                   </div>
                 )}
               </div>
+              </div>
             ))}
 
+            {/* clip-audio lanes: one per video track, below the video tracks.
+                Shows each clip's original audio waveform; mute/volume here feed
+                the export. */}
+            {tracks.map((track) => {
+              const collapsed = hidden.has(`a${track.id}`)
+              return (
+                <div key={`audio-${track.id}`} className="tl-lane-row">
+                  <div
+                    className={`tl-lane-hdr audio ${collapsed ? 'collapsed' : ''}`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <span className="lane-name">A{track.index + 2}</span>
+                    {!collapsed && (
+                      <AudioControls
+                        muted={track.audio_muted}
+                        volume={track.audio_volume}
+                        onToggleMute={() => updateTrackAudio(track.id, { muted: !track.audio_muted })}
+                        onVolume={(v) => updateTrackAudio(track.id, { volume: v })}
+                      />
+                    )}
+                    <button
+                      className="hide-btn"
+                      title={collapsed ? 'Show track' : 'Hide track'}
+                      onClick={() => toggleHidden(`a${track.id}`)}
+                    >
+                      {collapsed ? '▸' : '▾'}
+                    </button>
+                  </div>
+                  <div
+                    className={`tl-clip-audio ${track.audio_muted ? 'muted' : ''} ${collapsed ? 'collapsed' : ''}`}
+                    onPointerDown={(e) => {
+                      if (e.target === e.currentTarget) {
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        seek((e.clientX - rect.left) / pxPerSec)
+                      }
+                    }}
+                  >
+                  {!collapsed &&
+                    track.clips.map((clip) => {
+                      // Follow the live drag preview so the audio moves/trims with
+                      // the clip, matching the video lane above.
+                      const isDragged = drag?.clipId === clip.id
+                      const shown = isDragged ? drag.preview : clip
+                      const shownTrack = isDragged ? drag.previewTrackId : track.id
+                      if (isDragged && shownTrack !== track.id) return null
+                      const w = Math.max(shown.duration * pxPerSec, 4)
+                      const cp = clipPeaks(shown)
+                      return (
+                        <div
+                          key={clip.id}
+                          className="tl-audio-clip"
+                          style={{ left: shown.timeline_start * pxPerSec, width: w }}
+                          title={videoById.get(clip.video_id)?.filename ?? ''}
+                        >
+                          {cp.length > 0 ? (
+                            <Waveform peaks={cp} width={w} height={40} color="#3f7d5a" />
+                          ) : (
+                            <div className="no-audio">
+                              {videoPeaks.has(clip.video_id) ? 'no audio' : '…'}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  {/* audio ghost while dragging a clip in from another track */}
+                  {!collapsed && drag && drag.previewTrackId === track.id && drag.trackId !== track.id && (
+                    <div
+                      className="tl-audio-clip"
+                      style={{
+                        left: drag.preview.timeline_start * pxPerSec,
+                        width: Math.max(drag.preview.duration * pxPerSec, 4),
+                        opacity: 0.6,
+                      }}
+                    >
+                      <Waveform
+                        peaks={clipPeaks(drag.preview)}
+                        width={Math.max(drag.preview.duration * pxPerSec, 4)}
+                        height={40}
+                        color="#3f7d5a"
+                      />
+                    </div>
+                  )}
+                  {/* audio preview of where a bin item will drop */}
+                  {!collapsed && binDrag && dropPos?.trackId === track.id && (
+                    <div
+                      className="tl-audio-clip drop-ghost"
+                      style={{
+                        left: dropPos.time * pxPerSec,
+                        width: Math.max((binDrag.t_out - binDrag.t_in) * pxPerSec, 4),
+                      }}
+                    >
+                      <Waveform
+                        peaks={clipPeaks({
+                          video_id: binDrag.video_id,
+                          source_in: binDrag.t_in,
+                          source_out: binDrag.t_out,
+                        })}
+                        width={Math.max((binDrag.t_out - binDrag.t_in) * pxPerSec, 4)}
+                        height={40}
+                        color="#3f7d5a"
+                      />
+                    </div>
+                  )}
+                  </div>
+                </div>
+              )
+            })}
+
             {snapEdge != null && (
-              <div className="tl-snapline" style={{ left: snapEdge * pxPerSec, top: RULER_H + TL_AUDIO_H }} />
+              <div className="tl-snapline" style={{ left: HEADER_W + snapEdge * pxPerSec, top: RULER_H + TL_AUDIO_H }} />
             )}
-            <div className="tl-playhead" style={{ left: playhead * pxPerSec }} />
+            <div className="tl-playhead" style={{ left: HEADER_W + playhead * pxPerSec }} />
           </div>
         </div>
 

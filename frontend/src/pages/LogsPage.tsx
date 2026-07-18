@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import type { LogRecord } from '../lib/types'
+import { IcDownload, IcPause, IcPlay, IcTrash } from '../components/icons'
 
 const LEVELS = ['ALL', 'DEBUG', 'INFO', 'WARNING', 'ERROR'] as const
 type Level = (typeof LEVELS)[number]
@@ -85,28 +86,37 @@ export default function LogsPage({ pid }: { pid: string }) {
     <div className="logs-page">
       <div className="logs-toolbar">
         <span className="logs-title">Backend logs</span>
-        <select value={minLevel} onChange={(e) => setMinLevel(e.target.value as Level)}>
+        <span className="tb-sep" />
+        <select value={minLevel} onChange={(e) => setMinLevel(e.target.value as Level)} title="minimum log level">
           {LEVELS.map((l) => (
             <option key={l} value={l}>
               {l === 'ALL' ? 'All levels' : `${l}+`}
             </option>
           ))}
         </select>
-        <label className="logs-check">
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />
-          Follow
-        </label>
-        <button className="small" onClick={() => setPaused((p) => !p)}>
-          {paused ? '▶ Resume' : '⏸ Pause'}
-        </button>
+        <div className="tb-group">
+          <button
+            className={`tb-btn tb-toggle${follow ? ' active' : ''}`}
+            aria-pressed={follow}
+            onClick={() => setFollow((v) => !v)}
+            title="auto-scroll to the newest line"
+          >
+            Follow
+          </button>
+          <button className="tb-btn" onClick={() => setPaused((p) => !p)} title={paused ? 'resume the live stream' : 'pause the live stream'}>
+            {paused ? <IcPlay /> : <IcPause />} {paused ? 'Resume' : 'Pause'}
+          </button>
+        </div>
         <span className="spacer" />
         <span className="hint">{shown.length} shown / {records.length} total</span>
-        <button className="small" onClick={download} disabled={records.length === 0}>
-          Download
-        </button>
-        <button className="small danger" onClick={clear}>
-          Clear
-        </button>
+        <div className="tb-group">
+          <button className="tb-btn" onClick={download} disabled={records.length === 0} title="download the current buffer as a .txt file">
+            <IcDownload /> Download
+          </button>
+          <button className="tb-btn danger" onClick={clear} title="clear the in-memory log buffer">
+            <IcTrash /> Clear
+          </button>
+        </div>
       </div>
 
       {!hasDebug && (
