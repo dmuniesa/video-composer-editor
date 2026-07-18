@@ -115,14 +115,22 @@ def make_proxy(video: Path, cache: Path) -> Path:
 
 
 def make_preview(video: Path, cache: Path) -> Path:
-    """Small silent H.264 with dense keyframes: cheap to decode and quick to
-    seek, used by the montage preview player in low-res mode."""
+    """Small H.264 with dense keyframes, used by the montage preview player in
+    low-res mode. Carries the clip's audio (AAC) when frames.preview_audio is
+    on, so the montage preview can sound it alongside the song."""
     cache.mkdir(parents=True, exist_ok=True)
     dest = cache / "preview.mp4"
     if dest.exists():
         return dest
-    height = settings.get().frames.preview_height
+    fs = settings.get().frames
+    height = fs.preview_height
     tmp = cache / "preview.tmp.mp4"
+    audio_args = (
+        ["-c:a", "aac", "-b:a", f"{fs.preview_audio_bitrate}k"]
+        if fs.preview_audio
+        # no audio stream in the output; videos with audio stay silent in preview
+        else ["-an"]
+    )
     _run_ffmpeg(
         [
             "-i", str(video),
@@ -130,7 +138,7 @@ def make_preview(video: Path, cache: Path) -> Path:
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
             "-g", "30",
             "-pix_fmt", "yuv420p",
-            "-an",
+            *audio_args,
             "-movflags", "+faststart",
             str(tmp),
         ],

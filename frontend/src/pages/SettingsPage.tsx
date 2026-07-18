@@ -331,7 +331,27 @@ export default function SettingsPage({ pid }: { pid?: string }) {
           <label>Preview height (px, montage SD mode + AI video mode)</label>
           <input type="number" min={144} max={720} step={1} value={f.preview_height}
             onChange={(e) => setFrames({ preview_height: num(e.target.value, 480) })} />
+
+          <label>Preview audio bitrate (kbps)</label>
+          <input type="number" min={32} max={320} step={32} value={f.preview_audio_bitrate}
+            disabled={!f.preview_audio}
+            onChange={(e) => setFrames({ preview_audio_bitrate: num(e.target.value, 128) })} />
         </div>
+        <label className="toggle-row" style={{ marginTop: 10 }}>
+          <input
+            type="checkbox"
+            checked={f.preview_audio}
+            onChange={(e) => setFrames({ preview_audio: e.target.checked })}
+          />
+          <span>
+            <b>Include clip audio in the SD preview</b>
+            <br />
+            <span className="hint">
+              Lets the montage preview sound each clip (alongside the song) when its lane isn't muted.
+              Turn off for smaller, silent previews.
+            </span>
+          </span>
+        </label>
         <p className="hint" style={{ marginTop: 10 }}>
           Example: min 3, max 10, +1 every 5 s → a 20 s clip gets 7 frames. The preview is also
           the video the AI watches when the analysis media is set to <b>Video</b>. Changes apply

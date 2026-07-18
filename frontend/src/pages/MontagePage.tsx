@@ -5,8 +5,9 @@ import { useProjectEvents } from '../lib/sse'
 import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
 import {
-  IcChevronDown, IcDownload, IcGear, IcMagnet, IcMonitor, IcPause, IcPlay,
-  IcRedo, IcSkipBack, IcTrackMinus, IcTrackPlus, IcUndo, IcZoomIn, IcZoomOut,
+  IcChevronDown, IcDownload, IcGear, IcLevels, IcMagnet, IcMonitor, IcPause, IcPlay,
+  IcRedo, IcSkipBack, IcTrackMinus, IcTrackPlus, IcUndo, IcVolumeOff, IcVolumeOn,
+  IcZoomIn, IcZoomOut,
 } from '../components/icons'
 import ScrubThumb from '../components/ScrubThumb'
 import StarRating from '../components/StarRating'
@@ -99,14 +100,14 @@ function AudioControls({
         title={muted ? 'Unmute' : 'Mute'}
         onClick={onToggleMute}
       >
-        {muted ? '🔇' : '🔊'}
+        {muted ? <IcVolumeOff /> : <IcVolumeOn />}
       </button>
       <button
         className={`vol-trigger ${muted ? 'muted' : ''}`}
         title={`Volume ${db > 0 ? '+' : ''}${db} dB`}
         onClick={() => setOpen((o) => !o)}
       >
-        🎚️
+        <IcLevels />
       </button>
       {open && (
         <>
@@ -526,6 +527,14 @@ export default function MontagePage({ pid }: { pid: string }) {
     }
   }, [song])
 
+  // Apply the song's mute/volume to its <audio> element for the preview mix.
+  useEffect(() => {
+    const el = audioRef.current
+    if (!el) return
+    el.muted = !!song?.muted
+    el.volume = Math.max(0, Math.min(1, song?.volume ?? 1))
+  }, [song?.muted, song?.volume])
+
   // drag the preview popup around by its header
   const startPopDrag = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button')) return
@@ -553,8 +562,29 @@ export default function MontagePage({ pid }: { pid: string }) {
   const togglePlay = () => {
     const a = audioRef.current
     if (!a) return
-    if (a.paused) a.play()
-    else a.pause()
+    if (a.paused) {
+      void a.play()
+      // Start the preview video's playback within this user gesture so the
+      // browser allows its (unmuted) audio — calling play() later from the sync
+      // effect is outside the gesture and gets silently blocked by autoplay
+      // policy, which is why clip audio wasn't heard. Once started here the
+      // element is unlocked and the effect can drive clip switches.
+      const pv = previewRef.current
+      const clip = clipAt(playhead)
+      if (pv && clip) {
+        const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
+        const speed = clip.speed || 1
+        if (!pv.src.endsWith(src)) pv.src = src
+        pv.currentTime = clip.source_in + (playhead - clip.timeline_start) * speed
+        pv.playbackRate = speed
+        const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
+        pv.muted = !!(tr?.audio_muted)
+        pv.volume = Math.max(0, Math.min(1, tr?.audio_volume ?? 1))
+        pv.play().catch(() => {})
+      }
+    } else {
+      a.pause()
+    }
   }
 
   useEffect(() => {
@@ -581,9 +611,14 @@ export default function MontagePage({ pid }: { pid: string }) {
       pv.currentTime = want
     }
     if (pv.playbackRate !== speed) pv.playbackRate = speed
+    // Preview audio = the playing clip's track settings (mute/volume), so the
+    // montage preview sounds the active clip audio alongside the song.
+    const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
+    pv.muted = !!(tr?.audio_muted)
+    pv.volume = Math.max(0, Math.min(1, tr?.audio_volume ?? 1))
     if (playing && pv.paused) pv.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
-  }, [playhead, clipAt, pid, previewOpen, previewLowRes])
+  }, [playhead, clipAt, pid, previewOpen, previewLowRes, tracks])
 
   const seek = (t: number) => {
     if (audioRef.current) audioRef.current.currentTime = Math.max(0, t)
@@ -1234,7 +1269,7 @@ export default function MontagePage({ pid }: { pid: string }) {
                 <button className="small" onClick={() => setPreviewOpen(false)} title="close">✕</button>
               </span>
             </div>
-            <video ref={previewRef} muted playsInline />
+            <video ref={previewRef} playsInline />
             <div className="preview-pop-controls">
               <button className="small" onClick={() => seek(0)} title="go to start">⏮</button>
               <button className="small" onClick={togglePlay} title="play/pause (Space)" disabled={!song}>

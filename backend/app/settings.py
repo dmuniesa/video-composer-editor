@@ -33,10 +33,17 @@ class FrameSettings(BaseModel):
     jpeg_quality: int = Field(3, ge=1, le=10)  # ffmpeg -q:v (lower = better)
     filmstrip_tiles: int = Field(20, ge=5, le=60)
     proxy_height: int = Field(720, ge=240, le=1080)
-    # Small silent H.264 used by the montage preview player in "SD" mode and
+    # Small H.264 used by the montage preview player in "SD" mode and
     # attached to the AI analysis when it runs in video mode (AnalysisSettings
     # .agy_media). Changing it takes effect after a re-extract.
     preview_height: int = Field(480, ge=144, le=720)
+    # Whether the SD preview carries the clip's audio (AAC). Off = silent
+    # preview.mp4 (smaller, and the montage preview won't sound clips). Takes
+    # effect after a re-extract.
+    preview_audio: bool = True
+    # AAC bitrate for the SD preview's audio track, in kbps. Ignored when
+    # preview_audio is False.
+    preview_audio_bitrate: int = Field(128, ge=32, le=320)
 
 
 class AISettings(BaseModel):

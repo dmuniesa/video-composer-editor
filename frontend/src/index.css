@@ -831,7 +831,8 @@ kbd {
  * dropdown. The lane header lifts above its siblings while the dropdown is open
  * so the menu isn't painted under the neighbouring track labels. */
 .vol-drop { position: relative; display: flex; gap: 1px; }
-.vol-mute, .vol-trigger { background: transparent; border: none; cursor: pointer; padding: 0; font-size: 12px; line-height: 1; }
+.vol-mute, .vol-trigger { background: transparent; border: none; cursor: pointer; padding: 0; font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.vol-mute svg, .vol-trigger svg { display: block; width: 15px; height: 15px; }
 .vol-mute.on { opacity: 1; }
 .vol-mute:not(.on) { opacity: 0.5; }
 .vol-trigger.muted { opacity: 0.4; }

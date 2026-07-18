@@ -156,3 +156,24 @@ export const IcShuffle = () => (
   </svg>
 )
 
+export const IcVolumeOn = () => (
+  <svg {...base}>
+    <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" />
+    <path d="M16 8.5a4.5 4.5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12" />
+  </svg>
+)
+
+export const IcVolumeOff = () => (
+  <svg {...base}>
+    <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none" />
+    <path d="m16 9.5 4.5 5M20.5 9.5 16 14.5" />
+  </svg>
+)
+
+export const IcLevels = () => (
+  <svg {...base}>
+    <path d="M5 21v-6M5 10V3M12 21v-9M12 7V3M19 21v-4M19 12V3" />
+    <path d="M3 8h4M10 14h4M17 16h4" />
+  </svg>
+)
+

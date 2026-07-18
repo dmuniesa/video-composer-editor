@@ -42,6 +42,8 @@ export interface AppSettings {
     filmstrip_tiles: number
     proxy_height: number
     preview_height: number
+    preview_audio: boolean
+    preview_audio_bitrate: number
   }
   ai: {
     provider: string
