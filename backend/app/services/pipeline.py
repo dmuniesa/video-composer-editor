@@ -141,6 +141,13 @@ def queue_media_job(pid: str, video_dir: Path, video_id: int) -> None:
                     video.has_proxy = True
                 jobs.update(job, 0.7, "preview proxy")
                 frames.make_preview(path, cache)
+                # Separate clip-audio file (preview.mp3); optional — a missing
+                # file just means the montage preview is silent for this clip.
+                try:
+                    jobs.update(job, 0.78, "clip audio")
+                    frames.make_clip_audio(path, cache)
+                except Exception as exc:  # noqa: BLE001 - clip audio is optional
+                    log.info("clip audio extract failed for #%d: %s", video_id, exc)
                 jobs.update(job, 0.85, "audio waveform")
                 audio_analysis.compute_video_peaks(path, cache / "audio_peaks.json")
                 video.status = "extracted"

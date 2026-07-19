@@ -37,12 +37,13 @@ class FrameSettings(BaseModel):
     # attached to the AI analysis when it runs in video mode (AnalysisSettings
     # .agy_media). Changing it takes effect after a re-extract.
     preview_height: int = Field(480, ge=144, le=720)
-    # Whether the SD preview carries the clip's audio (AAC). Off = silent
-    # preview.mp4 (smaller, and the montage preview won't sound clips). Takes
-    # effect after a re-extract.
+    # Whether a separate clip-audio file (preview.mp3) is extracted for the
+    # montage preview to sound each clip. The preview.mp4 itself is always mute
+    # (so the AI's analysis input is unaffected by the montage audio system).
+    # Off = no preview.mp3, the montage preview stays silent. Re-extract to apply.
     preview_audio: bool = True
-    # AAC bitrate for the SD preview's audio track, in kbps. Ignored when
-    # preview_audio is False.
+    # MP3 bitrate for the clip-audio file, in kbps. Ignored when preview_audio
+    # is False.
     preview_audio_bitrate: int = Field(128, ge=32, le=320)
 
 

@@ -71,6 +71,9 @@ def test_full_flow(client, project):
     ranged = client.get(f"/media/{pid}/video/{v['id']}", headers={"Range": "bytes=0-99"})
     assert ranged.status_code == 206
     assert ranged.headers["content-range"].startswith("bytes 0-99/")
+    # clip-audio route: the fixture videos have no audio stream, so the separate
+    # preview.mp3 isn't generated -> 404 (graceful; the preview just stays silent)
+    assert client.get(f"/media/{pid}/audio/{v['id']}").status_code == 404
 
     # --- AI analysis through the fake agy ---
     res = client.post(f"/api/projects/{pid}/analyze", json={})

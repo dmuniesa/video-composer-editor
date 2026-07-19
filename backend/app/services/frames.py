@@ -116,8 +116,10 @@ def make_proxy(video: Path, cache: Path) -> Path:
 
 def make_preview(video: Path, cache: Path) -> Path:
     """Small H.264 with dense keyframes, used by the montage preview player in
-    low-res mode. Carries the clip's audio (AAC) when frames.preview_audio is
-    on, so the montage preview can sound it alongside the song."""
+    low-res mode and attached to the AI analysis in video mode. Always MUTE: the
+    clip's audio is extracted separately (make_clip_audio → preview.mp3) so the
+    AI's input is unaffected by the montage audio system, and the montage preview
+    sounds the clip via that separate file."""
     cache.mkdir(parents=True, exist_ok=True)
     dest = cache / "preview.mp4"
     if dest.exists():
@@ -125,12 +127,6 @@ def make_preview(video: Path, cache: Path) -> Path:
     fs = settings.get().frames
     height = fs.preview_height
     tmp = cache / "preview.tmp.mp4"
-    audio_args = (
-        ["-c:a", "aac", "-b:a", f"{fs.preview_audio_bitrate}k"]
-        if fs.preview_audio
-        # no audio stream in the output; videos with audio stay silent in preview
-        else ["-an"]
-    )
     _run_ffmpeg(
         [
             "-i", str(video),
@@ -138,7 +134,7 @@ def make_preview(video: Path, cache: Path) -> Path:
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
             "-g", "30",
             "-pix_fmt", "yuv420p",
-            *audio_args,
+            "-an",  # mute: clip audio lives in a separate preview.mp3
             "-movflags", "+faststart",
             str(tmp),
         ],
@@ -148,12 +144,44 @@ def make_preview(video: Path, cache: Path) -> Path:
     return dest
 
 
+def make_clip_audio(video: Path, cache: Path) -> Path | None:
+    """Extract the clip's audio to a standalone preview.mp3 — the montage
+    preview's clip-audio source, kept separate from the mute preview.mp4 the AI
+    analyzes. Returns None when frames.preview_audio is off or the source has no
+    audio stream (the montage preview then stays silent for this clip)."""
+    if not settings.get().frames.preview_audio:
+        return None
+    cache.mkdir(parents=True, exist_ok=True)
+    dest = cache / "preview.mp3"
+    if dest.exists():
+        return dest
+    fs = settings.get().frames
+    tmp = cache / "preview.tmp.mp3"
+    try:
+        _run_ffmpeg(
+            [
+                "-i", str(video),
+                "-vn",  # audio only
+                "-ac", "2",  # stereo (mono sources upmixed) — matches the export lanes
+                "-c:a", "libmp3lame", "-b:a", f"{fs.preview_audio_bitrate}k",
+                str(tmp),
+            ],
+            timeout=600,
+        )
+    except RuntimeError:
+        # No audio stream in the source (or undecodeable) — nothing to extract;
+        # the clip is silent in the preview.
+        return None
+    tmp.rename(dest)
+    return dest
+
+
 def clear_derived_frames(cache: Path) -> None:
-    """Delete analysis frames + filmstrip + thumbnail + preview so the next
-    media job regenerates them with the current settings. The preview matters:
-    it must honor a changed preview_height, both for the montage SD player and
-    as the video the AI analyzes in video mode. Only the (expensive) proxy is
-    kept."""
+    """Delete analysis frames + filmstrip + thumbnail + preview (+ clip audio)
+    so the next media job regenerates them with the current settings. The preview
+    matters: it must honor a changed preview_height, both for the montage SD
+    player and as the video the AI analyzes in video mode. Only the (expensive)
+    proxy is kept."""
     if not cache.is_dir():
         return
     for p in cache.glob("frame_*.jpg"):
@@ -161,3 +189,4 @@ def clear_derived_frames(cache: Path) -> None:
     (cache / "filmstrip.jpg").unlink(missing_ok=True)
     (cache / "thumb.jpg").unlink(missing_ok=True)
     (cache / "preview.mp4").unlink(missing_ok=True)
+    (cache / "preview.mp3").unlink(missing_ok=True)

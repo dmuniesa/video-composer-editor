@@ -98,6 +98,19 @@ def media_preview(pid: str, vid: int, request: Request) -> Response:
     return _ranged(request, path)
 
 
+@router.get("/media/{pid}/audio/{vid}")
+def media_clip_audio(pid: str, vid: int, request: Request) -> Response:
+    """Standalone clip audio (preview.mp3) the montage preview plays as a separate
+    source — kept apart from the mute preview.mp4 the AI analyzes. 404 when the
+    file isn't present (no audio stream in the source, preview_audio off, or not
+    yet generated); the client then simply has no clip audio for this video."""
+    video_dir, video, _orig = _get_video(pid, vid)
+    path = dbm.cache_dir_for(video_dir) / video.cache_key / "preview.mp3"
+    if not path.is_file():
+        raise HTTPException(404, "clip audio not available")
+    return _ranged(request, path)
+
+
 @router.get("/media/{pid}/thumb/{vid}")
 def media_thumb(pid: str, vid: int) -> FileResponse:
     video_dir, video, _orig = _get_video(pid, vid)

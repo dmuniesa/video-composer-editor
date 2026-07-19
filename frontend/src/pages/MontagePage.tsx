@@ -217,6 +217,9 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [composeOpen, setComposeOpen] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
+  /** separate clip-audio element (preview.mp3) — the preview video is mute, so
+   * the clip's sound is played and gain-controlled through this element */
+  const clipAudioRef = useRef<HTMLAudioElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
   /** viewport x (px) where the playhead should stay after a zoom change */
@@ -608,25 +611,35 @@ export default function MontagePage({ pid }: { pid: string }) {
     if (!a) return
     if (a.paused) {
       void a.play()
-      // Start the preview video's playback within this user gesture so the
-      // browser allows its (unmuted) audio — calling play() later from the sync
-      // effect is outside the gesture and gets silently blocked by autoplay
-      // policy, which is why clip audio wasn't heard. Once started here the
-      // element is unlocked and the effect can drive clip switches.
-      resumePreviewGain() // also unlock the Web Audio context in this gesture
+      // Start playback of the preview video AND the separate clip-audio element
+      // within this user gesture so the browser allows audio — calling play()
+      // later from the sync effect is outside the gesture and gets silently
+      // blocked by autoplay policy. Once started here both elements are unlocked
+      // and the effect can drive clip switches.
+      resumePreviewGain() // unlock the Web Audio context in this gesture
       const pv = previewRef.current
+      const ca = clipAudioRef.current
       const clip = clipAt(playhead)
       if (pv && clip) {
-        const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
+        const vsrc = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
+        const asrc = media.audio(pid, clip.video_id)
         const speed = clip.speed || 1
-        if (!pv.src.endsWith(src)) pv.src = src
-        pv.currentTime = clip.source_in + (playhead - clip.timeline_start) * speed
+        const want = clip.source_in + (playhead - clip.timeline_start) * speed
+        if (!pv.src.endsWith(vsrc)) pv.src = vsrc
+        pv.currentTime = want
         pv.playbackRate = speed
-        const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
-        pv.muted = !!(tr?.audio_muted)
-        bindPreviewGain(pv)
-        const finalDb = (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
-        setPreviewGain((tr?.audio_volume ?? 1) * Math.pow(10, finalDb / 20))
+        pv.muted = true // the video is mute; the clip's sound comes from `ca`
+        if (ca) {
+          if (!ca.src.endsWith(asrc)) ca.src = asrc
+          ca.currentTime = want
+          ca.playbackRate = speed
+          const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
+          ca.muted = !!(tr?.audio_muted)
+          bindPreviewGain(ca) // route the clip audio through the gain node
+          const finalDb = (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
+          setPreviewGain((tr?.audio_volume ?? 1) * Math.pow(10, finalDb / 20))
+          ca.play().catch(() => {})
+        }
         pv.play().catch(() => {})
       }
     } else {
@@ -636,38 +649,54 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   useEffect(() => {
     const pv = previewRef.current
+    const ca = clipAudioRef.current
     if (!pv) return
     const clip = clipAt(playhead)
-    void previewOpen // re-sync the <video> right after the popup (re)mounts
+    void previewOpen // re-sync the <video>/<audio> right after the popup (re)mounts
     if (!clip) {
       pv.pause()
+      if (ca) ca.pause()
       pv.removeAttribute('src')
       pv.load()
+      if (ca) {
+        ca.removeAttribute('src')
+        ca.load()
+      }
       return
     }
-    const src = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
+    const vsrc = previewLowRes ? media.preview(pid, clip.video_id) : media.video(pid, clip.video_id)
+    const asrc = media.audio(pid, clip.video_id)
     const speed = clip.speed || 1
     const want = clip.source_in + (playhead - clip.timeline_start) * speed
     const playing = audioRef.current && !audioRef.current.paused
-    // While playing, tolerate small drift so we don't fight the video's own playback.
-    // While paused (scrubbing / frame-stepping), seek to the exact frame so the preview follows.
-    if (!pv.src.endsWith(src)) {
-      pv.src = src
-      pv.currentTime = want
-    } else if (!playing || Math.abs(pv.currentTime - want) > 0.5 * Math.max(1, speed)) {
-      pv.currentTime = want
+    // While playing, tolerate small drift so we don't fight the element's own playback.
+    // While paused (scrubbing / frame-stepping), seek to the exact frame so it follows.
+    const follow = (el: HTMLMediaElement, src: string) => {
+      if (!el.src.endsWith(src)) {
+        el.src = src
+        el.currentTime = want
+      } else if (!playing || Math.abs(el.currentTime - want) > 0.5 * Math.max(1, speed)) {
+        el.currentTime = want
+      }
+      if (el.playbackRate !== speed) el.playbackRate = speed
     }
-    if (pv.playbackRate !== speed) pv.playbackRate = speed
-    // Preview audio = the playing clip's track settings (mute) plus the clip's
-    // own gain (normalisation gain when on + user offset), routed through a Web
-    // Audio GainNode so boosts above 0 dB are audible. The song plays alongside.
-    const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
-    pv.muted = !!(tr?.audio_muted)
-    bindPreviewGain(pv)
-    const finalDb = (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
-    setPreviewGain((tr?.audio_volume ?? 1) * Math.pow(10, finalDb / 20))
+    follow(pv, vsrc)
+    pv.muted = true // the video is mute; the clip's sound comes from `ca`
+    // Clip audio = the playing clip's track settings (mute) plus the clip's own
+    // gain (normalisation gain when on + user offset), routed through a Web Audio
+    // GainNode so boosts above 0 dB are audible. The song plays alongside.
+    if (ca) {
+      follow(ca, asrc)
+      const tr = tracks.find((t) => t.clips.some((c) => c.id === clip.id))
+      ca.muted = !!(tr?.audio_muted)
+      bindPreviewGain(ca)
+      const finalDb = (normalizeAudio ? clip.norm_gain_db || 0 : 0) + (clip.audio_gain_db || 0)
+      setPreviewGain((tr?.audio_volume ?? 1) * Math.pow(10, finalDb / 20))
+    }
     if (playing && pv.paused) pv.play().catch(() => {})
+    if (playing && ca && ca.paused) ca.play().catch(() => {})
     if (!playing && !pv.paused) pv.pause()
+    if (!playing && ca && !ca.paused) ca.pause()
   }, [playhead, clipAt, pid, previewOpen, previewLowRes, tracks, normalizeAudio, bindPreviewGain, setPreviewGain])
 
   const seek = (t: number) => {
@@ -1309,6 +1338,9 @@ export default function MontagePage({ pid }: { pid: string }) {
         </div>
 
         {song && <audio ref={audioRef} src={media.song(pid)} style={{ display: 'none' }} />}
+        {/* clip audio for the montage preview (separate from the mute preview.mp4);
+            src is set imperatively per active clip by the preview sync effect */}
+        <audio ref={clipAudioRef} style={{ display: 'none' }} crossOrigin="anonymous" />
 
         {previewOpen && (
           <div
