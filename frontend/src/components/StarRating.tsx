@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { IcStar } from './icons'
 
 interface Props {
   stars: number
@@ -25,7 +26,7 @@ export default function StarRating({ stars, onChange }: Props) {
             onChange?.(n === stars ? 0 : n)
           }}
         >
-          ★
+          <IcStar filled={n <= active} />
         </span>
       ))}
     </span>

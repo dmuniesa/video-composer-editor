@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, fmtTime } from '../lib/api'
 import type { ProjectInfo, SongInfo, Source, Video } from '../lib/types'
 import FileBrowser from '../components/FileBrowser'
-import { IcSparkles } from '../components/icons'
+import { IcCheck, IcCircle, IcClose, IcEdit, IcFolder, IcMusic, IcPlus, IcRefresh, IcSparkles, IcWarning } from '../components/icons'
 
 interface Props {
   project: ProjectInfo | null
@@ -220,15 +220,15 @@ export default function SetupPage({ project, onChanged }: Props) {
           ) : (
             <h1 className="name-title" onClick={startEditName} title="Click to rename">
               {project.name}
-              <span className="name-edit-icon" aria-hidden>✎</span>
+              <span className="name-edit-icon" aria-hidden><IcEdit /></span>
             </h1>
           )}
           <div className="crumb" style={{ marginBottom: 0 }} title="Project storage folder">
-            📦 {project.video_dir}
+            <span className="il-ic"><IcFolder /></span> {project.video_dir}
           </div>
         </div>
-        <button onClick={() => api.scan(project.id).then(onChanged).catch((e) => setError(e.message))}>
-          ⟳ Rescan all
+        <button className="btn-ic" onClick={() => api.scan(project.id).then(onChanged).catch((e) => setError(e.message))}>
+          <IcRefresh /> Rescan all
         </button>
       </header>
 
@@ -245,7 +245,9 @@ export default function SetupPage({ project, onChanged }: Props) {
           <ul className="source-list">
             {project.sources.map((s) => (
               <li key={s.id} className="source-row">
-                <span className="source-icon" aria-hidden>{s.online ? '📁' : '⚠️'}</span>
+                <span className="source-icon" aria-hidden style={!s.online ? { color: 'var(--danger)' } : undefined}>
+                  {s.online ? <IcFolder /> : <IcWarning />}
+                </span>
                 <span className="source-meta">
                   <span className="source-label">{s.label}</span>
                   <span className="crumb" style={{ marginBottom: 0 }}>{s.path}</span>
@@ -260,7 +262,7 @@ export default function SetupPage({ project, onChanged }: Props) {
                   Repoint…
                 </button>
                 <button className="small danger" title="Remove folder" onClick={() => removeSource(s)}>
-                  ✕
+                  <IcClose />
                 </button>
               </li>
             ))}
@@ -283,7 +285,7 @@ export default function SetupPage({ project, onChanged }: Props) {
             <FileBrowser mode="dir" onPick={addSource} />
           </div>
         ) : (
-          <button className="primary" onClick={chooseAddFolder}>＋ Add folder</button>
+          <button className="primary btn-ic" onClick={chooseAddFolder}><IcPlus /> Add folder</button>
         )}
       </div>
 
@@ -291,7 +293,7 @@ export default function SetupPage({ project, onChanged }: Props) {
         <div className="panel-title-row">
           <h2>Clips</h2>
           <span className="hint">
-            {total > 0 && ready === total ? '✓ all processed' : working > 0 ? 'processing…' : ''}
+            {total > 0 && ready === total ? <><span className="il-ic" style={{ color: 'var(--ok)' }}><IcCheck /></span> all processed</> : working > 0 ? 'processing…' : ''}
           </span>
         </div>
         {total === 0 ? (
@@ -352,12 +354,12 @@ export default function SetupPage({ project, onChanged }: Props) {
         </p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
-            className="primary"
+            className="primary btn-ic"
             disabled={!project.ai_available}
             title={project.ai_available ? `provider: ${project.ai_provider}` : 'No AI provider configured'}
             onClick={() => analyze()}
           >
-            Analyze all with AI{project.ai_provider ? ` (${project.ai_provider})` : ''}
+            <IcSparkles /> Analyze all with AI{project.ai_provider ? ` (${project.ai_provider})` : ''}
           </button>
           {!project.ai_available && (
             <Link to={`/p/${project.id}/settings`}>Configure a provider in Settings →</Link>
@@ -440,7 +442,7 @@ export default function SetupPage({ project, onChanged }: Props) {
         </div>
         {project.song_path ? (
           <div className="song-card">
-            <span className="song-icon">🎵</span>
+            <span className="song-icon"><IcMusic /></span>
             <div className="song-meta">
               <div className="song-name">{basename(project.song_path)}</div>
               <div className="hint">
@@ -471,8 +473,8 @@ export default function SetupPage({ project, onChanged }: Props) {
             }}
           />
         ) : (
-          <button onClick={chooseSong}>
-            {project.song_path ? 'Change song' : 'Choose song…'}
+          <button className="btn-ic" onClick={chooseSong}>
+            <IcMusic /> {project.song_path ? 'Change song' : 'Choose song…'}
           </button>
         )}
       </div>
@@ -482,7 +484,7 @@ export default function SetupPage({ project, onChanged }: Props) {
         <ol className="steps-list">
           {steps.map((s) => (
             <li key={s.label} className={s.done ? 'done' : ''}>
-              <span className="step-check">{s.done ? '✓' : '○'}</span>
+              <span className="step-check">{s.done ? <IcCheck /> : <IcCircle />}</span>
               <span className="step-body">
                 <span className="step-label">{s.to ? <Link to={s.to}>{s.label}</Link> : s.label}</span>
                 <span className="hint">{s.detail}</span>

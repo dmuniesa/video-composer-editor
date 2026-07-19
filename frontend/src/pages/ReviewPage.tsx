@@ -7,7 +7,7 @@ import InfoTip from '../components/InfoTip'
 import VideoCard from '../components/VideoCard'
 import VideoDetail from '../components/VideoDetail'
 import ExcludedPanel from '../components/ExcludedPanel'
-import { IcSparkles, IcTrash } from '../components/icons'
+import { IcClose, IcSparkles, IcStar, IcTrash } from '../components/icons'
 import { folderList, folderOf, matchesQuery } from '../lib/videoFilter'
 
 export default function ReviewPage({ pid, project }: { pid: string; project: ProjectInfo | null }) {
@@ -269,7 +269,7 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
             </label>
           )}
           <label className="rt-field">
-            min ★{' '}
+            min <IcStar filled />{' '}
             <select value={minStars} onChange={(e) => setMinStars(Number(e.target.value))}>
               {[0, 1, 2, 3, 4, 5].map((n) => (
                 <option key={n} value={n}>{n}</option>
@@ -295,12 +295,12 @@ export default function ReviewPage({ pid, project }: { pid: string; project: Pro
           </button>
           {tagFilter && (
             <span className="tag active" onClick={() => setTagFilter('')}>
-              #{tagFilter} ✕
+              #{tagFilter} <IcClose />
             </span>
           )}
           {personFilter && (
             <span className="person-chip active" onClick={() => setPersonFilter('')} style={{ cursor: 'pointer' }}>
-              @{personFilter} ✕
+              @{personFilter} <IcClose />
             </span>
           )}
           <span className="spacer" />

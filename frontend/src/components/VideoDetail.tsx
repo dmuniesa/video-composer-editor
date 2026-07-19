@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import type { Video, VideoRange } from '../lib/types'
 import StarRating from './StarRating'
+import {
+  IcBan, IcBolt, IcCamera, IcClock, IcClose, IcLoop, IcPin, IcPlay, IcPlus, IcSmile, IcSparkles, IcTrash,
+} from './icons'
 
 interface Props {
   pid: string
@@ -195,7 +198,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
           <h3>{video.filename}</h3>
           <StarRating stars={video.stars} onChange={onRate} />
           <button className={video.rejected ? 'danger' : ''} onClick={() => onReject(!video.rejected)}>
-            {video.rejected ? 'Rejected ✕' : 'Reject'}
+            <IcBan /> {video.rejected ? 'Rejected' : 'Reject'}
           </button>
           <button
             className="danger"
@@ -204,9 +207,9 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
               if (confirm(`Remove "${video.filename}" from the project?\n\nThe source file on disk is not deleted, but a later rescan will re-add it.`)) onDelete()
             }}
           >
-            Delete
+            <IcTrash /> Delete
           </button>
-          <button onClick={onClose}>Close</button>
+          <button onClick={onClose}><IcClose /> Close</button>
         </div>
 
         <video ref={videoRef} src={media.video(pid, video.id)} controls preload="metadata" />
@@ -268,7 +271,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
             <dt><b>←</b> / <b>→</b></dt><dd>step one frame back / forward</dd>
             <dt><b>Shift+←</b> / <b>Shift+→</b></dt><dd>jump to previous / next clip</dd>
             <dt><b>L</b></dt><dd>loop the selected range</dd>
-            <dt>▶ / 🔁</dt><dd>on a range: play once or loop (click again to stop)</dd>
+            <dt><IcPlay /> / <IcLoop /></dt><dd>on a range: play once or loop (click again to stop)</dd>
           </dl>
         )}
 
@@ -283,14 +286,14 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                 title="Play this range once (click again to stop)"
                 onClick={() => togglePlay(r, 'once')}
               >
-                ▶
+                <IcPlay />
               </button>
               <button
                 className={`small ${isActive && playMode === 'loop' ? 'primary' : ''}`}
                 title="Loop this range (click again to stop)"
                 onClick={() => togglePlay(r, 'loop')}
               >
-                🔁
+                <IcLoop />
               </button>
               <span>
                 {fmtTime(r.t_in)} → {fmtTime(r.t_out)} ({fmtTime(r.t_out - r.t_in)})
@@ -306,7 +309,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                 }}
               />
               <button className="small danger" onClick={() => api.deleteRange(pid, video.id, r.id).then(onChanged)}>
-                ✕
+                <IcClose />
               </button>
             </div>
             )
@@ -324,20 +327,20 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                   title={video.description ? 'Re-run the AI analysis for this clip' : 'Describe & score this clip with AI'}
                   onClick={() => api.analyze(pid, [video.id], !!video.description).then(onChanged).catch(() => {})}
                 >
-                  {video.status === 'analyzing' ? 'Analyzing…' : video.description ? '✨ Re-analyze' : '✨ Analyze with AI'}
+                  {video.status === 'analyzing' ? 'Analyzing…' : <><IcSparkles /> {video.description ? 'Re-analyze' : 'Analyze with AI'}</>}
                 </button>
               )}
             </div>
             <p style={{ margin: '4px 0' }}>{video.description || <span className="hint">No description yet.</span>}</p>
             {(video.energy || video.mood.length > 0 || video.scene || video.time_of_day || video.shot_type) && (
               <div className="tag-row">
-                {video.energy && <span className="tag" title="Motion/action level">⚡ {video.energy}</span>}
+                {video.energy && <span className="tag" title="Motion/action level"><IcBolt /> {video.energy}</span>}
                 {video.mood.map((m) => (
-                  <span key={m} className="tag" title="Mood">🎭 {m}</span>
+                  <span key={m} className="tag" title="Mood"><IcSmile /> {m}</span>
                 ))}
-                {video.scene && <span className="tag" title="Scene">📍 {video.scene}</span>}
-                {video.time_of_day && <span className="tag" title="Time of day">🕒 {video.time_of_day}</span>}
-                {video.shot_type && <span className="tag" title="Shot type">🎥 {video.shot_type}</span>}
+                {video.scene && <span className="tag" title="Scene"><IcPin /> {video.scene}</span>}
+                {video.time_of_day && <span className="tag" title="Time of day"><IcClock /> {video.time_of_day}</span>}
+                {video.shot_type && <span className="tag" title="Shot type"><IcCamera /> {video.shot_type}</span>}
               </div>
             )}
             {editTags ? (
@@ -367,7 +370,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                         title="Play this suggested moment (click again to stop)"
                         onClick={() => togglePlay(fake, 'once')}
                       >
-                        ▶ {fmtTime(h.t_in)} → {fmtTime(h.t_out)}
+                        <IcPlay /> {fmtTime(h.t_in)} → {fmtTime(h.t_out)}
                       </button>
                       <span className="hint" style={{ flex: 1 }}>{h.reason}</span>
                       <button
@@ -377,7 +380,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
                           api.addRange(pid, video.id, { t_in: h.t_in, t_out: h.t_out, label: h.reason.slice(0, 60) }).then(onChanged)
                         }
                       >
-                        ＋
+                        <IcPlus />
                       </button>
                     </div>
                   )

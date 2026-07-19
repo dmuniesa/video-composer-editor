@@ -42,6 +42,13 @@ button.small {
 }
 button.small svg { display: block; flex: none; }
 
+/* a plain/primary button that leading-icon + label (gaps the icon like tb-btn) */
+.btn-ic { display: inline-flex; align-items: center; gap: 6px; }
+.btn-ic svg { width: 15px; height: 15px; flex: none; }
+/* a small inline icon used inside a line of text (crumbs, hints) */
+.il-ic { display: inline-flex; align-items: center; vertical-align: -2px; }
+.il-ic svg { width: 13px; height: 13px; display: block; }
+
 input, select, textarea {
   font: inherit;
   color: var(--text);
@@ -260,7 +267,8 @@ kbd {
 .setup-header h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -0.02em; }
 .setup-header button { flex-shrink: 0; }
 .setup-header .name-title { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
-.setup-header .name-edit-icon { font-size: 13px; color: var(--text-dim); opacity: 0; transition: opacity 0.12s; }
+.setup-header .name-edit-icon { color: var(--text-dim); opacity: 0; transition: opacity 0.12s; display: inline-flex; }
+.setup-header .name-edit-icon svg { width: 14px; height: 14px; display: block; }
 .setup-header .name-title:hover .name-edit-icon { opacity: 1; }
 .setup-header .name-edit { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; width: 100%; padding: 2px 6px; }
 
@@ -286,9 +294,11 @@ kbd {
 
 .song-card { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .song-icon {
-  flex-shrink: 0; width: 38px; height: 38px; border-radius: 9px; font-size: 17px;
+  flex-shrink: 0; width: 38px; height: 38px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center; background: var(--accent-soft);
+  color: var(--accent);
 }
+.song-icon svg { width: 18px; height: 18px; display: block; }
 .song-meta { min-width: 0; }
 .song-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -297,7 +307,8 @@ kbd {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px;
 }
-.source-icon { flex-shrink: 0; font-size: 17px; }
+.source-icon { flex-shrink: 0; display: inline-flex; color: var(--text-dim); }
+.source-icon svg { width: 17px; height: 17px; display: block; }
 .source-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
 .source-label { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .source-count { flex-shrink: 0; white-space: nowrap; }
@@ -336,10 +347,11 @@ kbd {
 .steps-list li { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .steps-list li:last-child { border-bottom: none; }
 .step-check {
-  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; font-size: 12px;
+  flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; margin-top: 1px;
   background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-dim);
 }
+.step-check svg { width: 13px; height: 13px; display: block; }
 .steps-list li.done .step-check {
   background: rgba(79, 191, 103, 0.12); border-color: rgba(79, 191, 103, 0.5); color: var(--ok);
 }
@@ -468,9 +480,13 @@ kbd {
 .card-footer { display: flex; align-items: center; justify-content: space-between; }
 .ai-score { font-size: 11px; color: var(--text-dim); }
 .ai-score b { color: var(--ok); }
+/* inline SVG icons inside tag/chip pills and the "min ★" filter field */
+.tag svg, .person-chip svg { width: 11px; height: 11px; vertical-align: -1px; }
+.rt-field svg { width: 13px; height: 13px; vertical-align: -2px; }
 
 .stars { display: inline-flex; gap: 1px; }
-.stars .star { cursor: pointer; font-size: 16px; color: var(--border); user-select: none; transition: color 0.08s, transform 0.08s; }
+.stars .star { cursor: pointer; color: var(--border); user-select: none; display: inline-flex; transition: color 0.08s, transform 0.08s; }
+.stars .star svg { width: 15px; height: 15px; display: block; }
 .stars .star.on { color: var(--star); }
 /* preview shows the rating a click would set, dimmer than a committed one */
 .stars .star.on.preview { color: var(--star); opacity: 0.65; transform: scale(1.12); }
@@ -489,6 +505,8 @@ kbd {
 @media (max-width: 700px) { .detail-panels-2col { grid-template-columns: 1fr; } }
 .detail-header { display: flex; align-items: center; gap: 12px; }
 .detail-header h3 { margin: 0; flex: 1; font-size: 15px; word-break: break-all; }
+.detail-header button { display: inline-flex; align-items: center; gap: 5px; }
+.detail-header button svg { width: 14px; height: 14px; flex: none; }
 
 /* Deleted-clips (tombstones) modal, centered over the review grid. */
 .excluded-modal {
@@ -534,6 +552,7 @@ kbd {
   gap: 3px 12px; font-size: 12px; color: var(--text-dim);
 }
 .keys-help dt { white-space: nowrap; }
+.keys-help dt svg { width: 13px; height: 13px; vertical-align: -2px; }
 .keys-help dd { margin: 0; }
 
 /* ---- Music page ---- */

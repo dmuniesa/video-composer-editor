@@ -207,9 +207,12 @@ export const IcFilm = () => (
   </svg>
 )
 
-export const IcStar = () => (
+export const IcStar = ({ filled }: { filled?: boolean }) => (
   <svg {...base}>
-    <path d="M12 17.8l-6.2 3.2 1.2-6.9-5-4.9 6.9-1L12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.9z" />
+    <path
+      d="M12 17.8l-6.2 3.2 1.2-6.9-5-4.9 6.9-1L12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.9z"
+      {...(filled ? { fill: 'currentColor', stroke: 'none' } : {})}
+    />
   </svg>
 )
 
@@ -226,6 +229,110 @@ export const IcRipple = () => (
   <svg {...base}>
     <rect x="13" y="7" width="7" height="10" rx="1" />
     <path d="M11 12H3.5M7 8 3.5 12 7 16" />
+  </svg>
+)
+
+// ---- review-page icons ----
+
+export const IcClose = () => (
+  <svg {...base}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </svg>
+)
+
+export const IcLoop = () => (
+  <svg {...base}>
+    <path d="M17 4l3 3-3 3" />
+    <path d="M4 11V9a4 4 0 0 1 4-4h12" />
+    <path d="M7 20l-3-3 3-3" />
+    <path d="M20 13v2a4 4 0 0 1-4 4H4" />
+  </svg>
+)
+
+/** circle + slash — reject a clip */
+export const IcBan = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M5.6 5.6 18.4 18.4" />
+  </svg>
+)
+
+/** AI attribute tags */
+export const IcBolt = () => (
+  <svg {...base}>
+    <path d="M13 2 5 13h5l-1 9 8-11h-5z" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+export const IcSmile = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+    <path d="M9 9h.01M15 9h.01" strokeWidth={3} />
+  </svg>
+)
+
+export const IcPin = () => (
+  <svg {...base}>
+    <path d="M12 21s-6-5.5-6-10.5a6 6 0 0 1 12 0c0 5-6 10.5-6 10.5z" />
+    <circle cx="12" cy="10.5" r="2.2" />
+  </svg>
+)
+
+export const IcClock = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7.5v5l3 2" />
+  </svg>
+)
+
+export const IcCamera = () => (
+  <svg {...base}>
+    <rect x="3" y="6" width="13" height="12" rx="2" />
+    <path d="M16 10l5-2.5v9L16 14" />
+  </svg>
+)
+
+// ---- setup-page icons ----
+
+export const IcEdit = () => (
+  <svg {...base}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+)
+
+export const IcFolder = () => (
+  <svg {...base}>
+    <path d="M3 18V8a1 1 0 0 1 1-1h6l2 2h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />
+  </svg>
+)
+
+export const IcWarning = () => (
+  <svg {...base}>
+    <path d="M12 3 2 20h20z" />
+    <path d="M12 9v5" />
+    <path d="M12 17h.01" strokeWidth={3} />
+  </svg>
+)
+
+export const IcMusic = () => (
+  <svg {...base}>
+    <path d="M9 18V5l12-2v13" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="18" cy="16" r="3" />
+  </svg>
+)
+
+export const IcCheck = () => (
+  <svg {...base}>
+    <path d="M5 12.5 10 17 19 7" />
+  </svg>
+)
+
+export const IcCircle = () => (
+  <svg {...base}>
+    <circle cx="12" cy="12" r="8" />
   </svg>
 )
 
