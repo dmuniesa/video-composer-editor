@@ -3,7 +3,8 @@ import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import type { Video, VideoRange } from '../lib/types'
 import StarRating from './StarRating'
 import {
-  IcBan, IcBolt, IcCamera, IcClose, IcLoop, IcPin, IcPlay, IcPlus, IcSmile, IcSparkles, IcTrash,
+  IcBan, IcBolt, IcCamera, IcClose, IcLoop, IcPin, IcPlay, IcPlus,
+  IcRange, IcSkipBack, IcSkipForward, IcSmile, IcSparkles, IcTrash,
 } from './icons'
 
 interface Props {
@@ -35,7 +36,14 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
   const [editTags, setEditTags] = useState(false)
   const [tagsText, setTagsText] = useState(video.hashtags.join(' '))
   const [showKeys, setShowKeys] = useState(false)
+  // HD = full-quality playback file (with audio). SD = the mute low-res preview
+  // proxy (dense keyframes → seeking is cheap, so scrubbing for ranges is smooth).
+  // Kept for the browser session so opening the next clip remembers the choice.
+  const [lowRes, setLowRes] = useState(() => sessionStorage.getItem('review.lowRes') === '1')
+  // Right-click context menu on the trim bar: {screen coords, time under cursor}.
+  const [menu, setMenu] = useState<{ x: number; y: number; time: number } | null>(null)
   const duration = video.duration || 1
+  const videoSrc = lowRes ? media.preview(pid, video.id) : media.video(pid, video.id)
 
   // Technical/EXIF info for this clip — shown here in Review, never on thumbnails.
   const meta = video.meta || {}
@@ -81,6 +89,21 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
     else el.addEventListener('loadedmetadata', apply, { once: true })
     return () => el.removeEventListener('loadedmetadata', apply)
   }, [initialTime, video.id])
+
+  // Switching SD↔HD reloads the element; re-seek to the last known frame so the
+  // playhead doesn't jump back to 0. playhead is captured at toggle time only.
+  useEffect(() => {
+    const el = videoRef.current
+    if (!el) return
+    const restore = () => { if (el.readyState >= 1) el.currentTime = playhead }
+    if (el.readyState >= 1) restore()
+    else el.addEventListener('loadedmetadata', restore, { once: true })
+    return () => el.removeEventListener('loadedmetadata', restore)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoSrc])
+
+  // Remember the SD/HD choice for the rest of the browser session.
+  useEffect(() => { sessionStorage.setItem('review.lowRes', lowRes ? '1' : '0') }, [lowRes])
 
   useEffect(() => {
     const el = videoRef.current
@@ -138,7 +161,10 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (menu) { setMenu(null); return }
+        onClose()
+      }
       else if (e.key === 'i' || e.key === 'I') setDraftIn(playhead)
       else if (e.key === 'o' || e.key === 'O') setDraftOut(playhead)
       else if (e.key === 'Enter') saveDraft()
@@ -163,7 +189,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [playhead, onClose, saveDraft, playMode, activeRange, video.ranges])
+  }, [playhead, onClose, saveDraft, playMode, activeRange, video.ranges, menu])
 
   const dragHandle = (range: VideoRange, side: 'in' | 'out') => (e: React.PointerEvent) => {
     e.stopPropagation()
@@ -185,6 +211,62 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
     window.addEventListener('pointerup', up)
   }
 
+  // Click-and-drag the playhead along the trim bar. Pausing first removes the
+  // fight with the running-playback timeupdate, and coalescing pointer events
+  // into one seek per animation frame stops the element being re-seeked faster
+  // than it can decode — that re-seeking is what made scrubbing feel stuck.
+  const startScrub = (e: React.PointerEvent) => {
+    if (e.button !== 0) return  // leave right-click for the context menu
+    e.preventDefault()
+    const el = videoRef.current
+    if (el) el.pause()
+    setPlayMode(null)
+    let target = timeAt(e.clientX)
+    let raf = 0
+    seek(target)
+    const apply = () => { raf = 0; seek(target) }
+    const move = (ev: PointerEvent) => {
+      target = timeAt(ev.clientX)
+      if (!raf) raf = requestAnimationFrame(apply)
+    }
+    const up = () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0 }
+      seek(target)
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  // Right-click the trim bar: park on the frame under the cursor and open the
+  // in/out/add-range menu. Same pause+seek as scrubbing so the mark is exact.
+  const openTimelineMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const t = timeAt(e.clientX)
+    const el = videoRef.current
+    if (el) el.pause()
+    setPlayMode(null)
+    seek(t)
+    setMenu({
+      x: Math.min(e.clientX, window.innerWidth - 248),
+      y: Math.min(e.clientY, window.innerHeight - 196),
+      time: t,
+    })
+  }
+
+  // "Add range" from the menu: commit the current in/out draft if both ends are
+  // set, otherwise drop a 2s range at the cursor so the item is never a no-op.
+  const addRangeAt = async (t: number) => {
+    const tIn = draftIn ?? t
+    const tOut = draftOut != null && draftOut > tIn + 0.05 ? draftOut : Math.min(duration, tIn + 2)
+    if (tOut - tIn < 0.1) return
+    await api.addRange(pid, video.id, { t_in: tIn, t_out: tOut })
+    setDraftIn(null)
+    setDraftOut(null)
+    onChanged()
+  }
+
   const saveTags = async () => {
     setEditTags(false)
     await api.editAnalysis(pid, video.id, { hashtags: tagsText.split(/[\s,]+/).filter(Boolean) })
@@ -192,6 +274,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
   }
 
   return (
+    <>
     <div className="detail-overlay" onClick={onClose}>
       <div className="detail-panel" onClick={(e) => e.stopPropagation()}>
         <div className="detail-header">
@@ -209,15 +292,25 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
           >
             <IcTrash /> Delete
           </button>
+          <button
+            className="small"
+            onClick={() => setLowRes((v) => !v)}
+            title={lowRes
+              ? 'SD — low-res proxy, smooth scrubbing but no audio. Click for HD.'
+              : 'HD — full quality with audio. Click for SD (smooth scrubbing).'}
+          >
+            {lowRes ? 'SD' : 'HD'}
+          </button>
           <button onClick={onClose}><IcClose /> Close</button>
         </div>
 
-        <video ref={videoRef} src={media.video(pid, video.id)} controls preload="metadata" />
+        <video ref={videoRef} src={videoSrc} controls preload="metadata" />
 
         <div
           ref={barRef}
           className="trimbar"
-          onPointerDown={(e) => seek(timeAt(e.clientX))}
+          onPointerDown={startScrub}
+          onContextMenu={openTimelineMenu}
         >
           <img src={media.filmstrip(pid, video.id)} alt="" draggable={false} />
           {video.ranges.map((r) => {
@@ -251,7 +344,7 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
           <div className="playhead" style={{ left: `${(playhead / duration) * 100}%` }} />
         </div>
         <div className="hint">
-          <b>I</b>/<b>O</b> set in/out · <b>Enter</b> save range · <b>Space</b> play
+          <b>I</b>/<b>O</b> set in/out · <b>Enter</b> save range · <b>Space</b> play · <b>drag</b> to scrub · <b>right-click</b> menu
           <button
             type="button"
             className="keys-toggle"
@@ -272,6 +365,8 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
             <dt><b>Shift+←</b> / <b>Shift+→</b></dt><dd>jump to previous / next clip</dd>
             <dt><b>L</b></dt><dd>loop the selected range</dd>
             <dt><IcPlay /> / <IcLoop /></dt><dd>on a range: play once or loop (click again to stop)</dd>
+            <dt><b>drag</b></dt><dd>scrub the trim bar (smoothest in SD mode)</dd>
+            <dt><b>right-click</b></dt><dd>empezar / finalizar / añadir un rango at the cursor</dd>
           </dl>
         )}
 
@@ -423,5 +518,37 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
         </div>
       </div>
     </div>
+    {menu && (
+      <>
+        <div
+          className="ctx-overlay"
+          onMouseDown={() => setMenu(null)}
+          onContextMenu={(e) => { e.preventDefault(); setMenu(null) }}
+        />
+        <div className="ctx-menu" style={{ left: menu.x, top: menu.y }}>
+          <div className="ctx-header">
+            <span className="ctx-title">{fmtTime(menu.time)}</span>
+            <span className="hint">right-clicked frame</span>
+          </div>
+          <button className="ctx-item" onClick={() => { setDraftIn(menu.time); setMenu(null) }}>
+            <span className="ctx-ic"><IcSkipBack /></span>
+            <span className="ctx-label">Empezar (in)</span>
+            <span className="hint">I</span>
+          </button>
+          <button className="ctx-item" onClick={() => { setDraftOut(menu.time); setMenu(null) }}>
+            <span className="ctx-ic"><IcSkipForward /></span>
+            <span className="ctx-label">Finalizar (out)</span>
+            <span className="hint">O</span>
+          </button>
+          <div className="ctx-sep" />
+          <button className="ctx-item" onClick={() => { void addRangeAt(menu.time); setMenu(null) }}>
+            <span className="ctx-ic"><IcRange /></span>
+            <span className="ctx-label">Añadir un rango</span>
+            <span className="hint">⏎</span>
+          </button>
+        </div>
+      </>
+    )}
+    </>
   )
 }

@@ -77,6 +77,13 @@ export const IcSkipBack = () => (
   </svg>
 )
 
+export const IcSkipForward = () => (
+  <svg {...base}>
+    <path d="M5 4 15 12 5 20z" fill="currentColor" stroke="none" />
+    <path d="M19 5v14" />
+  </svg>
+)
+
 export const IcPlay = () => (
   <svg {...base}>
     <path d="M7 4.5 19 12 7 19.5z" fill="currentColor" stroke="none" />
