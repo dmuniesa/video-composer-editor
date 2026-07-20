@@ -10,11 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sqlite3
 import threading
+import time
 from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from .models import Base
 
@@ -113,6 +116,40 @@ def _seed_sources(engine) -> None:
         )
 
 
+# Remount guard. Project folders may live on a volume that Windows spins down
+# or dismounts between requests (external/USB/network drive, encrypted
+# container, cloud-synced folder). A pooled SQLite connection whose file handle
+# survived a dismount then fails with "disk I/O error" on the next query.
+# NullPool opens a fresh connection per session (no stale handles), and
+# _connect_with_retry bridges the few seconds the OS needs to remount the
+# volume on first access.
+_CONNECT_ATTEMPTS = 6
+_CONNECT_BACKOFF = 0.5
+
+
+def _connect_with_retry(db_path: Path):
+    """Return a DBAPI creator that retries sqlite3.connect across a volume
+    remount. The volume typically comes back within a second or two of the
+    first failed access, so a short backoff turns a hard 500 into a brief
+    wait."""
+
+    def _connect():
+        last_err: Exception | None = None
+        for attempt in range(_CONNECT_ATTEMPTS):
+            try:
+                return sqlite3.connect(
+                    str(db_path), timeout=30, check_same_thread=False
+                )
+            except sqlite3.Error as exc:
+                last_err = exc
+                if attempt + 1 < _CONNECT_ATTEMPTS:
+                    time.sleep(_CONNECT_BACKOFF * (attempt + 1))
+        assert last_err is not None
+        raise last_err
+
+    return _connect
+
+
 def session_factory(video_dir: str | Path) -> sessionmaker:
     resolved = str(Path(video_dir).resolve())
     with _lock:
@@ -120,8 +157,9 @@ def session_factory(video_dir: str | Path) -> sessionmaker:
             cache = cache_dir_for(resolved)
             cache.mkdir(parents=True, exist_ok=True)
             engine = create_engine(
-                f"sqlite:///{cache / 'montage.db'}",
-                connect_args={"check_same_thread": False, "timeout": 30},
+                "sqlite://",
+                creator=_connect_with_retry(cache / "montage.db"),
+                poolclass=NullPool,
             )
             Base.metadata.create_all(engine)
             _ensure_columns(engine)
