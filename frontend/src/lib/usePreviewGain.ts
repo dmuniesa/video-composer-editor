@@ -34,9 +34,9 @@ export function usePreviewGain() {
     return ctx
   }, [])
 
-  /** Wire a <video> element into the graph (idempotent per element). */
+  /** Wire a media element (<video> or <audio>) into the graph (idempotent per element). */
   const bind = useCallback(
-    (el: HTMLVideoElement | null) => {
+    (el: HTMLMediaElement | null) => {
       if (!el) return
       const ctx = ensureCtx()
       if (!ctx || !gainRef.current) return

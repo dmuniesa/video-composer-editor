@@ -128,7 +128,6 @@ export interface Video {
   mood: string[]
   energy: 'low' | 'medium' | 'high' | null
   scene: string | null
-  time_of_day: string | null
   shot_type: string | null
   highlights: VideoHighlight[]
   stars: number

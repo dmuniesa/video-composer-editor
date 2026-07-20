@@ -142,7 +142,6 @@ class VideoAnalysis(Base):
     mood_json: Mapped[str] = mapped_column(Text, default="[]")  # ["happy","funny"]
     energy: Mapped[str | None] = mapped_column(String, nullable=True)  # low|medium|high
     scene: Mapped[str | None] = mapped_column(String, nullable=True)  # "beach"
-    time_of_day: Mapped[str | None] = mapped_column(String, nullable=True)  # day|sunrise|sunset|night
     shot_type: Mapped[str | None] = mapped_column(String, nullable=True)  # drone|wide|close-up|...
     # AI-suggested best moments as time ranges (video-mode analysis only):
     # [{"t_in": 2.0, "t_out": 4.0, "reason": "the boy leans into the camera"}]

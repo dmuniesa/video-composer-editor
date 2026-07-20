@@ -68,7 +68,6 @@ def video_dict(v: Video, people: list[dict] | None = None) -> dict:
         "mood": a.mood if a and aspects.mood else [],
         "energy": a.energy if a and aspects.energy else None,
         "scene": a.scene if a and aspects.scene else None,
-        "time_of_day": a.time_of_day if a and aspects.scene else None,
         "shot_type": a.shot_type if a and aspects.scene else None,
         "highlights": a.highlights if a and aspects.highlights else [],
         "stars": v.rating.stars if v.rating else 0,

@@ -76,7 +76,7 @@ Rules:
   belong to the same moment/scene, so keep them together and roughly ordered by
   shot_at unless an instruction says otherwise.
 - Videos may carry AI-analyzed "energy" (low/medium/high motion), "mood"
-  (emotional tone words), "scene", "time_of_day", "shot_type" and "highlights"
+  (emotional tone words), "scene", "shot_type" and "highlights"
   ([{{"t_in", "t_out", "reason"}}]: the clip's best moments as time ranges in
   seconds from its start).
 - Match energy to the music: put high-energy clips on the chorus/drop and other
@@ -86,8 +86,8 @@ Rules:
   source_in/source_out window overlapping a highlight range — it marks the
   clip's best moment. Hand-picked "ranges" still take priority over highlights.
 - Vary scene and shot_type between consecutive clips (e.g. avoid three drone
-  shots in a row), and group time_of_day into coherent progressions (day →
-  sunset → night) rather than ping-ponging, unless asked otherwise.\
+  shots in a row), and prefer coherent progressions rather than ping-ponging,
+  unless asked otherwise.\
 """
 
 
@@ -212,8 +212,6 @@ def build_context(db: Session) -> dict:
             if aspects.scene:
                 if a.scene:
                     entry["scene"] = a.scene
-                if a.time_of_day:
-                    entry["time_of_day"] = a.time_of_day
                 if a.shot_type:
                     entry["shot_type"] = a.shot_type
             if aspects.highlights and a.highlights:

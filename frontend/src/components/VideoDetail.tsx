@@ -3,7 +3,7 @@ import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import type { Video, VideoRange } from '../lib/types'
 import StarRating from './StarRating'
 import {
-  IcBan, IcBolt, IcCamera, IcClock, IcClose, IcLoop, IcPin, IcPlay, IcPlus, IcSmile, IcSparkles, IcTrash,
+  IcBan, IcBolt, IcCamera, IcClose, IcLoop, IcPin, IcPlay, IcPlus, IcSmile, IcSparkles, IcTrash,
 } from './icons'
 
 interface Props {
@@ -332,14 +332,13 @@ export default function VideoDetail({ pid, video, aiAvailable, initialTime, onCl
               )}
             </div>
             <p style={{ margin: '4px 0' }}>{video.description || <span className="hint">No description yet.</span>}</p>
-            {(video.energy || video.mood.length > 0 || video.scene || video.time_of_day || video.shot_type) && (
+            {(video.energy || video.mood.length > 0 || video.scene || video.shot_type) && (
               <div className="tag-row">
                 {video.energy && <span className="tag" title="Motion/action level"><IcBolt /> {video.energy}</span>}
                 {video.mood.map((m) => (
                   <span key={m} className="tag" title="Mood"><IcSmile /> {m}</span>
                 ))}
                 {video.scene && <span className="tag" title="Scene"><IcPin /> {video.scene}</span>}
-                {video.time_of_day && <span className="tag" title="Time of day"><IcClock /> {video.time_of_day}</span>}
                 {video.shot_type && <span className="tag" title="Shot type"><IcCamera /> {video.shot_type}</span>}
               </div>
             )}

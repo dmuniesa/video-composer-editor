@@ -41,7 +41,7 @@ else:
         '{"description": "A sunny beach with people walking along the shore.", '
         '"score": 7, "hashtags": ["Beach", "#sunny", "people walking"], '
         '"mood": ["Happy", "calm"], "energy": "medium", '
-        '"scene": "beach", "time_of_day": "day", "shot_type": "wide", '
+        '"scene": "beach", "shot_type": "wide", '
         '"highlights": [{"start_s": 0.5, "end_s": 2.0, "reason": "best moment"}]}\n'
         '```'
     )

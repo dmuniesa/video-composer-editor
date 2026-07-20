@@ -251,7 +251,6 @@ def queue_analysis_job(pid: str, video_dir: Path, video_id: int, force: bool = F
                 analysis.mood = result["mood"]
                 analysis.energy = result["energy"]
                 analysis.scene = result["scene"]
-                analysis.time_of_day = result["time_of_day"]
                 analysis.shot_type = result["shot_type"]
                 analysis.highlights = result["highlights"]
                 db.add(analysis)

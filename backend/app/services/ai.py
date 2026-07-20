@@ -56,7 +56,6 @@ _ASPECT_FIELDS: dict[str, list[str]] = {
     "energy": ['"energy": "low" | "medium" | "high"'],
     "scene": [
         '"scene": "beach"',
-        '"time_of_day": "day" | "sunrise" | "sunset" | "night"',
         '"shot_type": "drone"',
     ],
 }
@@ -178,12 +177,6 @@ _ENERGY = {
     "low": "low", "medium": "medium", "med": "medium", "high": "high",
     "1": "low", "2": "low", "3": "medium", "4": "high", "5": "high",
 }
-_TIME_OF_DAY = {
-    "day": "day", "daytime": "day", "morning": "day", "afternoon": "day", "noon": "day",
-    "sunrise": "sunrise", "dawn": "sunrise",
-    "sunset": "sunset", "dusk": "sunset", "golden hour": "sunset", "goldenhour": "sunset",
-    "night": "night", "evening": "night",
-}
 _SHOT_ALIASES = {
     "aerial": "drone", "closeup": "close-up", "close up": "close-up",
     "extreme close-up": "close-up", "point of view": "pov", "time-lapse": "timelapse",
@@ -259,7 +252,7 @@ def analyze_clip(
     duration: float = 0.0,
 ) -> dict:
     """Describe/score/hashtag a clip, plus whichever optional aspects are
-    enabled in Settings (mood, energy, scene/time_of_day/shot_type, highlights).
+    enabled in Settings (mood, energy, scene/shot_type, highlights).
 
     The clip reaches the model either as `video_file` (the low-res preview.mp4,
     agy only — the caller decides per the agy_media setting; the model sees
@@ -268,9 +261,9 @@ def analyze_clip(
     when given (and the toggle is on) the description can use them.
 
     Returns {"description", "score", "hashtags", "mood", "energy", "scene",
-    "time_of_day", "shot_type", "highlights", "raw"} — every key always
-    present; disabled/missing aspects come back as None/[]. Highlights are
-    only requested in video mode. Retries once on unparseable output."""
+    "shot_type", "highlights", "raw"} — every key always present;
+    disabled/missing aspects come back as None/[]. Highlights are only
+    requested in video mode. Retries once on unparseable output."""
     aspects = settings.get().analysis
     active = provider()
     if video_file is not None:
@@ -338,9 +331,6 @@ def analyze_clip(
                 "mood": _word_list(data.get("mood"), cap=3) if aspects.mood else [],
                 "energy": _enum_or_none(data.get("energy"), _ENERGY) if aspects.energy else None,
                 "scene": _label_or_none(data.get("scene")) if aspects.scene else None,
-                "time_of_day": (
-                    _enum_or_none(data.get("time_of_day"), _TIME_OF_DAY) if aspects.scene else None
-                ),
                 "shot_type": shot_type,
                 "highlights": (
                     _norm_highlight_ranges(data.get("highlights"), duration)
