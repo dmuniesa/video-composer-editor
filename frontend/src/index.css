@@ -639,12 +639,6 @@ kbd {
   border-top: 1px solid var(--border);
 }
 .preview-pop-controls input[type='range'] { flex: 1; min-width: 0; accent-color: #ff5555; }
-/* Left-edge resize handle (popup is anchored to the right, so grab the left side
-   to widen it). Sits above the header so it wins pointerdown over drag-to-move. */
-.preview-resizer {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
-  cursor: ew-resize; z-index: 3;
-}
 .montage-toolbar {
   display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   padding: 6px 10px; border-bottom: 1px solid var(--border);

@@ -204,13 +204,17 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [playhead, setPlayhead] = useState(0)
   const [previewOpen, setPreviewOpen] = useState(true)
   const [previewLowRes, setPreviewLowRes] = useState(true)
-  /** null = default position (anchored bottom-right via CSS) */
-  const [popPos, setPopPos] = useState<{ x: number; y: number } | null>(null)
-  /** null = responsive CSS clamp; once dragged, the explicit pixel width is kept
-   *  for the session. The video keeps its 16:9 ratio, so width drives height. */
-  const [previewW, setPreviewW] = useState<number | null>(() => {
-    const v = sessionStorage.getItem('montagePreviewW')
-    return v ? Number(v) : null
+  /** null = default position (anchored bottom-right via CSS); otherwise the last
+   *  dragged position, kept for the session. */
+  const [popPos, setPopPos] = useState<{ x: number; y: number } | null>(() => {
+    const raw = sessionStorage.getItem('montagePreviewPos')
+    try { return raw ? JSON.parse(raw) : null } catch { return null }
+  })
+  /** null = CSS default size; otherwise the last size from the native resize:both
+   *  handle, kept for the session. */
+  const [previewSize, setPreviewSize] = useState<{ w: number; h: number } | null>(() => {
+    const raw = sessionStorage.getItem('montagePreviewSize')
+    try { return raw ? JSON.parse(raw) : null } catch { return null }
   })
   const [playing, setPlaying] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -363,8 +367,32 @@ export default function MontagePage({ pid }: { pid: string }) {
     localStorage.setItem('montageBinSort', binSort)
   }, [binSort])
   useEffect(() => {
-    if (previewW != null) sessionStorage.setItem('montagePreviewW', String(previewW))
-  }, [previewW])
+    if (popPos) sessionStorage.setItem('montagePreviewPos', JSON.stringify(popPos))
+  }, [popPos])
+  useEffect(() => {
+    if (previewSize) sessionStorage.setItem('montagePreviewSize', JSON.stringify(previewSize))
+  }, [previewSize])
+
+  // The popup uses the browser's native resize:both corner handle, which changes
+  // the element but not React state — so a re-render would snap it back. Watch
+  // the box and capture size into state (debounced) so it survives remounts.
+  useEffect(() => {
+    if (!previewOpen) return
+    const el = popRef.current
+    if (!el) return
+    let t: number | undefined
+    const ro = new ResizeObserver((entries) => {
+      // offsetWidth/Height are border-box integers — matches the width/height
+      // style under box-sizing: border-box, so restore is exact (no border drift).
+      const el = entries[0].target as HTMLElement
+      const next = { w: el.offsetWidth, h: el.offsetHeight }
+      setPreviewSize(next)
+      window.clearTimeout(t)
+      t = window.setTimeout(() => sessionStorage.setItem('montagePreviewSize', JSON.stringify(next)), 200)
+    })
+    ro.observe(el)
+    return () => { ro.disconnect(); window.clearTimeout(t) }
+  }, [previewOpen])
 
   // ---- composition frame size: resolution tier × aspect ratio ----
   const applySeqSize = (tier: number, ratioW: number, ratioH: number) => {
@@ -606,24 +634,6 @@ export default function MontagePage({ pid }: { pid: string }) {
       const x = Math.max(0, Math.min(ev.clientX - prect.left - offX, prect.width - rect.width))
       const y = Math.max(0, Math.min(ev.clientY - prect.top - offY, prect.height - rect.height))
       setPopPos({ x, y })
-    }
-    const up = () => {
-      window.removeEventListener('pointermove', move)
-      window.removeEventListener('pointerup', up)
-    }
-    window.addEventListener('pointermove', move)
-    window.addEventListener('pointerup', up)
-  }
-
-  // resize the preview popup via its left edge — anchored to the right, so
-  // dragging the handle leftward widens it. Kept for the browser session.
-  const startPreviewResize = (e: React.PointerEvent) => {
-    e.preventDefault()
-    e.stopPropagation()  // don't also start a header drag
-    const startX = e.clientX
-    const startW = previewW ?? popRef.current?.offsetWidth ?? 320
-    const move = (ev: PointerEvent) => {
-      setPreviewW(Math.max(200, Math.min(640, startW + (startX - ev.clientX))))
     }
     const up = () => {
       window.removeEventListener('pointermove', move)
@@ -1375,10 +1385,9 @@ export default function MontagePage({ pid }: { pid: string }) {
             ref={popRef}
             style={{
               ...(popPos ? { left: popPos.x, top: popPos.y, right: 'auto', bottom: 'auto' } : {}),
-              ...(previewW != null ? { width: previewW } : {}),
+              ...(previewSize ? { width: previewSize.w, height: previewSize.h } : {}),
             }}
           >
-            <div className="preview-resizer" onPointerDown={startPreviewResize} title="drag to resize the preview" />
             <div className="preview-pop-head" onPointerDown={startPopDrag}>
               <span>preview · {fmtTime(playhead)}</span>
               <span style={{ display: 'flex', gap: 4 }}>
