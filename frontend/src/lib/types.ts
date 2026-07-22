@@ -258,6 +258,26 @@ export interface TimelineState {
   normalize_target_lufs: number
 }
 
+/** One action from a pasted model reply that failed validation (analyze/apply). */
+export interface ComposeRejection {
+  index: number
+  action: string
+  reason: string
+}
+
+/** Dry-run report for a pasted model reply (compose-validate): what would
+ *  happen, which actions are rejected and why, plus coverage/quality warnings. */
+export interface ComposeReport {
+  valid: boolean
+  summary: string
+  action_count: number
+  by_type: Record<string, number>
+  would_apply: number
+  rejected: ComposeRejection[]
+  result: { clips: number; tracks: number; ends_at: number }
+  warnings: string[]
+}
+
 export interface JobInfo {
   id: number
   kind: string

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from sqlalchemy import select
@@ -312,6 +313,123 @@ def apply_actions(db: Session, actions: list[dict], placed_by: str) -> tuple[int
     return applied, errors
 
 
+def normalize_reply(raw: str) -> str:
+    """Accept either the full composer reply (a {"summary", "actions": [...]}
+    object) or a bare actions array, and return JSON text parse_actions can
+    consume (always an object). The paste box tolerates what a chat UI tends
+    to copy — sometimes just the array, sometimes the whole object. Only ever
+    raises ComposeError so the paste path has one error type."""
+    raw = (raw or "").strip()
+    if not raw:
+        raise ComposeError("empty response — paste the model's JSON reply")
+    try:
+        inner = _extract_json(raw)
+        data = json.loads(inner)
+    except AIError as exc:
+        raise ComposeError(f"could not find JSON in the reply: {exc}") from exc
+    except ValueError as exc:
+        raise ComposeError(f"the reply is not valid JSON: {exc}") from exc
+    if isinstance(data, list):
+        return json.dumps({"actions": data})
+    return inner
+
+
+# apply_actions formats each error as "action #<i> (<kind>): <msg>"; parse it
+# back into structured rows for the UI. Anything off-format is kept verbatim.
+_REJECTED_RE = re.compile(r"^action #(\d+) \(([^)]*)\): (.*)$", re.DOTALL)
+
+
+def _structured_rejections(errors: list[str]) -> list[dict]:
+    rows: list[dict] = []
+    for e in errors:
+        m = _REJECTED_RE.match(e)
+        if m:
+            rows.append(
+                {
+                    "index": int(m.group(1)),
+                    "action": m.group(2),
+                    "reason": m.group(3).strip(),
+                }
+            )
+        else:
+            rows.append({"index": -1, "action": "?", "reason": e})
+    return rows
+
+
+def analyze_actions(db: Session, actions: list[dict]) -> dict:
+    """Dry-run a parsed action list against the current timeline and return a
+    report for the UI, WITHOUT persisting: apply_actions flushes its changes,
+    we read the resulting timeline, then rollback. Reuses the same validation
+    the real compose path uses, so the report matches what Apply would do.
+
+    Never raises — a hard failure (apply_actions normally only collects
+    per-action errors) becomes a single rejection row."""
+    by_type: dict[str, int] = {}
+    for a in actions:
+        kind = str(a.get("action", "?"))
+        by_type[kind] = by_type.get(kind, 0) + 1
+
+    song = db.scalar(select(Song))
+    song_dur = song.duration if song else None
+    sections = list(song.sections) if song else []
+
+    try:
+        applied, errors = apply_actions(db, actions, placed_by="preview")
+        timeline = ops.timeline_state(db)
+    except Exception as exc:  # rare: apply_actions collects per-action errors
+        db.rollback()
+        return {
+            "valid": False,
+            "summary": "",
+            "action_count": len(actions),
+            "by_type": by_type,
+            "would_apply": 0,
+            "rejected": [{"index": -1, "action": "?", "reason": str(exc)}],
+            "result": {"clips": 0, "tracks": 0, "ends_at": 0.0},
+            "warnings": [],
+        }
+    db.rollback()  # discard the flushed preview; nothing is committed
+
+    clips = [c for t in timeline["tracks"] for c in t["clips"]]
+    ends_at = max((c["timeline_start"] + c["duration"] for c in clips), default=0.0)
+
+    warnings: list[str] = []
+    if song_dur:
+        if ends_at > song_dur + 0.5:
+            warnings.append(f"montage runs {ends_at - song_dur:.1f}s past the song end")
+        elif ends_at < song_dur - 1.0 and clips:
+            warnings.append(f"{song_dur - ends_at:.1f}s of the song is uncovered at the end")
+    # Song sections with no clip overlapping them.
+    for s in sections:
+        if not any(
+            c["timeline_start"] < s.end and (c["timeline_start"] + c["duration"]) > s.start
+            for c in clips
+        ):
+            warnings.append(f"no footage over {s.label or 'section'} ({s.start:.1f}-{s.end:.1f}s)")
+    # Same video placed back-to-back on a track.
+    for t in timeline["tracks"]:
+        prev_vid = None
+        for c in sorted(t["clips"], key=lambda c: c["timeline_start"]):
+            if prev_vid is not None and c["video_id"] == prev_vid:
+                warnings.append(f"video {c['video_id']} used back-to-back on track {t['index']}")
+            prev_vid = c["video_id"]
+
+    return {
+        "valid": True,
+        "summary": "",
+        "action_count": len(actions),
+        "by_type": by_type,
+        "would_apply": applied,
+        "rejected": _structured_rejections(errors),
+        "result": {
+            "clips": len(clips),
+            "tracks": len(timeline["tracks"]),
+            "ends_at": round(ends_at, 2),
+        },
+        "warnings": warnings,
+    }
+
+
 def _ask(prompt: str) -> str:
     active = provider()
     if active == "agy":
@@ -369,6 +487,31 @@ def run_compose(pid: str, video_dir: Path, instructions: str, job: jobs.Job) -> 
         log.warning("compose: %d/%d action(s) rejected:\n%s", len(errors), len(actions), "\n".join(errors))
     return {
         "provider": active,
+        "applied": applied,
+        "errors": errors,
+        "summary": summary,
+        "actions_total": len(actions),
+    }
+
+
+def run_apply(pid: str, video_dir: Path, raw: str, job: jobs.Job) -> dict:
+    """Apply a model reply the user pasted (no provider call). Mirrors the
+    apply half of run_compose; the parse/validate half is shared with
+    analyze_actions through normalize_reply + parse_actions. Runs inside a
+    background job; returns the same summary dict shape as run_compose so the
+    UI's existing "compose" event handler renders the result unchanged."""
+    actions, summary = parse_actions(normalize_reply(raw))
+    jobs.update(job, 0.5, f"applying {len(actions)} action(s)")
+    with dbm.open_session(video_dir) as db:
+        snap = history.snapshot(db)
+        applied, errors = apply_actions(db, actions, placed_by="paste")
+        db.commit()
+        if applied:
+            history.record(pid, snap)  # the pasted batch is one undo step
+    if errors:
+        log.warning("apply: %d/%d action(s) rejected:\n%s", len(errors), len(actions), "\n".join(errors))
+    return {
+        "provider": "paste",
         "applied": applied,
         "errors": errors,
         "summary": summary,

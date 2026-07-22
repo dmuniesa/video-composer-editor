@@ -268,3 +268,88 @@ def test_settings_api_composer_field():
         data["composer"]["provider"] = "banana"
         res = client.put("/api/settings", json=data)
         assert res.status_code == 422
+
+
+# ---- paste round-trip: normalize_reply, analyze_actions, run_apply ----
+
+def test_normalize_reply_object_and_array():
+    obj = '{"summary": "s", "actions": [{"action": "remove", "clip_id": 1}]}'
+    actions, _ = composer.parse_actions(composer.normalize_reply(obj))
+    assert actions[0]["action"] == "remove"
+    # a bare actions array (what a chat UI often copies) is wrapped into an object
+    arr = '[{"action": "remove", "clip_id": 1}]'
+    actions, _ = composer.parse_actions(composer.normalize_reply(arr))
+    assert len(actions) == 1
+    for bad in ("   ", "definitely not json"):
+        with pytest.raises(composer.ComposeError):
+            composer.normalize_reply(bad)
+
+
+def test_analyze_actions_dry_run_does_not_persist(db):
+    actions = [
+        {"action": "place", "video_id": 1, "track": 0, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0},
+    ]
+    report = composer.analyze_actions(db, actions)
+    assert report["valid"] is True
+    assert report["would_apply"] == 1 and report["rejected"] == []
+    assert report["by_type"]["place"] == 1
+    assert report["result"]["clips"] == 1  # the preview timeline held the clip
+    # ...but the real timeline is untouched (dry-run rolled back)
+    assert ops.timeline_state(db)["tracks"][0]["clips"] == []
+
+
+def test_analyze_actions_flags_problems(db):
+    song = Song(path="song.wav", duration=10.0, bpm=120.0, status="ready")
+    db.add(song)
+    db.flush()
+    db.add(SongSection(song_id=song.id, start=0.0, end=10.0, label="verse", energy=0.5))
+    db.commit()
+
+    actions = [
+        {"action": "place", "video_id": 1, "track": 0, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0},
+        # overlaps the first -> rejected, but analysis continues
+        {"action": "place", "video_id": 2, "track": 0, "timeline_start": 2.0, "source_in": 0.0, "source_out": 3.0},
+    ]
+    report = composer.analyze_actions(db, actions)
+    assert report["would_apply"] == 1
+    assert len(report["rejected"]) == 1
+    assert report["rejected"][0]["action"] == "place"
+    assert "overlaps" in report["rejected"][0]["reason"]
+    # the single 0-4s clip leaves 4-10s of the verse uncovered
+    assert any("uncovered" in w for w in report["warnings"])
+    assert ops.timeline_state(db)["tracks"][0]["clips"] == []  # still untouched
+
+
+def test_run_apply_applies_and_records_undo(tmp_path):
+    from app.services import timeline_history as history
+
+    with dbm.open_session(tmp_path) as db:
+        db.add(Video(rel_path="a.mp4", filename="a.mp4", duration=10.0, cache_key="k1"))
+        db.commit()
+        ops.ensure_default_tracks(db)
+        db.commit()
+    pid = dbm.register_project(tmp_path)
+
+    assert history.can_undo(pid) is False
+    raw = (
+        '{"summary": "s", "actions": [{"action": "place", "video_id": 1, '
+        '"track": 0, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0}]}'
+    )
+    result = composer.run_apply(pid, tmp_path, raw, _fake_job())
+    assert result["provider"] == "paste"
+    assert result["applied"] == 1 and result["actions_total"] == 1
+    with dbm.open_session(tmp_path) as db:
+        clip = ops.timeline_state(db)["tracks"][0]["clips"][0]
+        assert clip["placed_by"] == "paste"
+    assert history.can_undo(pid) is True  # the pasted batch is one undo step
+
+
+def test_run_apply_raises_on_garbage(tmp_path):
+    with dbm.open_session(tmp_path) as db:
+        db.add(Video(rel_path="a.mp4", filename="a.mp4", duration=10.0, cache_key="k1"))
+        db.commit()
+        ops.ensure_default_tracks(db)
+        db.commit()
+    pid = dbm.register_project(tmp_path)
+    with pytest.raises(composer.ComposeError):
+        composer.run_apply(pid, tmp_path, "definitely not json", _fake_job())

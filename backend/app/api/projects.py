@@ -371,6 +371,64 @@ def project_compose(pid: str, body: ComposeRequest) -> dict:
     return {"job_id": job.id}
 
 
+class ComposePromptRequest(BaseModel):
+    instructions: str = ""
+
+
+class ComposeReplyRequest(BaseModel):
+    raw: str
+
+
+@router.post("/projects/{pid}/compose-prompt")
+def project_compose_prompt(pid: str, body: ComposePromptRequest) -> dict:
+    """Return the exact prompt the in-app composer would send, so the user can
+    run it externally (when the provider is down/unavailable) and paste the
+    reply back through compose-validate / compose-apply. Provider-independent."""
+    video_dir = resolve_project(pid)
+    with dbm.open_session(video_dir) as db:
+        prompt = composer.build_prompt(composer.build_context(db), body.instructions)
+    return {"prompt": prompt}
+
+
+@router.post("/projects/{pid}/compose-validate")
+def project_compose_validate(pid: str, body: ComposeReplyRequest) -> dict:
+    """Dry-run a pasted model reply: parse + analyze WITHOUT mutating the
+    timeline, returning the structured report (action counts, per-action
+    rejections, and warnings about coverage/repeats/overrun). Provider-
+    independent; never records history."""
+    video_dir = resolve_project(pid)
+    try:
+        actions, _summary = composer.parse_actions(composer.normalize_reply(body.raw))
+    except (composer.ComposeError, ai.AIError, ValueError) as exc:
+        raise HTTPException(400, str(exc))
+    with dbm.open_session(video_dir) as db:
+        return composer.analyze_actions(db, actions)
+
+
+@router.post("/projects/{pid}/compose-apply")
+def project_compose_apply(pid: str, body: ComposeReplyRequest) -> dict:
+    """Apply a pasted model reply to the timeline (no provider call). The
+    fallback for when the provider is down/unavailable: run the prompt
+    externally, paste the JSON reply, apply it here. The whole batch is one
+    undo step, exactly like the normal compose."""
+    video_dir = resolve_project(pid)
+    if jobs.has_active(pid, "compose"):
+        raise HTTPException(409, "a compose job is already running")
+
+    def work(job: jobs.Job) -> None:
+        try:
+            result = composer.run_apply(pid, video_dir, body.raw, job)
+            broadcaster.publish(pid, "compose", {"status": "done", **result})
+        except Exception as exc:
+            broadcaster.publish(pid, "compose", {"status": "error", "error": str(exc)})
+            raise
+        finally:
+            broadcaster.publish(pid, "timeline", {"source": "paste"})
+
+    job = jobs.submit(pid, "compose", "apply-response", work, pool="ai")
+    return {"job_id": job.id}
+
+
 class SongRequest(BaseModel):
     path: str
 

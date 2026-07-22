@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  ComposeReport,
   ExcludedFile,
   FaceInfo,
   FsListing,
@@ -212,6 +213,25 @@ export const api = {
     req<{ job_id: number }>(`/api/projects/${pid}/compose`, {
       method: 'POST',
       body: JSON.stringify({ instructions }),
+    }),
+  /** The exact prompt the in-app composer would send — to run externally and
+   *  paste the reply back via composeValidate / composeApply. */
+  composePrompt: (pid: string, instructions: string) =>
+    req<{ prompt: string }>(`/api/projects/${pid}/compose-prompt`, {
+      method: 'POST',
+      body: JSON.stringify({ instructions }),
+    }),
+  /** Dry-run a pasted model reply: returns the analysis report, no mutation. */
+  composeValidate: (pid: string, raw: string) =>
+    req<ComposeReport>(`/api/projects/${pid}/compose-validate`, {
+      method: 'POST',
+      body: JSON.stringify({ raw }),
+    }),
+  /** Apply a pasted model reply to the timeline (no provider call). */
+  composeApply: (pid: string, raw: string) =>
+    req<{ job_id: number }>(`/api/projects/${pid}/compose-apply`, {
+      method: 'POST',
+      body: JSON.stringify({ raw }),
     }),
 
   timeline: (pid: string) => req<TimelineState>(`/api/projects/${pid}/timeline`),

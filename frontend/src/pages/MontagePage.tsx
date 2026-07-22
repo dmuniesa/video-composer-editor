@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, media, fmtTime, fmtBytes } from '../lib/api'
 import { useProjectEvents } from '../lib/sse'
 import { usePreviewGain } from '../lib/usePreviewGain'
-import type { SongInfo, TimelineClip, Track, Video } from '../lib/types'
+import type { ComposeReport, SongInfo, TimelineClip, Track, Video } from '../lib/types'
 import InfoTip from '../components/InfoTip'
 import {
   IcChevronDown, IcDownload, IcFilm, IcGear, IcLevels, IcMagnet, IcMonitor, IcNormalize, IcPause, IcPlay,
@@ -225,6 +225,11 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [composing, setComposing] = useState(false)
   const [composeResult, setComposeResult] = useState('')
   const [composeOpen, setComposeOpen] = useState(false)
+  // External round-trip: copy the prompt, run it outside, paste the reply back.
+  const [replyText, setReplyText] = useState('')
+  const [composeReport, setComposeReport] = useState<ComposeReport | null>(null)
+  const [analyzeBusy, setAnalyzeBusy] = useState(false)
+  const [copyingPrompt, setCopyingPrompt] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   const previewRef = useRef<HTMLVideoElement>(null)
   /** separate clip-audio element (preview.mp3) — the preview video is mute, so
@@ -346,6 +351,41 @@ export default function MontagePage({ pid }: { pid: string }) {
     setComposeResult('')
     setComposing(true)
     api.compose(pid, instructions).catch((err) => {
+      setComposing(false)
+      setToast(err.message)
+    })
+  }
+
+  // External round-trip (works even with the provider down/unavailable):
+  // copy the exact prompt, run it outside, paste the reply, analyze, apply.
+  const copyPrompt = () => {
+    setCopyingPrompt(true)
+    api
+      .composePrompt(pid, instructions)
+      .then((r) =>
+        navigator.clipboard.writeText(r.prompt).then(
+          () => setToast('Prompt copied — run it externally, then paste the reply back'),
+          () => setToast('Could not write to the clipboard'),
+        ),
+      )
+      .catch((err) => setToast(err.message))
+      .finally(() => setCopyingPrompt(false))
+  }
+
+  const analyzeReply = () => {
+    setComposeReport(null)
+    setAnalyzeBusy(true)
+    api
+      .composeValidate(pid, replyText)
+      .then(setComposeReport)
+      .catch((err) => setToast(err.message))
+      .finally(() => setAnalyzeBusy(false))
+  }
+
+  const applyReply = () => {
+    setComposeResult('')
+    setComposing(true)
+    api.composeApply(pid, replyText).catch((err) => {
       setComposing(false)
       setToast(err.message)
     })
@@ -1112,6 +1152,73 @@ export default function MontagePage({ pid }: { pid: string }) {
               >
                 {composing ? 'Composing…' : 'Compose'}
               </button>
+
+              <div className="compose-divider" />
+              <div className="compose-external">
+                <div className="compose-external-head">
+                  <span className="compose-external-title">External response</span>
+                  <button
+                    className="tb-btn"
+                    onClick={copyPrompt}
+                    disabled={copyingPrompt}
+                    title="Copy the exact prompt (with the full project context) to run outside the app, then paste the reply below"
+                  >
+                    {copyingPrompt ? 'Copying…' : 'Copy prompt'}
+                  </button>
+                </div>
+                <textarea
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  placeholder={'Paste the model\'s JSON reply — {"summary":…, "actions":[…]} — or just the actions array'}
+                  rows={3}
+                />
+                <div className="compose-external-actions">
+                  <button
+                    className="tb-btn"
+                    onClick={analyzeReply}
+                    disabled={analyzeBusy || !replyText.trim()}
+                    title="Validate the pasted reply without changing the timeline"
+                  >
+                    {analyzeBusy ? 'Analyzing…' : 'Analyze'}
+                  </button>
+                  <button
+                    className="primary"
+                    onClick={applyReply}
+                    disabled={composing || !replyText.trim()}
+                  >
+                    {composing ? 'Applying…' : 'Apply'}
+                  </button>
+                </div>
+                {composeReport && (
+                  <div
+                    className={`compose-report ${
+                      composeReport.rejected.length || composeReport.warnings.length ? 'warn' : 'ok'
+                    }`}
+                  >
+                    <div className="compose-report-summary">
+                      {composeReport.rejected.length || composeReport.warnings.length
+                        ? `⚠ ${composeReport.would_apply}/${composeReport.action_count} would apply · ${composeReport.rejected.length} rejected · ${composeReport.warnings.length} warning(s)`
+                        : `✓ clean — ${composeReport.would_apply} action(s) would apply · ${composeReport.result.clips} clip(s) on ${composeReport.result.tracks} track(s), ends at ${fmtTime(composeReport.result.ends_at)}`}
+                    </div>
+                    {composeReport.rejected.length > 0 && (
+                      <ul className="compose-report-list">
+                        {composeReport.rejected.map((r, i) => (
+                          <li key={i}>
+                            <b>#{r.index}</b> {r.action}: {r.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {composeReport.warnings.length > 0 && (
+                      <ul className="compose-report-list">
+                        {composeReport.warnings.map((w, i) => (
+                          <li key={i}>{w}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </>
           )}
           {composeResult && <div className="hint">{composeResult}</div>}

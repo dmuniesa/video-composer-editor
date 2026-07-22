@@ -612,6 +612,18 @@ kbd {
   margin-bottom: 8px; border-bottom: 1px solid var(--border);
 }
 .compose-panel textarea { resize: vertical; font-size: 12px; }
+.compose-divider { height: 1px; background: var(--border); margin: 2px 0; }
+.compose-external { display: flex; flex-direction: column; gap: 6px; }
+.compose-external-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.compose-external-title { font-size: 11px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.compose-external-actions { display: flex; gap: 6px; }
+.compose-external-actions .primary { flex: 1; }
+.compose-report { font-size: 11px; line-height: 1.45; border-radius: 6px; padding: 6px 8px; border: 1px solid var(--border); }
+.compose-report.ok { border-color: rgba(79, 191, 103, 0.5); background: rgba(79, 191, 103, 0.12); }
+.compose-report.warn { border-color: rgba(229, 83, 75, 0.5); background: rgba(229, 83, 75, 0.10); }
+.compose-report-summary { font-weight: 600; }
+.compose-report-list { margin: 4px 0 0; padding-left: 16px; color: var(--text-dim); }
+.compose-report.warn .compose-report-list li { color: var(--text); }
 
 .montage-main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
 /* Floating program monitor: anchored to the bottom-right corner over the
