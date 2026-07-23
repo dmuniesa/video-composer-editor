@@ -987,6 +987,10 @@ export default function MontagePage({ pid }: { pid: string }) {
 
   // ---- drag from bin ----
   const startBinDrag = (payload: { video_id: number; t_in: number; t_out: number }) => (e: React.DragEvent) => {
+    // Range rows/segments can live inside the draggable .bin-item (grid view).
+    // dragstart bubbles, so without this the parent's handler would run too and
+    // overwrite the payload with the whole clip (t_in 0 → t_out duration).
+    e.stopPropagation()
     e.dataTransfer.setData('application/x-montage', JSON.stringify(payload))
     e.dataTransfer.effectAllowed = 'copy'
     setBinDrag(payload)
