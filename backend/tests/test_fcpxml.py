@@ -1,4 +1,7 @@
+import os
 from xml.etree import ElementTree as ET
+
+import pytest
 
 from app.services.fcpxml import build_fcpxml
 
@@ -24,6 +27,19 @@ SONG = {"path": "/media/trip/song.mp3", "duration": 20.0}
 
 def build() -> str:
     return build_fcpxml("trip montage", VIDEOS, TRACKS, SONG)
+
+
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="UNC path handling is Windows-specific — Path.resolve keeps the "
+    "\\\\host\\\\share authority only on Windows",
+)
+def test_unc_src_url_uses_authority():
+    from app.services import fcpxml
+
+    unc = r"\\nas-server\Public\bioparc\DSCF9102.MOV"
+    assert fcpxml._src_url(unc) == "file://nas-server/Public/bioparc/DSCF9102.MOV"
+    assert fcpxml._src_url(r"C:\media\beach.mp4").startswith("file:///")
 
 
 def _rational_seconds(value: str) -> float:

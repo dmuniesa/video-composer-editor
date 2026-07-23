@@ -81,7 +81,7 @@
             </link>
           </clipitem>
           <clipitem id="clipitem-2">
-            <name>dinner with ñ.mov</name>
+            <name>dinner with ï¿½.mov</name>
             <enabled>TRUE</enabled>
             <duration>900</duration>
             <rate>
@@ -91,9 +91,9 @@
             <start>100</start>
             <end>238</end>
             <in>300</in>
-            <out>438</out>
+            <out>465</out>
             <file id="file-2">
-              <name>dinner with ñ.mov</name>
+              <name>dinner with ï¿½.mov</name>
               <pathurl>file://localhost/media/trip/dinner%20with%20%C3%B1.mov</pathurl>
               <rate>
                 <timebase>30</timebase>
@@ -332,7 +332,7 @@
             </link>
           </clipitem>
           <clipitem id="audioclip-2-1" premiereChannelType="stereo">
-            <name>dinner with ñ.mov</name>
+            <name>dinner with ï¿½.mov</name>
             <enabled>TRUE</enabled>
             <duration>750</duration>
             <rate>
@@ -413,7 +413,7 @@
             </link>
           </clipitem>
           <clipitem id="audioclip-2-2" premiereChannelType="stereo">
-            <name>dinner with ñ.mov</name>
+            <name>dinner with ï¿½.mov</name>
             <enabled>TRUE</enabled>
             <duration>750</duration>
             <rate>

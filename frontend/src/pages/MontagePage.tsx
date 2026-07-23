@@ -7,7 +7,7 @@ import type { ComposeReport, SongInfo, TimelineClip, Track, Video } from '../lib
 import InfoTip from '../components/InfoTip'
 import {
   IcChevronDown, IcDownload, IcFilm, IcGear, IcLevels, IcMagnet, IcMonitor, IcNormalize, IcPause, IcPlay,
-  IcPlus, IcRange, IcRedo, IcRefresh, IcRipple, IcScissors, IcSkipBack, IcStar, IcTrackMinus,
+  IcPlus, IcRange, IcRedo, IcRefresh, IcRipple, IcScissors, IcSkipBack, IcSparkles, IcStar, IcTrackMinus,
   IcTrackPlus, IcTrash, IcUndo, IcVolumeOff, IcVolumeOn, IcZoomIn, IcZoomOut,
 } from '../components/icons'
 import ScrubThumb from '../components/ScrubThumb'
@@ -194,6 +194,10 @@ export default function MontagePage({ pid }: { pid: string }) {
   const [binWidth, setBinWidth] = useState(() => Number(localStorage.getItem('montageBinWidth')) || 300)
   const [binSort, setBinSort] = useState<SortKey>(
     () => (localStorage.getItem('montageBinSort') as SortKey) || 'recorded',
+  )
+  /** show AI-suggested ranges (highlights) as extra draggable bin entries */
+  const [showAiRanges, setShowAiRanges] = useState(
+    () => localStorage.getItem('montageShowAiRanges') === '1',
   )
   const [drag, setDrag] = useState<DragState | null>(null)
   const [dropTrack, setDropTrack] = useState<number | null>(null)
@@ -407,6 +411,9 @@ export default function MontagePage({ pid }: { pid: string }) {
     localStorage.setItem('montageBinSort', binSort)
   }, [binSort])
   useEffect(() => {
+    localStorage.setItem('montageShowAiRanges', showAiRanges ? '1' : '0')
+  }, [showAiRanges])
+  useEffect(() => {
     if (popPos) sessionStorage.setItem('montagePreviewPos', JSON.stringify(popPos))
   }, [popPos])
   useEffect(() => {
@@ -479,6 +486,12 @@ export default function MontagePage({ pid }: { pid: string }) {
   const width = duration * pxPerSec
 
   const videoById = useMemo(() => new Map(videos.map((v) => [v.id, v])), [videos])
+  // video ids that have at least one clip on the timeline — to mark them as
+  // "in use" in the bin so the still-available ones are easy to spot manually.
+  const usedVideoIds = useMemo(
+    () => new Set(tracks.flatMap((t) => t.clips.map((c) => c.video_id))),
+    [tracks],
+  )
   const kept = useMemo(() => videos.filter((v) => !v.rejected), [videos])
 
   // ---- clip-audio lane helpers ----
@@ -544,6 +557,21 @@ export default function MontagePage({ pid }: { pid: string }) {
       .filter((v) => binFolder === '*' || folderKey(v) === binFolder)
       .sort(cmp)
   }, [kept, binQuery, binFolder, binSort])
+  // how many of the currently shown bin entries are already on the timeline
+  const usedInBin = useMemo(
+    () => binVideos.reduce((n, v) => n + (usedVideoIds.has(v.id) ? 1 : 0), 0),
+    [binVideos, usedVideoIds],
+  )
+
+  /** range-like items shown for a bin entry: the user's saved ranges always,
+   *  plus AI highlights when the toggle is on. Each is draggable to the
+   *  timeline as a sub-clip (video_id + t_in/t_out). */
+  const binRangeItems = (v: Video) => [
+    ...v.ranges.map((r) => ({ key: `r${r.id}`, t_in: r.t_in, t_out: r.t_out, label: r.label, ai: false })),
+    ...(showAiRanges
+      ? v.highlights.map((h, i) => ({ key: `h${i}`, t_in: h.t_in, t_out: h.t_out, label: h.reason, ai: true }))
+      : []),
+  ]
 
   const snapPoints = useMemo(() => {
     if (!song) return []
@@ -779,6 +807,23 @@ export default function MontagePage({ pid }: { pid: string }) {
   const seek = (t: number) => {
     if (audioRef.current) audioRef.current.currentTime = Math.max(0, t)
     setPlayhead(Math.max(0, t))
+  }
+
+  // Jump the playhead to the first placed clip of `videoId` (earliest
+  // timeline_start across all tracks), select it so it's highlighted, and
+  // scroll the timeline so it's centred. Called by the bin's "on timeline"
+  // badge to navigate to a clip already on the timeline.
+  const goToFirstClip = (videoId: number) => {
+    const clips = tracks.flatMap((t) => t.clips).filter((c) => c.video_id === videoId)
+    if (clips.length === 0) return
+    const first = clips.reduce((a, b) => (b.timeline_start < a.timeline_start ? b : a))
+    seek(first.timeline_start)
+    setSelectedClip(first.id)
+    const el = scrollRef.current
+    if (el) {
+      const mid = first.timeline_start + first.duration / 2
+      el.scrollLeft = Math.max(0, HEADER_W + mid * pxPerSec - el.clientWidth / 2)
+    }
   }
 
   useEffect(() => {
@@ -1226,6 +1271,11 @@ export default function MontagePage({ pid }: { pid: string }) {
         <div className="bin-head">
           <span className="bin-title">
             Clips <span className="hint">{binVideos.length}</span>
+            {usedInBin > 0 && (
+              <span className="hint bin-used-count" title="clips already placed on the timeline">
+                · {usedInBin} on timeline
+              </span>
+            )}
           </span>
           <select
             className="bin-sort"
@@ -1242,6 +1292,14 @@ export default function MontagePage({ pid }: { pid: string }) {
             <button className={binView === 'details' ? 'active' : ''} title="list with details" onClick={() => setBinView('details')}>≣</button>
             <button className={binView === 'grid' ? 'active' : ''} title="large thumbnails" onClick={() => setBinView('grid')}>▦</button>
           </div>
+          <button
+            className={`bin-ai-toggle${showAiRanges ? ' active' : ''}`}
+            aria-pressed={showAiRanges}
+            onClick={() => setShowAiRanges((v) => !v)}
+            title="show/hide AI-suggested ranges (highlights) — drag them to the timeline like any range"
+          >
+            <IcSparkles /> AI
+          </button>
           <InfoTip>
             <b>Bin tips</b>
             <ul>
@@ -1285,18 +1343,51 @@ export default function MontagePage({ pid }: { pid: string }) {
           )}
         </div>
         <div className={`bin-list bin-view-${binView}`}>
-          {binVideos.map((v) => (
+          {binVideos.map((v) => {
+            const rangeItems = binRangeItems(v)
+            return (
             <div key={v.id} className="bin-entry" onContextMenu={openCtxMenu(v.id)}>
               <div
-                className="bin-item"
+                className={`bin-item${usedVideoIds.has(v.id) ? ' used' : ''}`}
                 draggable
                 onDoubleClick={() => setDetailId(v.id)}
                 onDragStart={startBinDrag({ video_id: v.id, t_in: 0, t_out: v.duration })}
                 onDragEnd={endBinDrag}
               >
                 <ScrubThumb pid={pid} videoId={v.id} duration={v.duration}>
+                  {usedVideoIds.has(v.id) && (
+                    <span
+                      className="bin-used"
+                      title="click to jump to this clip on the timeline"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        goToFirstClip(v.id)
+                      }}
+                      onDoubleClick={(e) => e.stopPropagation()}
+                    >
+                      ● on timeline
+                    </span>
+                  )}
                   {binView === 'grid' && <span className="bin-grid-dur">{fmtTime(v.duration)}</span>}
                 </ScrubThumb>
+                {binView === 'grid' && rangeItems.length > 0 && (
+                  <div className="bin-grid-ranges" title="drag a segment to the timeline">
+                    {rangeItems.map((it) => (
+                      <div
+                        key={it.key}
+                        className={`bin-grid-seg${it.ai ? ' ai' : ''}`}
+                        style={{
+                          left: `${(it.t_in / v.duration) * 100}%`,
+                          width: `${((it.t_out - it.t_in) / v.duration) * 100}%`,
+                        }}
+                        draggable
+                        onDragStart={startBinDrag({ video_id: v.id, t_in: it.t_in, t_out: it.t_out })}
+                        onDragEnd={endBinDrag}
+                        title={`${it.ai ? 'AI · ' : ''}${it.label || (it.ai ? 'suggestion' : 'range')} · ${fmtTime(it.t_in)}–${fmtTime(it.t_out)}`}
+                      />
+                    ))}
+                  </div>
+                )}
                 <div className="meta">
                   <div className="name" title={v.rel_path}>{v.filename}</div>
                   <div className="sub">
@@ -1320,19 +1411,21 @@ export default function MontagePage({ pid }: { pid: string }) {
                 </div>
               </div>
               {binView !== 'grid' &&
-                v.ranges.map((r) => (
+                rangeItems.map((it) => (
                   <div
-                    key={r.id}
-                    className="bin-range"
+                    key={it.key}
+                    className={`bin-range${it.ai ? ' ai' : ''}`}
                     draggable
-                    onDragStart={startBinDrag({ video_id: v.id, t_in: r.t_in, t_out: r.t_out })}
+                    onDragStart={startBinDrag({ video_id: v.id, t_in: it.t_in, t_out: it.t_out })}
                     onDragEnd={endBinDrag}
+                    title={`${it.ai ? 'AI suggestion · ' : ''}${fmtTime(it.t_in)}–${fmtTime(it.t_out)}`}
                   >
-                    ◳ {r.label || 'range'} {fmtTime(r.t_in)}–{fmtTime(r.t_out)}
+                    {it.ai ? '✦' : '◳'} {it.label || (it.ai ? 'AI suggestion' : 'range')} {fmtTime(it.t_in)}–{fmtTime(it.t_out)}
                   </div>
                 ))}
             </div>
-          ))}
+            )
+          })}
         </div>
         {binVideos.length === 0 && kept.length > 0 && (
           <div className="hint" style={{ textAlign: 'center', padding: 12 }}>

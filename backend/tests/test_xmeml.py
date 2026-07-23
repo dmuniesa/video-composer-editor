@@ -33,6 +33,23 @@ def build() -> str:
 
 
 @pytest.mark.skipif(
+    os.name != "nt",
+    reason="UNC path handling is Windows-specific — Path.resolve keeps the "
+    "\\\\host\\\\share authority only on Windows",
+)
+def test_unc_path_url_uses_authority_not_localhost():
+    # NAS media registered by its UNC path (\\host\share\...) must export with
+    # the host as the file:// authority, not under 'localhost' — otherwise
+    # Premiere treats the host as a local folder name and the media is missing.
+    from app.services import xmeml
+
+    unc = r"\\nas-server\Public\bioparc\DSCF9102.MOV"
+    assert xmeml._pathurl(unc) == "file://nas-server/Public/bioparc/DSCF9102.MOV"
+    # local drive paths keep their existing localhost/<drive> form
+    assert xmeml._pathurl(r"C:\media\beach.mp4").startswith("file://localhost/")
+
+
+@pytest.mark.skipif(
     os.name != "posix",
     reason="golden fixtures use POSIX paths; Path.resolve() rewrites them to "
     "drive paths (C:\\media\\...) elsewhere, so only the byte-for-byte compare "
@@ -142,6 +159,32 @@ def test_sequence_fps_override():
     assert first.findtext("end") == "200"  # 4s at 50fps
     # no speed filter on 1x clips
     assert first.find("filter") is None
+
+
+def test_mixed_fps_1x_clip_out_uses_clip_rate():
+    # Sequence runs faster than the source (50fps seq vs 25fps source). The clip's
+    # <out> must be computed in the CLIP's rate, not the sequence rate, otherwise
+    # the out point overshoots the media and the clip shows black in Premiere.
+    tracks = [
+        {
+            "name": "V1",
+            "clips": [
+                # 4s of a 5s source, placed at the timeline start
+                {"video_id": 1, "timeline_start": 0.0, "source_in": 0.0, "source_out": 4.0},
+            ],
+        }
+    ]
+    root = ET.fromstring(build_xmeml("t", VIDEOS, tracks, None, sequence_fps=50.0))
+    item = root.find("sequence/media/video/track/clipitem")
+    assert item.findtext("rate/timebase") == "25"   # clip keeps its source rate
+    assert item.findtext("start") == "0"
+    assert item.findtext("end") == "200"            # 4s at the 50fps sequence
+    assert item.findtext("in") == "0"
+    # out = in + slot(converted to clip rate) = 0 + round(200 * 25/50) = 100
+    # i.e. 4.0s of source — NOT 200 frames (8s), which would blow past the media.
+    assert item.findtext("out") == "100"
+    media_end = float(item.findtext("duration"))  # 12s * 25fps = 300 frames
+    assert float(item.findtext("out")) <= media_end
 
 
 def test_clip_speed_time_remap():

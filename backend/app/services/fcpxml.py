@@ -12,6 +12,7 @@ the xmeml exporter does."""
 from __future__ import annotations
 
 import math
+import urllib.parse
 import urllib.request
 from collections import Counter
 from pathlib import Path
@@ -33,12 +34,16 @@ def _frame_duration(fps: float) -> tuple[int, int]:
 
 
 def _src_url(path: str) -> str:
-    # pathname2url is platform-specific: on Windows a drive path yields
-    # '///C:/...' (three slashes), on POSIX '/path/...'. Normalise to a single
-    # leading slash so the URL is always the canonical file:///<path> form —
-    # otherwise the extra slashes make Windows drive paths import as UNC
-    # (\\C:\...) and the media can't be relinked.
-    url = urllib.request.pathname2url(str(Path(path).resolve()))
+    # Local drive paths -> the canonical file:///<drive>/... form (pathname2url
+    # plus a single leading slash on Windows). UNC network paths
+    # (\\host\share\...) need the RFC 8089 file://<host>/<share>/... authority
+    # form instead — 'file:///<host>' would make the host a path segment and the
+    # media can't be relinked.
+    s = str(Path(path).resolve())
+    if s.startswith("\\\\"):  # UNC: \\host\share\...
+        host, rest = s.lstrip("\\").split("\\", 1)
+        return "file://" + host + "/" + urllib.parse.quote(rest.replace("\\", "/"))
+    url = urllib.request.pathname2url(s)
     return "file:///" + url.lstrip("/")
 
 

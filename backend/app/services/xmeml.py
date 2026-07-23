@@ -31,12 +31,17 @@ def _rate_for(fps: float) -> tuple[int, str]:
 
 
 def _pathurl(path: str) -> str:
-    # pathname2url is platform-specific: on Windows a drive path yields
-    # '///C:/...' (three slashes), on POSIX '/path/...'. Normalise to a single
-    # leading slash so the URL is always file://localhost/<path> — otherwise the
-    # extra slashes make Windows drive paths import as UNC (\\C:\...) and
-    # Premiere shows the media as missing.
-    url = urllib.request.pathname2url(str(Path(path).resolve()))
+    # Local drive paths -> file://localhost/<drive>/... (the form pathname2url
+    # plus a single leading slash gives on Windows), which Premiere resolves as
+    # local media. UNC network paths (\\host\share\...) need the RFC 8089
+    # file://<host>/<share>/... authority form instead — wrapping a UNC path
+    # under 'localhost' makes Premiere treat the host as a local folder name and
+    # the media shows as missing.
+    s = str(Path(path).resolve())
+    if s.startswith("\\\\"):  # UNC: \\host\share\...
+        host, rest = s.lstrip("\\").split("\\", 1)
+        return "file://" + host + "/" + urllib.parse.quote(rest.replace("\\", "/"))
+    url = urllib.request.pathname2url(s)
     return "file://localhost/" + url.lstrip("/")
 
 
@@ -214,10 +219,13 @@ def build_xmeml(
             start_f = frames(clip["timeline_start"])
             end_f = frames(clip["timeline_start"] + clip_len(clip))
             in_f = int(round(clip["source_in"] * v_timebase))
-            if abs(speed - 1.0) < 1e-6:
-                out_f = in_f + (end_f - start_f)
-            else:
-                out_f = int(round(clip["source_out"] * v_timebase))
+            # <in>/<out> are source-media points and must be in the clip's own
+            # rate (v_timebase), never the sequence rate. Deriving <out> from the
+            # timeline slot mixes rates (mixed-fps clips then slip/show black),
+            # and when the slot rounds up it pushes <out> past the media end ->
+            # black. source_out is already validated <= media length, so use it
+            # directly for both 1x and retimed clips.
+            out_f = int(round(clip["source_out"] * v_timebase))
 
             name = Path(v["path"]).name
             vid_id = f"clipitem-{clip_counter}"

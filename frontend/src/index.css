@@ -591,6 +591,32 @@ kbd {
 .bin-item .meta .name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bin-item .meta .sub { font-size: 11px; color: var(--text-dim); }
 .bin-range { margin-left: 12px; font-size: 11px; color: var(--accent); cursor: grab; padding: 2px 6px; }
+.bin-range.ai { color: #a479e2; }
+.bin-range:hover { background: rgba(127,127,127,0.12); }
+
+/* grid view: a mini timeline of the clip's ranges under the thumbnail.
+   Each segment is a draggable sub-clip (user range, or AI highlight when the
+   AI toggle is on). Positioned by % of the clip's duration. */
+.bin-grid-ranges {
+  position: relative; height: 10px; flex-shrink: 0;
+  background: rgba(127,127,127,0.18); border-radius: 3px; overflow: hidden;
+}
+.bin-grid-seg {
+  position: absolute; top: 0; bottom: 0; min-width: 4px;
+  background: var(--accent); border-radius: 2px; cursor: grab;
+}
+.bin-grid-seg.ai { background: #a479e2; }
+.bin-grid-seg:hover { filter: brightness(1.2); }
+
+/* AI-ranges toggle in the bin header — same visual weight as the view toggles */
+.bin-ai-toggle {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; font-size: 11px; line-height: 1.2;
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text-dim); cursor: pointer;
+}
+.bin-ai-toggle:hover { color: var(--text); }
+.bin-ai-toggle.active { color: #a479e2; border-color: #a479e2; }
 
 /* grid view: a big thumbnail card, name underneath */
 .bin-view-grid .bin-item { flex-direction: column; align-items: stretch; gap: 6px; padding: 4px; }
@@ -600,6 +626,18 @@ kbd {
   position: absolute; right: 3px; bottom: 3px; font-size: 9px; padding: 0 4px;
   border-radius: 3px; background: rgba(0,0,0,0.7);
 }
+/* a clip already placed on the timeline: a subtle green border + a corner
+   badge on its thumbnail, so the still-available clips stand out. */
+.bin-item.used { border-color: rgba(79, 191, 103, 0.55); }
+.bin-used {
+  position: absolute; left: 3px; top: 3px; z-index: 1;
+  font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing:0.2px;
+  padding: 1px 5px; border-radius: 999px;
+  background: rgba(79, 191, 103, 0.92); color: #0a1a10;
+  cursor: pointer;
+}
+.bin-used:hover { background: #4fbf67; }
+.bin-used-count { color: var(--ok); margin-left: 4px; }
 
 .bin-view-toggle { display: inline-flex; gap: 2px; }
 .bin-view-toggle button {

@@ -45,7 +45,13 @@ _BASE_FIELDS = [
 ]
 _BASE_RULES = [
     "3 to 8 hashtags, single words, lowercase, no # symbol.",
-    "Judge stability, light, composition and subject interest for the score.",
+    '"score": Rate how usable this clip is for a family music montage on a scale of 1-10 based on this strict rubric:\n'
+    '    * 1-3: Unusable (extremely shaky, blurry, completely dark, or subject is blocked).\n'
+    '    * 4-6: Mediocre/Filler (okay composition, normal walking/talking, slightly unstable).\n'
+    '    * 7-8: Great (stable camera, good lighting, clear action, beautiful scenery, or clear faces).\n'
+    '    * 9-10: Perfect (cinematic, strong positive emotions/smiles from the identified people, perfect composition).\n'
+    '    * CRITICAL PENALTY: If the total clip duration is less than 3.0 seconds, the maximum score allowed is 4, regardless of how good it looks.\n'
+    '    * USABILITY PENALTY: To score above a 6, the clip MUST have at least one stable, usable continuous segment (highlight) that lasts 1 second or more.',
 ]
 
 # Optional analysis aspects, each toggleable in Settings (AnalysisSettings).
